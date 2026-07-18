@@ -1,13 +1,18 @@
 from story_generator.vocabulary.models import VocabularyItem
 
 
-def parse_vocab(raw):
-    vocab = raw["Vocabs"][0]
+def parse_vocab(response: dict) -> VocabularyItem:
+    vocab = response["Vocabs"][0]
+
+    definition = (
+        vocab.get("customDefinition")
+        or vocab.get("definitions", {}).get("en", "")
+    )
 
     return VocabularyItem(
         skritter_vocab_id=vocab["id"],
-        language=vocab["language"],
+        language=vocab["lang"],
         writing=vocab["writing"],
         reading=vocab["reading"],
-        definition_en=vocab["definitions"]["en"],
+        definition_en=definition,
     )
