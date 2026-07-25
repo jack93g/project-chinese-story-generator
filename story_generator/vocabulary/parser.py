@@ -11,7 +11,7 @@ def parse_vocab(response: dict) -> VocabularyItem:
 
     return VocabularyItem(
         skritter_vocab_id=vocab["id"],
-        language=vocab["lang"],
+        language=vocab.get("language") or vocab["lang"],
         writing=vocab["writing"],
         reading=vocab["reading"],
         definition_en=definition,
