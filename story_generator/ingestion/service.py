@@ -10,11 +10,19 @@ class SyncPartialFailureError(Exception):
 
 
 class IngestionService:
-    def __init__(self, client, repository, session, tracking_repository):
+    def __init__(
+        self,
+        client,
+        vocabulary_repository,
+        vocabulary_session,
+        sync_run_repository,
+        tracking_session,
+    ):
         self.client = client
-        self.repository = repository
-        self.session = session
-        self.tracking_repository = tracking_repository
+        self.vocabulary_repository = vocabulary_repository
+        self.vocabulary_session = vocabulary_session
+        self.sync_run_repository = sync_run_repository
+        self.tracking_session = tracking_session
 
 
     def import_list(self, list_id: str) -> dict:
@@ -22,7 +30,7 @@ class IngestionService:
         imported = 0
         skipped = 0
         try:
-            list_db_id = self.repository.ensure_list(
+            list_db_id = self.vocabulary_repository.ensure_list(
                 list_data["id"],
                 list_data["name"],
             )
@@ -33,8 +41,8 @@ class IngestionService:
                     print(f"  Progress: {i}/{total}")
                 vocab_response = self.client.get_vocabs(vocab_id)
                 vocab = parse_vocab(vocab_response)
-                vocab_db_id, inserted = self.repository.ensure_vocab(vocab)
-                self.repository.link_vocab_to_list(
+                vocab_db_id, inserted = self.vocabulary_repository.ensure_vocab(vocab)
+                self.vocabulary_repository.link_vocab_to_list(
                     list_db_id,
                     vocab_db_id,
                 )
@@ -42,9 +50,9 @@ class IngestionService:
                     imported += 1
                 else:
                     skipped += 1
-            self.session.commit()
+            self.vocabulary_session.commit()
         except Exception:
-            self.session.rollback()
+            self.vocabulary_session.rollback()
             raise
         print(f"Finished '{list_data['name']}'.")
         return {
@@ -100,7 +108,8 @@ class IngestionService:
         return self._with_sync_tracking(lambda: self.import_list(list_id))
 
     def _with_sync_tracking(self, fn) -> dict:
-        sync_run = self.tracking_repository.create_sync_run()
+        sync_run = self.sync_run_repository.create_sync_run()
+        self.tracking_session.commit()
         self.client.on_response = self._make_payload_recorder(sync_run.id)
         result = None
         try:
@@ -108,23 +117,26 @@ class IngestionService:
             if result.get("failures"):
                 raise SyncPartialFailureError(result["failures"])
         except Exception as exc:
-            self.tracking_repository.fail_sync_run(
+            self.sync_run_repository.fail_sync_run(
                 sync_run.id,
                 self._safe_error_message(exc),
                 summary=result,  # None for a hard crash, populated for partial failure
             )
+            self.tracking_session.commit()
             raise
         else:
-            self.tracking_repository.complete_sync_run(sync_run.id, result)
+            self.sync_run_repository.complete_sync_run(sync_run.id, result)
+            self.tracking_session.commit()
             return result
         finally:
             self.client.on_response = None
 
     def _make_payload_recorder(self, sync_run_id: int):
         def record(request_path, request_params, response_status, payload):
-            self.tracking_repository.add_raw_payload(
+            self.sync_run_repository.add_raw_payload(
                 sync_run_id, request_path, request_params, response_status, payload
             )
+            self.tracking_session.commit()
         return record
 
     def _safe_error_message(self, exc: Exception) -> str:

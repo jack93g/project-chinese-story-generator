@@ -1,6 +1,6 @@
 import pytest
 
-from story_generator.database.models import (
+from story_generator.ingestion.persistence.models import (
     SyncRun,
     RawSkritterPayload,
 )

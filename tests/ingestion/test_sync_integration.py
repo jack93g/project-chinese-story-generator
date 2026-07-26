@@ -2,15 +2,18 @@ import httpx
 import pytest
 import respx
 
-from story_generator.database.models import (
+from story_generator.ingestion.persistence.models import (
     SyncRun,
     RawSkritterPayload,
+)
+from story_generator.vocabulary.persistence.models import (
     VocabularyItem,
     VocabularyList,
 )
-from story_generator.database.repository import Repository
+from story_generator.ingestion.persistence.repository import SyncRunRepository
 from story_generator.ingestion.service import IngestionService
 from story_generator.ingestion.skritter_client import SkritterClient
+from story_generator.vocabulary.persistence.repository import VocabularyRepository
 
 
 LIST_URL = "https://legacy.skritter.com/api/v0/vocablists/123"
@@ -60,9 +63,11 @@ def test_successful_sync_creates_succeeded_run_with_payloads(two_sessions):
     _mock_vocab("zh-你好-0", "你好", "ni3 hao3", "hello")
 
     client = SkritterClient("fake-token")
-    repository = Repository(session)
-    tracking_repository = Repository(tracking_session)
-    service = IngestionService(client, repository, session, tracking_repository)
+    vocabulary_repository = VocabularyRepository(session)
+    sync_run_repository = SyncRunRepository(tracking_session)
+    service = IngestionService(
+        client, vocabulary_repository, session, sync_run_repository, tracking_session
+    )
 
     result = service.run_single_list("123")
     assert result["vocab_imported"] == 1
@@ -100,9 +105,11 @@ def test_failed_sync_marks_run_failed_and_rolls_back_vocab(two_sessions):
     )
 
     client = SkritterClient("fake-token")
-    repository = Repository(session)
-    tracking_repository = Repository(tracking_session)
-    service = IngestionService(client, repository, session, tracking_repository)
+    vocabulary_repository = VocabularyRepository(session)
+    sync_run_repository = SyncRunRepository(tracking_session)
+    service = IngestionService(
+        client, vocabulary_repository, session, sync_run_repository, tracking_session
+    )
 
     with pytest.raises(httpx.HTTPStatusError):
         service.run_single_list("123")
@@ -142,9 +149,11 @@ def test_reimporting_same_list_is_idempotent_and_creates_second_sync_run(two_ses
     _mock_vocab("zh-你好-0", "你好", "ni3 hao3", "hello")
 
     client = SkritterClient("fake-token")
-    repository = Repository(session)
-    tracking_repository = Repository(tracking_session)
-    service = IngestionService(client, repository, session, tracking_repository)
+    vocabulary_repository = VocabularyRepository(session)
+    sync_run_repository = SyncRunRepository(tracking_session)
+    service = IngestionService(
+        client, vocabulary_repository, session, sync_run_repository, tracking_session
+    )
 
     first = service.run_single_list("123")
     second = service.run_single_list("123")

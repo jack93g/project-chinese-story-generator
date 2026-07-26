@@ -43,7 +43,7 @@ def test_import_list():
     repository.ensure_list.return_value = 1
     repository.ensure_vocab.side_effect = [(10, True), (11, True)]
 
-    service = IngestionService(client, repository, session, Mock())
+    service = IngestionService(client, repository, session, Mock(), Mock())
     result = service.import_list("123")
 
     assert result == {
@@ -78,7 +78,7 @@ def test_import_list_counts_skipped_vocab():
     # first vocab is new, second already existed (conflict -> not inserted)
     repository.ensure_vocab.side_effect = [(10, True), (11, False)]
 
-    service = IngestionService(client, repository, session, Mock())
+    service = IngestionService(client, repository, session, Mock(), Mock())
     result = service.import_list("123")
 
     assert result == {
@@ -102,7 +102,7 @@ def test_import_list_rolls_back_on_failure():
     }
     client.get_vocabs.side_effect = RuntimeError("Skritter API failed")
 
-    service = IngestionService(client, repository, session, Mock())
+    service = IngestionService(client, repository, session, Mock(), Mock())
 
     try:
         service.import_list("123")
@@ -124,10 +124,13 @@ def _make_service_with_import_list(import_list_return):
     repository = Mock()
     session = Mock()
     tracking_repository = Mock()
+    tracking_session = Mock()
 
-    service = IngestionService(client, repository, session, tracking_repository)
+    service = IngestionService(
+        client, repository, session, tracking_repository, tracking_session
+    )
     service.import_list = Mock(side_effect=import_list_return)
-    return service, client, tracking_repository
+    return service, client, tracking_repository, tracking_session
 
 
 def test_run_single_list_marks_sync_run_succeeded():
@@ -139,7 +142,7 @@ def test_run_single_list_marks_sync_run_succeeded():
         "vocab_skipped": 0,
         "failures": [],
     }
-    service, client, tracking_repository = _make_service_with_import_list(
+    service, client, tracking_repository, tracking_session = _make_service_with_import_list(
         [success_result]
     )
     tracking_repository.create_sync_run.return_value = sync_run
@@ -150,13 +153,14 @@ def test_run_single_list_marks_sync_run_succeeded():
     tracking_repository.create_sync_run.assert_called_once()
     tracking_repository.complete_sync_run.assert_called_once_with(42, success_result)
     tracking_repository.fail_sync_run.assert_not_called()
+    assert tracking_session.commit.call_count == 2
     # on_response should be wired during the run and cleared afterward
     assert client.on_response is None
 
 
 def test_run_single_list_marks_sync_run_failed_on_exception():
     sync_run = Mock(id=42)
-    service, client, tracking_repository = _make_service_with_import_list(
+    service, client, tracking_repository, tracking_session = _make_service_with_import_list(
         RuntimeError("boom")
     )
     tracking_repository.create_sync_run.return_value = sync_run
@@ -174,6 +178,7 @@ def test_run_single_list_marks_sync_run_failed_on_exception():
     assert "RuntimeError" in call_args.args[1]
     assert "boom" in call_args.args[1]
     assert call_args.kwargs.get("summary") is None
+    assert tracking_session.commit.call_count == 2
     assert client.on_response is None
 
 
@@ -183,6 +188,7 @@ def test_run_all_lists_marks_sync_run_failed_on_partial_failure():
     repository = Mock()
     session = Mock()
     tracking_repository = Mock()
+    tracking_session = Mock()
     tracking_repository.create_sync_run.return_value = sync_run
 
     partial_result = {
@@ -193,7 +199,9 @@ def test_run_all_lists_marks_sync_run_failed_on_partial_failure():
         "failures": [{"id": "456", "name": "Broken List", "error": "boom"}],
     }
 
-    service = IngestionService(client, repository, session, tracking_repository)
+    service = IngestionService(
+        client, repository, session, tracking_repository, tracking_session
+    )
     service.import_all_lists = Mock(return_value=partial_result)
 
     try:
@@ -209,6 +217,7 @@ def test_run_all_lists_marks_sync_run_failed_on_partial_failure():
     assert "Broken List" in call_args.args[1]
     # summary is preserved even though the run is marked failed
     assert call_args.kwargs.get("summary") == partial_result
+    assert tracking_session.commit.call_count == 2
 
 
 def test_run_single_list_wires_raw_payload_recording():
@@ -217,9 +226,12 @@ def test_run_single_list_wires_raw_payload_recording():
     repository = Mock()
     session = Mock()
     tracking_repository = Mock()
+    tracking_session = Mock()
     tracking_repository.create_sync_run.return_value = sync_run
 
-    service = IngestionService(client, repository, session, tracking_repository)
+    service = IngestionService(
+        client, repository, session, tracking_repository, tracking_session
+    )
 
     captured_recorder = {}
 
@@ -244,3 +256,4 @@ def test_run_single_list_wires_raw_payload_recording():
     tracking_repository.add_raw_payload.assert_called_once_with(
         7, "/vocabs", {"ids": "x"}, 200, {"Vocabs": []}
     )
+    assert tracking_session.commit.call_count == 3
