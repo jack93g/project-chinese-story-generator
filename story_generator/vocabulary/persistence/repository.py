@@ -1,6 +1,8 @@
+from __future__ import annotations
 from sqlalchemy import func
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.orm import Session
+
 
 from story_generator.vocabulary.persistence.models import (
     VocabularyItem,
@@ -76,3 +78,20 @@ class VocabularyRepository:
             .on_conflict_do_nothing(index_elements=["list_id", "vocabulary_id"])
         )
         self.session.execute(stmt)
+
+    def list_lists(self, limit: int, offset: int) -> list[tuple[VocabularyList, int]]:
+        return (
+            self.session.query(VocabularyList, func.count(list_vocabulary.c.vocabulary_id))
+            .outerjoin(list_vocabulary, list_vocabulary.c.list_id == VocabularyList.id)
+            .group_by(VocabularyList.id)
+            .order_by(VocabularyList.id.asc())
+            .limit(limit)
+            .offset(offset)
+            .all()
+        )
+
+    def count_lists(self) -> int:
+        return self.session.query(VocabularyList).count()
+
+    def get_list_by_id(self, list_id: int) -> VocabularyList | None:
+        return self.session.get(VocabularyList, list_id)
