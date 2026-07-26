@@ -15,15 +15,9 @@ from dotenv import load_dotenv
 load_dotenv()
 
 from story_generator.database.base import Base
-from story_generator.database.models import (
-    VocabularyList,
-    VocabularyItem,
-    list_vocabulary,
-    SyncRun,
-    RawSkritterPayload,
-    Story,
-    story_vocabulary_items,
-)  # noqa
+import story_generator.ingestion.persistence.models  # noqa: F401
+import story_generator.stories.persistence.models  # noqa: F401
+import story_generator.vocabulary.persistence.models  # noqa: F401
 
 # this is the Alembic Config object, which provides
 # access to the values within the .ini file in use.

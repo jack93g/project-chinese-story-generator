@@ -1,7 +1,7 @@
-from story_generator.vocabulary.models import VocabularyItem
+from story_generator.vocabulary.types import SkritterVocabularyRecord
 
 
-def parse_vocab(response: dict) -> VocabularyItem:
+def parse_vocab(response: dict) -> SkritterVocabularyRecord:
     vocab = response["Vocabs"][0]
 
     definition = (
@@ -9,7 +9,7 @@ def parse_vocab(response: dict) -> VocabularyItem:
         or vocab.get("definitions", {}).get("en", "")
     )
 
-    return VocabularyItem(
+    return SkritterVocabularyRecord(
         skritter_vocab_id=vocab["id"],
         language=vocab.get("language") or vocab["lang"],
         writing=vocab["writing"],

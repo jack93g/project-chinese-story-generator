@@ -7,6 +7,10 @@ from dotenv import load_dotenv
 from sqlalchemy import create_engine, event
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy import text
+from fastapi.testclient import TestClient
+
+from story_generator.api.app import create_app
+from story_generator.api.dependencies import get_db
 
 load_dotenv()
 
@@ -112,3 +116,17 @@ def two_sessions(engine):
             "TRUNCATE TABLE raw_skritter_payloads, sync_runs, "
             "list_vocabulary, vocabulary_items, vocabulary_lists RESTART IDENTITY CASCADE"
         ))
+
+@pytest.fixture
+def client(db_session):
+    """
+    FastAPI test client backed by the transactional test database.
+    """
+    app = create_app()
+
+    app.dependency_overrides[get_db] = lambda: db_session
+
+    with TestClient(app) as client:
+        yield client
+
+    app.dependency_overrides.clear()

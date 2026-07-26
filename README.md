@@ -29,11 +29,15 @@ The modules have deliberately separate responsibilities:
   call a service, and return JSON; they should stay thin.
 - **`story_generator/ingestion`** contains the Skritter client and the
   vocabulary-import workflow.
-- **`story_generator/database`** contains SQLAlchemy models, sessions, and
-  repositories for reading and writing PostgreSQL data.
+- **`story_generator/database`** contains shared SQLAlchemy setup: the
+  declarative base, database engine, and session factory.
+- **`story_generator/vocabulary/persistence`** contains vocabulary ORM mappings
+  and PostgreSQL persistence operations.
+- **`story_generator/ingestion/persistence`** contains sync-run audit mappings
+  and persistence operations.
 - **`story_generator/vocabulary`** contains vocabulary-specific parsing and
   domain data structures.
-- **`scripts/run_ingestion.py`** is the manual command-line entry point for a
+- **`story_generator/cli/ingestion.py`** is the manual command-line entry point for a
   vocabulary sync.
 
 ### Client, repository, and service
@@ -106,8 +110,8 @@ Apply migrations first, then import either one list or every list available to
 the configured Skritter account:
 
 ```bash
-.venv/bin/python scripts/run_ingestion.py --list-id YOUR_LIST_ID
-.venv/bin/python scripts/run_ingestion.py --all
+.venv/bin/python -m story_generator.cli.ingestion --list-id YOUR_LIST_ID
+.venv/bin/python -m story_generator.cli.ingestion --all
 ```
 
 The importer is designed to be idempotent: importing the same vocabulary and

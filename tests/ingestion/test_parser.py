@@ -1,5 +1,5 @@
 from story_generator.vocabulary.parser import parse_vocab
-from story_generator.vocabulary.models import VocabularyItem
+from story_generator.vocabulary.types import SkritterVocabularyRecord
 
 
 def test_parse_vocab():
@@ -19,7 +19,7 @@ def test_parse_vocab():
 
     result = parse_vocab(raw)
 
-    assert result == VocabularyItem(
+    assert result == SkritterVocabularyRecord(
         skritter_vocab_id="zh-刻板印象-0",
         language="zh",
         writing="刻板印象",
