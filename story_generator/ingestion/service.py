@@ -1,4 +1,6 @@
 from story_generator.vocabulary.parser import parse_vocab
+from story_generator.ingestion.persistence.repository import SyncRunRepository
+from story_generator.ingestion.schemas import SyncRunResponse, SyncStatusResponse
 
 class SyncPartialFailureError(Exception):
     """Raised when a batch sync completes but one or more lists failed."""
@@ -145,3 +147,26 @@ class IngestionService:
         # details. Truncated defensively for storage.
         message = f"{type(exc).__name__}: {exc}"
         return message[:2000]
+
+
+class SyncStatusService:
+    def __init__(self, repository: SyncRunRepository):
+        self.repository = repository
+
+    def get_latest(self) -> SyncStatusResponse:
+        sync_run = self.repository.get_latest()
+
+        if sync_run is None:
+            return SyncStatusResponse(latest_run=None)
+
+        return SyncStatusResponse(
+            latest_run=SyncRunResponse(
+                id=sync_run.id,
+                source=sync_run.source,
+                status=sync_run.status,
+                started_at=sync_run.started_at,
+                completed_at=sync_run.completed_at,
+                error_message=sync_run.error_message,
+                summary=sync_run.summary,
+            )
+        )
