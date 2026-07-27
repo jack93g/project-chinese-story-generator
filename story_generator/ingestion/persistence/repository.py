@@ -54,3 +54,11 @@ class SyncRunRepository:
         sync_run.error_message = error_message
         if summary is not None:
             sync_run.summary = summary
+
+    def get_latest(self) -> SyncRun | None:
+        return (
+            self.session.query(SyncRun)
+            .order_by(SyncRun.id.desc())
+            .limit(1)
+            .one_or_none()
+        )
