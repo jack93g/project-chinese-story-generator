@@ -49,7 +49,7 @@
 ### Definition of done
 
 - SQLAlchemy models and Alembic migrations represent the operational schema.
-- FastAPI exposes REST endpoints for vocabulary, vocabulary lists, stories, and sync status.
+- FastAPI exposes REST endpoints for vocabulary, vocabulary lists, saved stories, and sync status. Story creation is owned by Milestone 3.
 - Route handlers remain thin; business logic stays within service and domain modules.
 - API and database behaviour are covered by automated tests.
 
@@ -65,15 +65,24 @@
 
 ## 3. Story generation
 
-**Goal:** Generate and persist useful stories constrained by learner vocabulary.
+**Goal:** Generate and persist useful stories through a durable, backend-owned asynchronous workflow.
+
+### Product and technical decisions
+
+- A generation is requested with a vocabulary-list ID, target HSK level, and optional controls such as topic and target length. The server selects a bounded set of vocabulary from that list; the client never supplies the prompt or arbitrary vocabulary IDs.
+- `POST /story-generations` creates a durable request and returns `202 Accepted` with its ID and `queued` status. A backend worker processes queued requests. `GET /story-generations/{id}` exposes lifecycle state; `GET /stories/{id}` returns a completed story. This is also the frontend contract for Milestone 5.
+- A story has a stable, provider-independent shape: Chinese title and body, requested/used target vocabulary, validation results, and generation provenance. The complete provider response is retained separately for debugging; it is not the public API contract.
+- Start with OpenAI behind a provider-neutral interface. Add Ollama-compatible Chinese-model providers only after the evaluation harness is in place, so models are compared against the same prompts and checks rather than selected by anecdote.
+- Generation is accepted when every selected target word is present and the generated text passes structural checks. HSK level is a target, not a guarantee: automated checks should flag unsupported vocabulary for review rather than claim formal HSK certification.
 
 ### Definition of done
 
-- A provider-neutral LLM interface has an OpenAI implementation.
-- Story generation selects appropriate learner vocabulary.
-- Generation records the inputs, model configuration, and metadata needed for debugging and reproducibility.
-- Stories and their vocabulary relationships persist in PostgreSQL.
-- Tests cover prompt construction, provider boundaries, persistence, and generation without requiring live model calls.
+- A provider-neutral LLM interface has an OpenAI implementation and a documented provider test double.
+- A durable generation request lifecycle (`queued`, `running`, `succeeded`, `failed`) is persisted and exposed through the API.
+- A worker selects a bounded, deterministic vocabulary sample from the requested list, builds a versioned prompt, invokes the configured provider, validates the structured result, and persists a completed story.
+- Generation records request inputs, selected vocabulary, prompt version, provider/model settings, token/latency metadata, validation outcome, and a redacted/raw provider response retention policy needed for debugging and reproducibility.
+- Stories persist their requested and actually used vocabulary relationships. Failed requests retain a safe diagnostic message and remain retryable.
+- Tests cover request validation, vocabulary selection, prompt construction, provider boundaries, lifecycle transitions, persistence, and generation without live model calls.
 
 ### Learning outcomes
 
@@ -87,15 +96,17 @@
 
 ## 4. Reader enrichment
 
-**Goal:** Prepare generated stories for an effective reading experience.
+**Goal:** Turn a completed story into a stable reader document that the frontend can render without per-token work.
 
 ### Definition of done
 
-- Stories are tokenised after generation.
-- Vocabulary occurrences are matched against the learner's vocabulary.
-- Unknown words are identified.
-- Pinyin and English definitions are attached to each token.
-- Reader metadata is persisted for efficient frontend rendering.
+- A successful story-generation event triggers an idempotent enrichment job; it records `pending`, `running`, `succeeded`, or `failed` status separately from generation.
+- Chinese text is segmented into ordered tokens and punctuation using a selected, documented tokenizer.
+- Vocabulary occurrences are matched using deterministic longest-match rules against the selected list and all known vocabulary; unmatched lexical tokens are marked as unknown candidates.
+- Pinyin and English definitions are attached from the vocabulary database when available; a documented fallback/enrichment source is used only for missing data and its provenance is stored.
+- A versioned reader-document payload is persisted for efficient frontend rendering, including stable token IDs, character offsets, sentence boundaries, vocabulary links, and known/unknown status.
+- `GET /stories/{id}/reader` returns the persisted reader document, with clear `409`/`422` behaviour while enrichment is incomplete or failed.
+- Tests cover segmentation edge cases, repeated and overlapping vocabulary, Unicode offsets, idempotent reprocessing, and API serialization.
 
 ### Learning outcomes
 

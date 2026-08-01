@@ -1,15 +1,19 @@
 import argparse
+import logging
 import sys
 
 from story_generator.config import get_skritter_access_token
-from story_generator.database.session import SessionLocal
+from story_generator.database.session import get_session_factory
 from story_generator.ingestion.persistence.repository import SyncRunRepository
 from story_generator.ingestion.service import IngestionService, SyncPartialFailureError
 from story_generator.ingestion.skritter_client import SkritterClient
 from story_generator.vocabulary.persistence.repository import VocabularyRepository
 
+logger = logging.getLogger(__name__)
+
 
 def main() -> None:
+    logging.basicConfig(level=logging.INFO, format="%(levelname)s %(name)s: %(message)s")
     parser = argparse.ArgumentParser(
         description="Import vocabulary from Skritter into the database."
     )
@@ -18,8 +22,9 @@ def main() -> None:
     group.add_argument("--all", action="store_true", help="Import all Skritter lists.")
     args = parser.parse_args()
 
-    vocabulary_session = SessionLocal()
-    tracking_session = SessionLocal()
+    session_factory = get_session_factory()
+    vocabulary_session = session_factory()
+    tracking_session = session_factory()
     try:
         service = IngestionService(
             SkritterClient(get_skritter_access_token()),
@@ -33,7 +38,7 @@ def main() -> None:
         else:
             service.run_all_lists()
     except SyncPartialFailureError as exc:
-        print(f"Sync completed with failures: {exc}")
+        logger.error("Sync completed with failures: %s", exc)
         sys.exit(1)
     finally:
         vocabulary_session.close()

@@ -1,6 +1,8 @@
 import httpx
+import pytest
 import respx
 
+from story_generator.ingestion.schemas import SkritterResponseError
 from story_generator.ingestion.skritter_client import SkritterClient
 
 
@@ -56,6 +58,7 @@ def test_get_vocab_returns_json():
         "Vocabs": [
             {
                 "id": "zh-刻板印象-0",
+                "language": "zh",
                 "writing": "刻板印象",
                 "reading": "ke4ban3yin4xiang4",
                 "definitions": {
@@ -76,9 +79,32 @@ def test_get_vocab_returns_json():
         )
     )
 
-    result = client.get_vocabs("zh-刻板印象-0")
+    result = client.get_vocab("zh-刻板印象-0")
 
     assert result == expected
+
+
+@respx.mock
+def test_get_vocab_reports_missing_required_fields():
+    client = SkritterClient("my_token")
+    respx.get(
+        "https://legacy.skritter.com/api/v0/vocabs",
+        params={"ids": "zh-刻板印象-0"},
+    ).mock(return_value=httpx.Response(200, json={"Vocabs": [{"id": "zh-刻板印象-0"}]}))
+
+    with pytest.raises(SkritterResponseError, match="writing: Field required"):
+        client.get_vocab("zh-刻板印象-0")
+
+
+@respx.mock
+def test_get_list_reports_malformed_response():
+    client = SkritterClient("my_token")
+    respx.get("https://legacy.skritter.com/api/v0/vocablists/123").mock(
+        return_value=httpx.Response(200, json={"VocabList": {"id": "123"}})
+    )
+
+    with pytest.raises(SkritterResponseError, match="name: Field required"):
+        client.get_list("123")
 
 @respx.mock
 def test_get_list_notifies_on_response():

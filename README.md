@@ -56,8 +56,11 @@ This project uses Python 3.12 and PostgreSQL.
 
 ```bash
 python3.12 -m venv .venv
-.venv/bin/python -m pip install -r requirements.txt -e .
+.venv/bin/python -m pip install -e ".[dev]"
 ```
+
+Runtime dependencies and the `dev` test extra are defined in
+`pyproject.toml`.
 
 Create a `.env` file in the project root. Do not commit it.
 

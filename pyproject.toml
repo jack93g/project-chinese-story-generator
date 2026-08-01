@@ -10,10 +10,18 @@ requires-python = ">=3.12"
 dependencies = [
     "alembic>=1.14,<2",
     "fastapi>=0.115,<1",
+    "httpx>=0.28,<1",
+    "pydantic>=2.0,<3",
     "psycopg[binary]>=3.3,<4",
     "python-dotenv>=1.1,<2",
     "SQLAlchemy>=2.0,<3",
     "uvicorn[standard]>=0.34,<1",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=9.1,<10",
+    "respx>=0.22,<1",
 ]
 
 [project.scripts]
@@ -21,4 +29,3 @@ sync-skritter = "story_generator.cli.ingestion:main"
 
 [tool.setuptools.packages.find]
 include = ["story_generator*"]
-
