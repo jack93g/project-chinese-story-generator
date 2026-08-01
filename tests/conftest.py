@@ -39,8 +39,7 @@ def _get_test_database_url() -> str:
             "Refusing to run tests against a database without 'test' in its name."
         )
 
-    # Redirect DATABASE_URL so application code importing SessionLocal
-    # also connects to the test database.
+    # Direct database access during integration tests uses this URL.
     os.environ["DATABASE_URL"] = test_url
 
     return test_url

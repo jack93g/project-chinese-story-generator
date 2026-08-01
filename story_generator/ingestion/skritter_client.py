@@ -1,5 +1,13 @@
 import httpx
 
+from story_generator.ingestion.schemas import (
+    SkritterResponseError,
+    SkritterVocabularyListResponse,
+    SkritterVocabularyListsResponse,
+    SkritterVocabularyResponse,
+    validate_skritter_response,
+)
+
 
 class SkritterClient:
     BASE_URL = "https://legacy.skritter.com/api/v0"
@@ -27,6 +35,15 @@ class SkritterClient:
                 body = {"_raw_text": response.text}
             self.on_response(request_path, request_params, response.status_code, body)
 
+    @staticmethod
+    def _json(response: httpx.Response, endpoint: str) -> object:
+        try:
+            return response.json()
+        except ValueError as exc:
+            raise SkritterResponseError(
+                f"Malformed Skritter response from {endpoint}: invalid JSON body"
+            ) from exc
+
     def get_list(self, list_id: str):
         url = f"{self.BASE_URL}/vocablists/{list_id}"
         request_path = f"/vocablists/{list_id}"
@@ -35,29 +52,27 @@ class SkritterClient:
         self._notify(request_path, {}, response)
         response.raise_for_status()
 
-        data = response.json()
-
-        vocab_list = data["VocabList"]
-
-        vocab_ids = []
-
-        for section in vocab_list["sections"]:
-            for row in section["rows"]:
-                vocab_ids.append(row["vocabId"])
+        parsed = validate_skritter_response(
+            SkritterVocabularyListResponse, self._json(response, request_path), request_path
+        )
+        vocab_list = parsed.vocab_list
+        vocab_ids = [row.vocabId for section in vocab_list.sections for row in section.rows]
 
         return {
-            "id": vocab_list["id"],
-            "name": vocab_list["name"],
+            "id": vocab_list.id,
+            "name": vocab_list.name,
             "vocab_ids": vocab_ids,
         }
 
-    def get_vocabs(self, vocab_id: str):
+    def get_vocab(self, vocab_id: str) -> dict:
         params = {"ids": vocab_id}
         response = self.client.get(f"{self.BASE_URL}/vocabs", params=params)
         self._notify("/vocabs", params, response)
         response.raise_for_status()
 
-        return response.json()
+        data = self._json(response, "/vocabs")
+        validate_skritter_response(SkritterVocabularyResponse, data, "/vocabs")
+        return data
 
     def get_lists(self):
         all_lists = []
@@ -79,19 +94,21 @@ class SkritterClient:
             self._notify("/vocablists", params, response)
             response.raise_for_status()
 
-            data = response.json()
-
-            all_lists.extend(data["VocabLists"])
-
-            cursor = data.get("cursor")
+            parsed = validate_skritter_response(
+                SkritterVocabularyListsResponse,
+                self._json(response, "/vocablists"),
+                "/vocablists",
+            )
+            all_lists.extend(parsed.vocab_lists)
+            cursor = parsed.cursor
 
             if not cursor:
                 break
 
         return [
             {
-                "id": vocab_list["id"],
-                "name": vocab_list["name"],
+                "id": vocab_list.id,
+                "name": vocab_list.name,
             }
             for vocab_list in all_lists
         ]

@@ -13,7 +13,7 @@ class VocabularyService:
         self.repository = repository
 
     def list(self, limit: int, offset: int) -> PaginatedVocabularyResponse:
-        vocabulary = self.repository.list(limit=limit, offset=offset)
+        vocabulary = self.repository.list_page(limit=limit, offset=offset)
         total = self.repository.count()
 
         items = [

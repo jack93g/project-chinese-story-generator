@@ -1,6 +1,11 @@
+import logging
+
 from story_generator.vocabulary.parser import parse_vocab
 from story_generator.ingestion.persistence.repository import SyncRunRepository
 from story_generator.ingestion.schemas import SyncRunResponse, SyncStatusResponse
+
+logger = logging.getLogger(__name__)
+
 
 class SyncPartialFailureError(Exception):
     """Raised when a batch sync completes but one or more lists failed."""
@@ -37,11 +42,11 @@ class IngestionService:
                 list_data["name"],
             )
             total = len(list_data["vocab_ids"])
-            print(f"Importing list '{list_data['name']}' ({total} vocabulary items)...")
+            logger.info("Importing list '%s' (%d vocabulary items)", list_data["name"], total)
             for i, vocab_id in enumerate(list_data["vocab_ids"], start=1):
                 if i % 25 == 0 or i == total:
-                    print(f"  Progress: {i}/{total}")
-                vocab_response = self.client.get_vocabs(vocab_id)
+                    logger.info("Import progress: %d/%d", i, total)
+                vocab_response = self.client.get_vocab(vocab_id)
                 vocab = parse_vocab(vocab_response)
                 vocab_db_id, inserted = self.vocabulary_repository.ensure_vocab(vocab)
                 self.vocabulary_repository.link_vocab_to_list(
@@ -56,7 +61,7 @@ class IngestionService:
         except Exception:
             self.vocabulary_session.rollback()
             raise
-        print(f"Finished '{list_data['name']}'.")
+        logger.info("Finished '%s'", list_data["name"])
         return {
             "lists_processed": 1,
             "vocab_processed": imported + skipped,
@@ -67,7 +72,7 @@ class IngestionService:
 
     def import_all_lists(self) -> dict:
         lists = self.client.get_lists()
-        print(f"Found {len(lists)} lists to import.\n")
+        logger.info("Found %d lists to import", len(lists))
 
         lists_processed = 0
         vocab_imported = 0
@@ -75,21 +80,21 @@ class IngestionService:
         failures = []
 
         for i, vocab_list in enumerate(lists, start=1):
-            print(f"[{i}/{len(lists)}] Importing '{vocab_list['name']}'...")
+            logger.info("Importing list %d/%d: '%s'", i, len(lists), vocab_list["name"])
             try:
                 result = self.import_list(vocab_list["id"])
                 lists_processed += 1
                 vocab_imported += result["vocab_imported"]
                 vocab_skipped += result["vocab_skipped"]
             except Exception as exc:
-                print(f"  FAILED: '{vocab_list['name']}' ({vocab_list['id']}): {exc}")
+                logger.exception(
+                    "Failed to import list '%s' (%s)", vocab_list["name"], vocab_list["id"]
+                )
                 failures.append({"id": vocab_list["id"], "name": vocab_list["name"], "error": str(exc)})
 
-        print(f"\nFinished. {lists_processed}/{len(lists)} lists imported successfully.")
+        logger.info("Finished: %d/%d lists imported successfully", lists_processed, len(lists))
         if failures:
-            print(f"{len(failures)} list(s) failed:")
-            for f in failures:
-                print(f"  - {f['name']} ({f['id']}): {f['error']}")
+            logger.error("%d list(s) failed during import", len(failures))
 
         return {
             "lists_processed": lists_processed,

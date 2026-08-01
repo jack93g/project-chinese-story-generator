@@ -3,7 +3,7 @@ from fastapi import FastAPI
 from story_generator.api.routers.health import router as health_router
 from story_generator.api.routers.vocabulary import router as vocabulary_router
 from story_generator.api.routers.sync_status import router as sync_status_router
-
+from story_generator.api.routers.stories import router as stories_router
 
 
 def create_app() -> FastAPI:
@@ -15,5 +15,6 @@ def create_app() -> FastAPI:
     app.include_router(health_router)
     app.include_router(vocabulary_router)
     app.include_router(sync_status_router)
+    app.include_router(stories_router)
 
     return app

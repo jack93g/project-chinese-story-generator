@@ -16,7 +16,7 @@ def test_import_list():
             "zh-谢谢-0",
         ],
     }
-    client.get_vocabs.side_effect = [
+    client.get_vocab.side_effect = [
         {
             "Vocabs": [
                 {
@@ -70,7 +70,7 @@ def test_import_list_counts_skipped_vocab():
         "name": "Test List",
         "vocab_ids": ["zh-你好-0", "zh-谢谢-0"],
     }
-    client.get_vocabs.side_effect = [
+    client.get_vocab.side_effect = [
         {"Vocabs": [{"id": "zh-你好-0", "language": "zh", "writing": "你好", "reading": "ni3 hao3", "definitions": {"en": "hello"}}]},
         {"Vocabs": [{"id": "zh-谢谢-0", "language": "zh", "writing": "谢谢", "reading": "xie4 xie", "definitions": {"en": "thanks"}}]},
     ]
@@ -100,7 +100,7 @@ def test_import_list_rolls_back_on_failure():
         "name": "Test List",
         "vocab_ids": ["zh-你好-0"],
     }
-    client.get_vocabs.side_effect = RuntimeError("Skritter API failed")
+    client.get_vocab.side_effect = RuntimeError("Skritter API failed")
 
     service = IngestionService(client, repository, session, Mock(), Mock())
 

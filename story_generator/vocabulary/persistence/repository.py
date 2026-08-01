@@ -21,7 +21,7 @@ class VocabularyRepository:
     def __init__(self, session: Session):
         self.session = session
 
-    def list(self, limit: int, offset: int) -> list[VocabularyItem]:
+    def list_page(self, limit: int, offset: int) -> list[VocabularyItem]:
         return (
             self.session.query(VocabularyItem)
             .order_by(VocabularyItem.id.asc())
