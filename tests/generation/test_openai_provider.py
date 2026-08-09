@@ -24,10 +24,9 @@ SAMPLE_REQUEST = GenerationRequestInput(
     vocabulary_snapshot=[
         {"id": 10, "writing": "菜单", "reading": "càidān", "definition_en": "menu"},
     ],
-    prompt_version="v1",
+    prompt_version="story-v1",  # was "v1"
     topic="a restaurant",
 )
-
 
 def _make_provider() -> OpenAIStoryGenerationProvider:
     client = httpx.Client()

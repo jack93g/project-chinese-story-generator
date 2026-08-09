@@ -1,7 +1,22 @@
 from datetime import datetime, timezone
 
+from sqlalchemy.orm import Session
+
 from story_generator.generation.persistence.models import StoryGenerationRequest
 from story_generator.generation.persistence.repository import GenerationRequestRepository
+from story_generator.generation.prompts.builder import CURRENT_PROMPT_VERSION
+from story_generator.generation.schemas import CreateGenerationRequestSchema
+from story_generator.generation.vocabulary_selection import (
+    EmptyVocabularyListError,  # noqa: F401  (re-exported for router)
+    select_vocabulary,
+)
+from story_generator.vocabulary.persistence.models import VocabularyList
+
+
+# TODO: placeholder until real provider-selection config exists.
+# Move to settings/env once that design lands.
+_DEFAULT_PROVIDER = "openai"
+_DEFAULT_MODEL = "gpt-4o"
 
 
 VALID_TRANSITIONS: dict[str, set[str]] = {
@@ -25,9 +40,43 @@ class GenerationRequestNotFoundError(Exception):
         super().__init__(f"Generation request {request_id} not found")
 
 
+class VocabularyListNotFoundError(Exception):
+    def __init__(self, vocabulary_list_id: int):
+        self.vocabulary_list_id = vocabulary_list_id
+        super().__init__(f"Vocabulary list {vocabulary_list_id} not found")
+
+
 class GenerationRequestService:
     def __init__(self, repository: GenerationRequestRepository):
         self.repository = repository
+
+    def create(self, db: Session, payload: CreateGenerationRequestSchema) -> StoryGenerationRequest:
+        """
+        Validates the vocabulary list exists, deterministically selects
+        vocabulary (capping short/oversized lists, rejecting empty
+        ones), stamps the current prompt version, resolves
+        provider/model from trusted server config (never client
+        input), and persists the request — all before any provider
+        call is made.
+        """
+        vocabulary_list = db.get(VocabularyList, payload.vocabulary_list_id)
+        if vocabulary_list is None:
+            raise VocabularyListNotFoundError(payload.vocabulary_list_id)
+
+        snapshot = select_vocabulary(db, vocabulary_list, payload.target_vocabulary_count)
+
+        request = StoryGenerationRequest(
+            vocabulary_list_id=vocabulary_list.id,
+            target_hsk_level=payload.target_hsk_level,
+            topic=payload.topic,
+            target_word_count=payload.target_word_count,
+            target_vocabulary_count=payload.target_vocabulary_count,
+            selected_vocabulary_snapshot=snapshot,
+            prompt_version=CURRENT_PROMPT_VERSION,
+            provider=_DEFAULT_PROVIDER,
+            model=_DEFAULT_MODEL,
+        )
+        return self.repository.create(request)
 
     def start(self, request_id: int) -> StoryGenerationRequest:
         request = self._get(request_id)

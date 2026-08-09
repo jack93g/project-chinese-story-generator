@@ -14,7 +14,7 @@ from sqlalchemy.orm import relationship
 
 from story_generator.database.base import Base
 import story_generator.vocabulary.persistence.models  # noqa: F401
-
+MAX_TARGET_WORD_COUNT = 1000
 
 class StoryGenerationRequest(Base):
     """
@@ -74,7 +74,7 @@ class StoryGenerationRequest(Base):
             name="story_generation_requests_hsk_level_check",
         ),
         CheckConstraint(
-            "target_word_count > 0",
+            f"target_word_count > 0 AND target_word_count <= {MAX_TARGET_WORD_COUNT}",
             name="story_generation_requests_word_count_check",
         ),
         CheckConstraint(
