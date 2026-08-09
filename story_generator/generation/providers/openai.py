@@ -9,10 +9,17 @@ tests — depends on the provider-neutral
 story_generator.generation.providers.base.StoryGenerationProvider
 interface instead, so a future Ollama/Qwen adapter can be dropped in
 without touching the service, the database tables, or the public API.
+
+User-facing prompt text is NOT built here — it comes from
+story_generator.generation.prompts.builder.build_prompt, dispatched by
+request.prompt_version, so the exact prompt persisted alongside a
+request (via GenerationRequestInput.prompt_version) is the exact
+prompt actually sent, regardless of which provider handles it.
 """
 
 import httpx
 
+from story_generator.generation.prompts.builder import build_prompt
 from story_generator.generation.providers.errors import (
     ProviderAPIError,
     ProviderAuthenticationError,
@@ -66,7 +73,7 @@ class OpenAIStoryGenerationProvider:
             "model": self._model,
             "messages": [
                 {"role": "system", "content": _SYSTEM_PROMPT},
-                {"role": "user", "content": self._build_user_prompt(request)},
+                {"role": "user", "content": build_prompt(request)},
             ],
             "response_format": {"type": "json_object"},
         }
@@ -91,20 +98,6 @@ class OpenAIStoryGenerationProvider:
         raw_text = self._extract_content(body)
         usage = self._extract_usage(body)
         return parse_structured_result(raw_text, usage)
-
-    def _build_user_prompt(self, request: GenerationRequestInput) -> str:
-        vocabulary_lines = "\n".join(
-            f"- {item.get('writing')} ({item.get('reading')}): {item.get('definition_en')}"
-            for item in request.vocabulary_snapshot
-        )
-        topic_line = f"Topic: {request.topic}\n" if request.topic else ""
-        return (
-            f"Write a story for an HSK {request.target_hsk_level} learner.\n"
-            f"{topic_line}"
-            f"Target length: approximately {request.target_word_count} Chinese characters.\n"
-            f"Use at least {request.target_vocabulary_count} of the following vocabulary "
-            f"words naturally in the story:\n{vocabulary_lines}\n"
-        )
 
     def _raise_for_status(self, response: httpx.Response) -> None:
         if response.status_code < 400:
