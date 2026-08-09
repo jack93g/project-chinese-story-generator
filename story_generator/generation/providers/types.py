@@ -36,6 +36,7 @@ class UsageMetadata:
     prompt_tokens: int
     completion_tokens: int
     total_tokens: int
+    latency_ms: int | None = None
 
 
 @dataclass(frozen=True)

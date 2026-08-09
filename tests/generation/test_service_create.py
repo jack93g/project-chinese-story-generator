@@ -2,8 +2,6 @@ import pytest
 
 from story_generator.generation.persistence.repository import GenerationRequestRepository
 from story_generator.generation.persistence.service import (
-    _DEFAULT_MODEL,
-    _DEFAULT_PROVIDER,
     GenerationRequestService,
     VocabularyListNotFoundError,
 )
@@ -57,7 +55,10 @@ def test_create_persists_request_with_prompt_version_and_snapshot(db_session):
     assert len(request.selected_vocabulary_snapshot) == 3
 
 
-def test_create_resolves_provider_and_model_from_server_config_not_client(db_session):
+def test_create_resolves_provider_and_model_from_server_config_not_client(db_session, monkeypatch):
+    monkeypatch.setenv("OPENAI_PROVIDER_LABEL", "openrouter")
+    monkeypatch.setenv("OPENAI_MODEL", "google/gemma-4-26b-a4b-it:free")
+
     vocab_list = _make_list_with_items(db_session, skritter_list_id="create-provider", n_items=2)
     repository = GenerationRequestRepository(db_session)
     service = GenerationRequestService(repository)
@@ -71,8 +72,8 @@ def test_create_resolves_provider_and_model_from_server_config_not_client(db_ses
 
     request = service.create(db_session, payload)
 
-    assert request.provider == _DEFAULT_PROVIDER
-    assert request.model == _DEFAULT_MODEL
+    assert request.provider == "openrouter"
+    assert request.model == "google/gemma-4-26b-a4b-it:free"
 
 
 def test_create_raises_on_missing_vocabulary_list(db_session):
