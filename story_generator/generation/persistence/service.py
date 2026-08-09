@@ -12,11 +12,9 @@ from story_generator.generation.vocabulary_selection import (
 )
 from story_generator.vocabulary.persistence.models import VocabularyList
 
+from story_generator.config import get_openai_model, get_openai_provider_label
 
-# TODO: placeholder until real provider-selection config exists.
-# Move to settings/env once that design lands.
-_DEFAULT_PROVIDER = "openai"
-_DEFAULT_MODEL = "gpt-4o"
+
 
 
 VALID_TRANSITIONS: dict[str, set[str]] = {
@@ -73,8 +71,8 @@ class GenerationRequestService:
             target_vocabulary_count=payload.target_vocabulary_count,
             selected_vocabulary_snapshot=snapshot,
             prompt_version=CURRENT_PROMPT_VERSION,
-            provider=_DEFAULT_PROVIDER,
-            model=_DEFAULT_MODEL,
+            provider=get_openai_provider_label(),
+            model=get_openai_model(),
         )
         return self.repository.create(request)
 

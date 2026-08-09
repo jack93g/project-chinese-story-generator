@@ -11,10 +11,12 @@ from story_generator.generation.providers.errors import (
     ProviderRateLimitError,
     ProviderTimeoutError,
 )
+
 from story_generator.generation.providers.openai import (
-    _CHAT_COMPLETIONS_URL,
+    _DEFAULT_CHAT_COMPLETIONS_URL as _CHAT_COMPLETIONS_URL,
     OpenAIStoryGenerationProvider,
 )
+
 from story_generator.generation.providers.types import GenerationRequestInput
 
 SAMPLE_REQUEST = GenerationRequestInput(
