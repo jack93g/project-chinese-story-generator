@@ -11,13 +11,6 @@ the same /chat/completions request/response shape (e.g. OpenRouter,
 Groq) — useful for local development without an OpenAI billing
 account.
 
-Everything outside this module — generation.service, the API layer,
-tests — depends on the provider-neutral
-story_generator.generation.providers.base.StoryGenerationProvider
-interface instead, so a future non-OpenAI-shaped adapter (Ollama/Qwen)
-can be dropped in without touching the service, the database tables,
-or the public API.
-
 User-facing prompt text is NOT built here — it comes from
 story_generator.generation.prompts.builder.build_prompt, dispatched by
 request.prompt_version, so the exact prompt persisted alongside a
@@ -26,11 +19,8 @@ prompt actually sent, regardless of which provider handles it.
 
 Credentials: the API key is only ever placed in the Authorization
 header of the outbound HTTP request — it is never included in the
-JSON request/response body that generate() works with, and this
-module never logs the key or the header. If a future caller wires
-add_raw_payload() into this flow, it must continue passing only the
-JSON body (never headers) — see GenerationRequestRepository's own
-docstring on this same constraint.
+JSON request/response body reported via on_raw_exchange, and this
+module never logs the key or the header.
 """
 
 import time
@@ -39,6 +29,7 @@ import httpx
 
 from story_generator.config import get_openai_api_key, get_openai_base_url, get_openai_model
 from story_generator.generation.prompts.builder import build_prompt
+from story_generator.generation.providers.base import RawExchangeCallback
 from story_generator.generation.providers.errors import (
     ProviderAPIError,
     ProviderAuthenticationError,
@@ -67,15 +58,6 @@ class OpenAIStoryGenerationProvider:
     """
     StoryGenerationProvider implementation backed by an OpenAI-
     compatible chat completions API, called via a plain httpx.Client.
-
-    The client is injected rather than constructed internally, both so
-    callers control connection pooling/base_url/etc. and so tests can
-    pass an httpx.Client that respx is mocking.
-
-    Any transport or API-level failure is caught and translated into
-    the provider-neutral taxonomy in providers.errors before it leaves
-    generate() — callers never see an httpx exception or a raw
-    provider error-response shape directly.
     """
 
     name = "openai"
@@ -94,7 +76,11 @@ class OpenAIStoryGenerationProvider:
         self._base_url = base_url
         self._timeout = timeout
 
-    def generate(self, request: GenerationRequestInput) -> GenerationResult:
+    def generate(
+        self,
+        request: GenerationRequestInput,
+        on_raw_exchange: RawExchangeCallback | None = None,
+    ) -> GenerationResult:
         payload = {
             **request.model_parameters,
             "model": self._model,
@@ -114,24 +100,33 @@ class OpenAIStoryGenerationProvider:
                 timeout=self._timeout,
             )
         except httpx.TimeoutException as exc:
+            if on_raw_exchange is not None:
+                on_raw_exchange(payload, None, None)
             raise ProviderTimeoutError(str(exc)) from exc
         except httpx.HTTPError as exc:
-            # Connection errors, protocol errors, etc. — anything that
-            # isn't a timeout and isn't an HTTP-status-carrying response.
+            if on_raw_exchange is not None:
+                on_raw_exchange(payload, None, None)
             raise ProviderAPIError(str(exc)) from exc
         latency_ms = int((time.monotonic() - start_time) * 1000)
 
-        self._raise_for_status(response)
+        response_body = self._try_parse_json_body(response)
 
-        body = self._parse_json_body(response)
-        raw_text = self._extract_content(body)
-        usage = self._extract_usage(body, latency_ms)
+        if on_raw_exchange is not None:
+            on_raw_exchange(payload, response.status_code, response_body)
+
+        self._raise_for_status(response, response_body)
+
+        if response_body is None:
+            raise ProviderInvalidResponseError("Provider response was not valid JSON")
+
+        raw_text = self._extract_content(response_body)
+        usage = self._extract_usage(response_body, latency_ms)
         return parse_structured_result(raw_text, usage)
 
-    def _raise_for_status(self, response: httpx.Response) -> None:
+    def _raise_for_status(self, response: httpx.Response, response_body: dict | None) -> None:
         if response.status_code < 400:
             return
-        message = self._error_message(response)
+        message = self._error_message(response, response_body)
         if response.status_code in (401, 403):
             raise ProviderAuthenticationError(message)
         if response.status_code == 429:
@@ -139,19 +134,17 @@ class OpenAIStoryGenerationProvider:
         raise ProviderAPIError(message, status_code=response.status_code)
 
     @staticmethod
-    def _error_message(response: httpx.Response) -> str:
-        try:
-            body = response.json()
-            return str(body.get("error", {}).get("message", body))
-        except ValueError:
-            return response.text or f"HTTP {response.status_code}"
+    def _error_message(response: httpx.Response, response_body: dict | None) -> str:
+        if response_body is not None:
+            return str(response_body.get("error", {}).get("message", response_body))
+        return response.text or f"HTTP {response.status_code}"
 
     @staticmethod
-    def _parse_json_body(response: httpx.Response) -> dict:
+    def _try_parse_json_body(response: httpx.Response) -> dict | None:
         try:
             return response.json()
-        except ValueError as exc:
-            raise ProviderInvalidResponseError(f"Provider response was not valid JSON: {exc}") from exc
+        except ValueError:
+            return None
 
     @staticmethod
     def _extract_content(body: dict) -> str:
@@ -179,13 +172,6 @@ class OpenAIStoryGenerationProvider:
 
 
 def build_openai_provider() -> OpenAIStoryGenerationProvider:
-    """
-    Construct an OpenAIStoryGenerationProvider from trusted server
-    configuration (environment variables via story_generator.config),
-    never from client-supplied input — see the AC on M3-3's request
-    schema, which deliberately excludes provider/model as fields a
-    caller can set.
-    """
     return OpenAIStoryGenerationProvider(
         client=httpx.Client(),
         api_key=get_openai_api_key(),

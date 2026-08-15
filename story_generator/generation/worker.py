@@ -1,0 +1,180 @@
+"""
+Durable worker for processing queued StoryGenerationRequests.
+
+Claiming is atomic via SELECT ... FOR UPDATE SKIP LOCKED (see
+GenerationRequestRepository.claim_next_request) — multiple worker
+processes can poll the same table concurrently without ever
+processing the same request twice.
+
+Crash recovery: if a worker dies mid-processing, its claimed request
+is left in "running" state indefinitely — there is no automatic
+in-process liveness detection (no heartbeat). Instead, call
+GenerationRequestService.reclaim_stale() periodically (e.g. at worker
+startup, or on a schedule) to requeue any "running" request whose
+started_at is older than a configured staleness threshold. Requests
+that are both stale AND have already exhausted MAX_ATTEMPTS are
+marked failed directly instead of requeued, so a worker that keeps
+crashing on the same request cannot loop it indefinitely. This is a
+deliberately simple, operator-driven recovery path — no heartbeat,
+no automatic scheduling of reclaim itself.
+
+Success persistence is atomic: the Story row, its
+StoryVocabularyItem associations, and the StoryGenerationRequest's
+succeeded status/usage/validation_report are all written in a single
+db.commit() in run_once() — either everything from a successful
+generation is saved, or none of it is.
+
+Vocabulary coverage is not required to be 100%: a story is only
+rejected (marked failed, no Story row created) when validate_story()
+reports coverage below VOCABULARY_COVERAGE_THRESHOLD. The raw
+provider exchange is persisted on every outcome — provider error,
+insufficient coverage, or success — so every failure mode is
+diagnosable from raw_generation_payloads.
+"""
+
+import time
+
+from sqlalchemy.orm import Session, sessionmaker
+
+from story_generator.generation.persistence.repository import GenerationRequestRepository
+from story_generator.generation.persistence.service import GenerationRequestService
+from story_generator.generation.providers.base import StoryGenerationProvider
+from story_generator.generation.providers.errors import ProviderError
+from story_generator.generation.providers.types import GenerationRequestInput
+from story_generator.generation.validation import validate_story
+from story_generator.stories.persistence.models import Story, StoryVocabularyItem
+from story_generator.vocabulary.persistence.models import VocabularyItem
+
+
+class GenerationWorker:
+    def __init__(self, provider: StoryGenerationProvider):
+        self._provider = provider
+
+    def run_once(self, db: Session) -> bool:
+        """
+        Attempt to claim and process one queued request.
+
+        Returns True if a request was claimed (regardless of whether
+        generation succeeded or failed), False if the queue was empty.
+        """
+        repository = GenerationRequestRepository(db)
+        service = GenerationRequestService(repository)
+
+        request = service.claim_next()
+        if request is None:
+            return False
+
+        generation_input = GenerationRequestInput(
+            target_hsk_level=request.target_hsk_level,
+            target_word_count=request.target_word_count,
+            target_vocabulary_count=request.target_vocabulary_count,
+            vocabulary_snapshot=request.selected_vocabulary_snapshot,
+            prompt_version=request.prompt_version,
+            topic=request.topic,
+        )
+
+        raw_exchange: dict = {"request_body": None, "response_status": None, "response_body": None}
+
+        def _record_raw_exchange(request_body, response_status, response_body):
+            raw_exchange["request_body"] = request_body
+            raw_exchange["response_status"] = response_status
+            raw_exchange["response_body"] = response_body
+
+        try:
+            result = self._provider.generate(generation_input, on_raw_exchange=_record_raw_exchange)
+        except ProviderError as exc:
+            repository.add_raw_payload(
+                generation_request_id=request.id,
+                attempt_number=request.attempt_count,
+                provider=request.provider,
+                request_body=raw_exchange["request_body"],
+                response_status=raw_exchange["response_status"],
+                payload=raw_exchange["response_body"],
+            )
+            service.fail(request.id, error_code=type(exc).__name__, error_message=str(exc))
+            db.commit()
+            return True
+
+        validation_report, used_map = validate_story(request, result)
+
+        repository.add_raw_payload(
+            generation_request_id=request.id,
+            attempt_number=request.attempt_count,
+            provider=request.provider,
+            request_body=raw_exchange["request_body"],
+            response_status=raw_exchange["response_status"],
+            payload=raw_exchange["response_body"],
+        )
+
+        if not validation_report["meets_coverage_threshold"]:
+            request.validation_report = validation_report
+            service.fail(
+                request.id,
+                error_code="InsufficientVocabularyCoverage",
+                error_message=(
+                    f"Generated story used {validation_report['used_vocabulary_count']}/"
+                    f"{validation_report['requested_vocabulary_count']} requested vocabulary "
+                    f"words (coverage {validation_report['coverage']:.0%}, "
+                    f"required {validation_report['coverage_threshold']:.0%})"
+                ),
+            )
+            db.commit()
+            return True
+
+        story = Story(
+            generation_request_id=request.id,
+            title=result.title,
+            content=result.body,
+            target_hsk=request.target_hsk_level,
+        )
+        for item in request.selected_vocabulary_snapshot:
+            vocabulary_item = db.get(VocabularyItem, item["id"])
+            story.vocabulary_associations.append(
+                StoryVocabularyItem(
+                    vocabulary_item=vocabulary_item,
+                    requested=True,
+                    used=used_map.get(item["id"], False),
+                )
+            )
+        db.add(story)
+
+        service.succeed(
+            request.id,
+            usage={
+                "prompt_tokens": result.usage.prompt_tokens,
+                "completion_tokens": result.usage.completion_tokens,
+                "total_tokens": result.usage.total_tokens,
+                "latency_ms": result.usage.latency_ms,
+            },
+        )
+        request.validation_report = validation_report
+
+        db.commit()
+        return True
+
+    def run_forever(
+        self,
+        session_factory: sessionmaker,
+        poll_interval: float = 5.0,
+        stale_after=None,
+    ) -> None:
+        db = session_factory()
+        try:
+            if stale_after is not None:
+                repository = GenerationRequestRepository(db)
+                service = GenerationRequestService(repository)
+                result = service.reclaim_stale(stale_after)
+                if result["failed"]:
+                    print(
+                        f"Marked {len(result['failed'])} stale request(s) as failed "
+                        f"(exhausted retry limit): {result['failed']}"
+                    )
+                if result["requeued"]:
+                    print(f"Requeued {len(result['requeued'])} stale request(s): {result['requeued']}")
+
+            while True:
+                processed = self.run_once(db)
+                if not processed:
+                    time.sleep(poll_interval)
+        finally:
+            db.close()

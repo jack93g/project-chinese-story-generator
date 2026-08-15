@@ -9,6 +9,7 @@ provider outcome (success, malformed output, timeout, provider error)
 without cost, latency, or nondeterministic model output.
 """
 
+from story_generator.generation.providers.base import RawExchangeCallback
 from story_generator.generation.providers.errors import (
     ProviderAPIError,
     ProviderAuthenticationError,
@@ -65,20 +66,32 @@ class FakeStoryGenerationProvider:
         self.usage = usage
         self.calls: list[GenerationRequestInput] = []
 
-    def generate(self, request: GenerationRequestInput) -> GenerationResult:
+    def generate(
+        self,
+        request: GenerationRequestInput,
+        on_raw_exchange: RawExchangeCallback | None = None,
+    ) -> GenerationResult:
         self.calls.append(request)
+        fake_request_body = {"model": "fake-model", "vocabulary_snapshot": request.vocabulary_snapshot}
 
         if self.scenario == "timeout":
+            if on_raw_exchange is not None:
+                on_raw_exchange(fake_request_body, None, None)
             raise ProviderTimeoutError("Fake provider timed out")
         if self.scenario == "rate_limit":
+            if on_raw_exchange is not None:
+                on_raw_exchange(fake_request_body, 429, {"error": "rate limited"})
             raise ProviderRateLimitError("Fake provider rate limit exceeded")
         if self.scenario == "auth_error":
+            if on_raw_exchange is not None:
+                on_raw_exchange(fake_request_body, 401, {"error": "unauthorized"})
             raise ProviderAuthenticationError("Fake provider rejected credentials")
         if self.scenario == "api_error":
+            if on_raw_exchange is not None:
+                on_raw_exchange(fake_request_body, 500, {"error": "server error"})
             raise ProviderAPIError("Fake provider returned a server error", status_code=500)
 
-        # "success" and "malformed" both go through the real parser, so
-        # a "malformed" scenario is just "success" with a bad
-        # raw_response — there's no separate malformed-handling code
-        # path to drift out of sync with production.
+        if on_raw_exchange is not None:
+            on_raw_exchange(fake_request_body, 200, {"content": self.raw_response})
+
         return parse_structured_result(self.raw_response, self.usage)
