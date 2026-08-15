@@ -112,7 +112,8 @@ def two_sessions(engine):
     session_b.close()
     with engine.begin() as conn:
         conn.execute(text(
-            "TRUNCATE TABLE raw_skritter_payloads, sync_runs, "
+            "TRUNCATE TABLE raw_skritter_payloads, sync_runs, story_vocabulary_items, "
+            "stories, raw_generation_payloads, story_generation_requests, "
             "list_vocabulary, vocabulary_items, vocabulary_lists RESTART IDENTITY CASCADE"
         ))
 

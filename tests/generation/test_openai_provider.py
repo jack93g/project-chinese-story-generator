@@ -197,3 +197,59 @@ def test_generate_propagates_parser_error_for_malformed_model_output():
 
     with pytest.raises(ProviderInvalidResponseError, match="not valid JSON"):
         provider.generate(SAMPLE_REQUEST)
+
+
+@respx.mock
+def test_generate_invokes_on_raw_exchange_on_success():
+    respx.post(_CHAT_COMPLETIONS_URL).mock(
+        return_value=httpx.Response(200, json=_success_body('{"title": "标题", "body": "正文内容。"}'))
+    )
+    provider = _make_provider()
+    captured = {}
+
+    def on_raw_exchange(request_body, response_status, response_body):
+        captured["request_body"] = request_body
+        captured["response_status"] = response_status
+        captured["response_body"] = response_body
+
+    provider.generate(SAMPLE_REQUEST, on_raw_exchange=on_raw_exchange)
+
+    assert captured["request_body"]["model"] == "gpt-test"
+    assert captured["response_status"] == 200
+    assert captured["response_body"]["choices"][0]["message"]["content"] == '{"title": "标题", "body": "正文内容。"}'
+
+
+@respx.mock
+def test_generate_invokes_on_raw_exchange_on_error_status():
+    respx.post(_CHAT_COMPLETIONS_URL).mock(
+        return_value=httpx.Response(500, json={"error": {"message": "server error"}})
+    )
+    provider = _make_provider()
+    captured = {}
+
+    def on_raw_exchange(request_body, response_status, response_body):
+        captured["response_status"] = response_status
+        captured["response_body"] = response_body
+
+    with pytest.raises(ProviderAPIError):
+        provider.generate(SAMPLE_REQUEST, on_raw_exchange=on_raw_exchange)
+
+    assert captured["response_status"] == 500
+    assert captured["response_body"] == {"error": {"message": "server error"}}
+
+
+@respx.mock
+def test_generate_invokes_on_raw_exchange_with_no_response_on_timeout():
+    respx.post(_CHAT_COMPLETIONS_URL).mock(side_effect=httpx.TimeoutException("timed out"))
+    provider = _make_provider()
+    captured = {}
+
+    def on_raw_exchange(request_body, response_status, response_body):
+        captured["response_status"] = response_status
+        captured["response_body"] = response_body
+
+    with pytest.raises(ProviderTimeoutError):
+        provider.generate(SAMPLE_REQUEST, on_raw_exchange=on_raw_exchange)
+
+    assert captured["response_status"] is None
+    assert captured["response_body"] is None

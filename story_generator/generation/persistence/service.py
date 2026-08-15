@@ -1,7 +1,8 @@
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 
 from sqlalchemy.orm import Session
 
+from story_generator.config import get_openai_model, get_openai_provider_label
 from story_generator.generation.persistence.models import StoryGenerationRequest
 from story_generator.generation.persistence.repository import GenerationRequestRepository
 from story_generator.generation.prompts.builder import CURRENT_PROMPT_VERSION
@@ -12,14 +13,13 @@ from story_generator.generation.vocabulary_selection import (
 )
 from story_generator.vocabulary.persistence.models import VocabularyList
 
-from story_generator.config import get_openai_model, get_openai_provider_label
-
-
-
+MAX_ATTEMPTS = 3
 
 VALID_TRANSITIONS: dict[str, set[str]] = {
     "queued": {"running"},
-    "running": {"succeeded", "failed"},
+    # "running" -> "queued" is the crash-recovery reclaim path (see
+    # GenerationRequestService.reclaim_stale), not a normal retry.
+    "running": {"succeeded", "failed", "queued"},
     "failed": {"queued"},
     "succeeded": set(),
 }
@@ -44,19 +44,21 @@ class VocabularyListNotFoundError(Exception):
         super().__init__(f"Vocabulary list {vocabulary_list_id} not found")
 
 
+class RetryLimitExceededError(Exception):
+    def __init__(self, request_id: int, attempt_count: int):
+        self.request_id = request_id
+        self.attempt_count = attempt_count
+        super().__init__(
+            f"Generation request {request_id} has exceeded the retry limit "
+            f"({attempt_count} attempts, max {MAX_ATTEMPTS})"
+        )
+
+
 class GenerationRequestService:
     def __init__(self, repository: GenerationRequestRepository):
         self.repository = repository
 
     def create(self, db: Session, payload: CreateGenerationRequestSchema) -> StoryGenerationRequest:
-        """
-        Validates the vocabulary list exists, deterministically selects
-        vocabulary (capping short/oversized lists, rejecting empty
-        ones), stamps the current prompt version, resolves
-        provider/model from trusted server config (never client
-        input), and persists the request — all before any provider
-        call is made.
-        """
         vocabulary_list = db.get(VocabularyList, payload.vocabulary_list_id)
         if vocabulary_list is None:
             raise VocabularyListNotFoundError(payload.vocabulary_list_id)
@@ -75,6 +77,15 @@ class GenerationRequestService:
             model=get_openai_model(),
         )
         return self.repository.create(request)
+
+    def claim_next(self) -> StoryGenerationRequest | None:
+        """Atomically claim the oldest queued request. See repository docstring."""
+        return self.repository.claim_next_request()
+
+    def reclaim_stale(self, stale_after: timedelta) -> dict[str, list[int]]:
+        """Requeue 'running' requests stuck past the staleness threshold,
+        or mark them failed if they've already exhausted MAX_ATTEMPTS."""
+        return self.repository.reclaim_stale_running(stale_after, max_attempts=MAX_ATTEMPTS)
 
     def start(self, request_id: int) -> StoryGenerationRequest:
         request = self._get(request_id)
@@ -101,6 +112,8 @@ class GenerationRequestService:
 
     def retry(self, request_id: int) -> StoryGenerationRequest:
         request = self._get(request_id)
+        if request.attempt_count >= MAX_ATTEMPTS:
+            raise RetryLimitExceededError(request_id, request.attempt_count)
         self._transition(request, "queued")
         request.started_at = None
         request.completed_at = None
