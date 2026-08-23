@@ -1,0 +1,271 @@
+"""
+Runs the EVAL_FIXTURES matrix against one or more providers and
+produces a report recording, per (fixture, provider) pair: schema
+validity, target-word coverage, length, latency, and manual quality
+notes.
+
+Manual quality notes workflow: to_json()'s output is the persisted
+source of truth for review notes, not the markdown. After running a
+comparison, a human edits `manual_quality_notes` directly in the
+written JSON file (one string field per outcome), then regenerates
+the markdown from that edited JSON via load_outcomes() + to_markdown()
+— see cli/provider_comparison.py's `render` subcommand. The markdown
+is always a rendering of whatever is in the JSON; editing the markdown
+by hand does not persist anything and will be overwritten on the next
+render.
+
+Deliberately standalone: no database, no persistence.* imports beyond
+the one constant reused from generation.validation. This harness is
+meant to be run offline/locally before a provider or model is ever
+wired into the live pipeline.
+"""
+
+import dataclasses
+import itertools
+import json
+from pathlib import Path
+
+from story_generator.eval.fixtures import EvalFixture
+from story_generator.generation.providers.base import StoryGenerationProvider
+from story_generator.generation.providers.errors import ProviderError
+from story_generator.generation.providers.types import GenerationRequestInput, GenerationResult
+from story_generator.generation.validation import VOCABULARY_COVERAGE_THRESHOLD
+
+
+@dataclasses.dataclass(frozen=True)
+class ProviderSpec:
+    """
+    One provider configuration to include in the comparison run.
+
+    base_url is required (not inferred from the provider instance)
+    because it's part of the approval key in
+    generation.providers.provider_registry — the report needs to
+    record the exact endpoint tested so whoever adds the registry
+    entry copies the right value.
+    """
+
+    label: str
+    provider: StoryGenerationProvider
+    model: str
+    base_url: str
+
+
+@dataclasses.dataclass
+class EvalOutcome:
+    fixture_name: str
+    category: str
+    provider_label: str
+    model: str
+    base_url: str
+    schema_valid: bool
+    error_code: str | None
+    error_message: str | None
+    requested_vocabulary_count: int | None
+    used_vocabulary_count: int | None
+    coverage: float | None
+    meets_coverage_threshold: bool | None
+    missing_vocabulary: list[dict]
+    target_word_count: int
+    actual_character_count: int | None
+    length_ratio: float | None
+    latency_ms: int | None
+    title: str | None
+    body: str | None
+    manual_quality_notes: str = ""
+
+
+def compute_coverage(vocabulary_snapshot: list[dict], result: GenerationResult) -> dict:
+    """
+    Deliberately duplicates the coverage math in
+    story_generator.generation.validation.validate_story(). That
+    function takes a StoryGenerationRequest ORM instance, which this
+    harness intentionally avoids depending on (no DB needed to run an
+    eval). If validate_story()'s algorithm changes, update this too —
+    worth extracting a shared pure function if the two drift further.
+    """
+    combined_text = f"{result.title}{result.body}"
+    missing = []
+    for item in vocabulary_snapshot:
+        if item["writing"] not in combined_text:
+            missing.append({"id": item["id"], "writing": item["writing"]})
+
+    requested = len(vocabulary_snapshot)
+    used = requested - len(missing)
+    coverage = used / requested if requested else 1.0
+
+    return {
+        "requested_vocabulary_count": requested,
+        "used_vocabulary_count": used,
+        "missing_vocabulary": missing,
+        "coverage": coverage,
+    }
+
+
+def run_single(fixture: EvalFixture, provider_spec: ProviderSpec) -> EvalOutcome:
+    request = GenerationRequestInput(
+        target_hsk_level=fixture.target_hsk_level,
+        target_word_count=fixture.target_word_count,
+        target_vocabulary_count=fixture.target_vocabulary_count,
+        vocabulary_snapshot=fixture.vocabulary_snapshot,
+        prompt_version=fixture.prompt_version,
+        topic=fixture.topic,
+    )
+
+    try:
+        result = provider_spec.provider.generate(request)
+    except ProviderError as exc:
+        return EvalOutcome(
+            fixture_name=fixture.name,
+            category=fixture.category,
+            provider_label=provider_spec.label,
+            model=provider_spec.model,
+            base_url=provider_spec.base_url,
+            schema_valid=False,
+            error_code=type(exc).__name__,
+            error_message=str(exc),
+            requested_vocabulary_count=len(fixture.vocabulary_snapshot),
+            used_vocabulary_count=None,
+            coverage=None,
+            meets_coverage_threshold=None,
+            missing_vocabulary=[],
+            target_word_count=fixture.target_word_count,
+            actual_character_count=None,
+            length_ratio=None,
+            latency_ms=None,
+            title=None,
+            body=None,
+        )
+
+    coverage_info = compute_coverage(fixture.vocabulary_snapshot, result)
+    actual_chars = len(result.body)
+
+    return EvalOutcome(
+        fixture_name=fixture.name,
+        category=fixture.category,
+        provider_label=provider_spec.label,
+        model=provider_spec.model,
+        base_url=provider_spec.base_url,
+        schema_valid=True,
+        error_code=None,
+        error_message=None,
+        requested_vocabulary_count=coverage_info["requested_vocabulary_count"],
+        used_vocabulary_count=coverage_info["used_vocabulary_count"],
+        coverage=coverage_info["coverage"],
+        meets_coverage_threshold=coverage_info["coverage"] >= VOCABULARY_COVERAGE_THRESHOLD,
+        missing_vocabulary=coverage_info["missing_vocabulary"],
+        target_word_count=fixture.target_word_count,
+        actual_character_count=actual_chars,
+        length_ratio=(actual_chars / fixture.target_word_count) if fixture.target_word_count else None,
+        latency_ms=result.usage.latency_ms,
+        title=result.title,
+        body=result.body,
+    )
+
+
+def run_comparison(
+    fixtures: list[EvalFixture], provider_specs: list[ProviderSpec]
+) -> list[EvalOutcome]:
+    return [
+        run_single(fixture, provider_spec)
+        for fixture, provider_spec in itertools.product(fixtures, provider_specs)
+    ]
+
+
+def to_json(outcomes: list[EvalOutcome]) -> str:
+    return json.dumps([dataclasses.asdict(o) for o in outcomes], indent=2, ensure_ascii=False)
+
+
+def load_outcomes(path: str | Path) -> list[EvalOutcome]:
+    """
+    Load outcomes previously written by to_json() — including any
+    manual_quality_notes a human has since edited directly into that
+    JSON file. This is the read side of the review-notes persistence
+    workflow described in this module's docstring: the JSON file is
+    the source of truth, and to_markdown(load_outcomes(path)) is how
+    a reviewed report gets (re-)rendered with those notes included.
+    """
+    data = json.loads(Path(path).read_text(encoding="utf-8"))
+    return [EvalOutcome(**item) for item in data]
+
+
+def _markdown_table_cell(text: str) -> str:
+    """Escape a string for safe use inside a single Markdown table cell."""
+    return text.replace("|", "\\|").replace("\n", "<br>")
+
+
+def to_markdown(outcomes: list[EvalOutcome]) -> str:
+    lines = [
+        "# Provider comparison report",
+        "",
+        "Automated columns (schema validity, coverage, length, latency) are filled "
+        "in by the script. **Manual quality notes are not** — read each transcript "
+        "below and fill that column in by hand before treating a provider/model as "
+        "usable. Coverage alone can look perfect on an ambiguous-word fixture while "
+        "the model still used the wrong sense of a heteronym.",
+        "",
+        "**To persist notes:** edit `manual_quality_notes` directly in the sibling "
+        "`.json` report (not this file — this file is only ever a rendering of the "
+        "JSON and gets overwritten). Then regenerate this markdown with "
+        "`python -m story_generator.cli.provider_comparison render --input <path-to-json>`.",
+        "",
+        "## Summary",
+        "",
+        "| Fixture | Category | Provider | Model | Base URL | Schema valid | Coverage | Meets threshold | Chars (actual/target) | Latency (ms) | Error | Manual quality notes |",
+        "|---|---|---|---|---|---|---|---|---|---|---|---|",
+    ]
+
+    for o in outcomes:
+        coverage_str = f"{o.coverage:.0%}" if o.coverage is not None else "—"
+        meets_str = "✅" if o.meets_coverage_threshold else ("❌" if o.meets_coverage_threshold is not None else "—")
+        chars_str = f"{o.actual_character_count}/{o.target_word_count}" if o.actual_character_count is not None else f"—/{o.target_word_count}"
+        latency_str = str(o.latency_ms) if o.latency_ms is not None else "—"
+        error_str = o.error_code or "—"
+        notes_str = _markdown_table_cell(o.manual_quality_notes) if o.manual_quality_notes else "_(fill in)_"
+        lines.append(
+            f"| {o.fixture_name} | {o.category} | {o.provider_label} | {o.model} | `{o.base_url}` | "
+            f"{'✅' if o.schema_valid else '❌'} | {coverage_str} | {meets_str} | "
+            f"{chars_str} | {latency_str} | {error_str} | {notes_str} |"
+        )
+
+    lines += [
+        "",
+        "## Approval snippet",
+        "",
+        "Once reviewed, the registry key for each provider/model/endpoint tested "
+        "here (for pasting into `provider_registry.py`):",
+        "",
+    ]
+    seen = set()
+    for o in outcomes:
+        key = (o.provider_label, o.model, o.base_url)
+        if key in seen:
+            continue
+        seen.add(key)
+        lines.append(f'- `("{o.provider_label}", "{o.model}", "{o.base_url}")`')
+    lines.append("")
+
+    lines += ["## Transcripts", ""]
+    for o in outcomes:
+        lines.append(f"### {o.fixture_name} — {o.provider_label} ({o.model} @ {o.base_url})")
+        lines.append("")
+        if not o.schema_valid:
+            lines.append(f"**Failed:** `{o.error_code}` — {o.error_message}")
+            lines.append("")
+            continue
+        if o.missing_vocabulary:
+            missing_words = ", ".join(item["writing"] for item in o.missing_vocabulary)
+            lines.append(f"**Missing vocabulary:** {missing_words}")
+            lines.append("")
+        lines.append(f"**Title:** {o.title}")
+        lines.append("")
+        lines.append(f"**Body:**\n\n{o.body}")
+        lines.append("")
+        if o.manual_quality_notes:
+            lines.append(f"**Manual quality notes:** {o.manual_quality_notes}")
+        else:
+            lines.append("**Manual quality notes:** _(fill in — correct sense of any "
+                          "ambiguous words? natural phrasing? does it read like it was "
+                          "written for the target HSK level?)_")
+        lines.append("")
+
+    return "\n".join(lines)

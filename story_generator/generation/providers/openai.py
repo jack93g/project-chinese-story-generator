@@ -21,6 +21,15 @@ Credentials: the API key is only ever placed in the Authorization
 header of the outbound HTTP request — it is never included in the
 JSON request/response body reported via on_raw_exchange, and this
 module never logs the key or the header.
+
+build_openai_provider() additionally gates on
+story_generator.generation.providers.provider_registry: the current
+(provider_label, model, base_url) combination must have a recorded,
+reviewed comparison entry before it can be resolved into a live
+provider (M3-7). This is ONE of two required call sites — the other is
+process startup for anything long-running (see
+provider_registry.assert_current_provider_approved's docstring for
+why both are needed).
 """
 
 import time
@@ -38,6 +47,7 @@ from story_generator.generation.providers.errors import (
     ProviderTimeoutError,
 )
 from story_generator.generation.providers.parser import parse_structured_result
+from story_generator.generation.providers.provider_registry import assert_current_provider_approved
 from story_generator.generation.providers.types import (
     GenerationRequestInput,
     GenerationResult,
@@ -172,6 +182,7 @@ class OpenAIStoryGenerationProvider:
 
 
 def build_openai_provider() -> OpenAIStoryGenerationProvider:
+    assert_current_provider_approved()
     return OpenAIStoryGenerationProvider(
         client=httpx.Client(),
         api_key=get_openai_api_key(),

@@ -2,6 +2,7 @@ from datetime import datetime, timedelta, timezone
 
 from sqlalchemy import select, update
 from sqlalchemy.orm import Session
+from story_generator.stories.persistence.models import Story
 
 from story_generator.generation.persistence.models import (
     RawGenerationPayload,
@@ -135,3 +136,11 @@ class GenerationRequestRepository:
             .order_by(RawGenerationPayload.attempt_number.asc())
             .all()
         )
+    
+    def get_story_id_for_request(self, generation_request_id: int) -> int | None:
+        story = (
+            self.session.query(Story)
+            .filter_by(generation_request_id=generation_request_id)
+            .first()
+        )
+        return story.id if story is not None else None

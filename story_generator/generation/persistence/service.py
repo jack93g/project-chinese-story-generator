@@ -78,6 +78,9 @@ class GenerationRequestService:
         )
         return self.repository.create(request)
 
+    def get(self, request_id: int) -> StoryGenerationRequest:
+        return self._get(request_id)
+
     def claim_next(self) -> StoryGenerationRequest | None:
         """Atomically claim the oldest queued request. See repository docstring."""
         return self.repository.claim_next_request()
