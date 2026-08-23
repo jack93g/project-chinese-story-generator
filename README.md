@@ -1,8 +1,8 @@
 # Chinese Story Generator
 
-A Python backend for importing Chinese vocabulary from Skritter, browsing the
-imported vocabulary and saved stories through an API, and laying the durable
-foundation for AI-assisted story generation.
+A Python backend for importing Chinese vocabulary from Skritter, browsing it
+through an API, and generating Chinese-language learning stories through a
+durable background workflow.
 
 ## Current capabilities
 
@@ -10,17 +10,20 @@ foundation for AI-assisted story generation.
 - Store vocabulary, list membership, sync-run history, and raw Skritter API
   payloads. Re-running an import is idempotent and does not duplicate
   vocabulary or list memberships.
-- Serve a FastAPI read API for vocabulary, vocabulary lists, saved stories,
-  and the latest sync status.
-- Persist saved stories and their selected vocabulary.
-- Persist story-generation requests and enforce their lifecycle
-  (`queued` → `running` → `succeeded` or `failed`, with failed requests
-  retryable). Generation payload persistence redacts secret-like fields.
+- Serve a FastAPI for vocabulary, vocabulary lists, saved stories, sync
+  status, and asynchronous story-generation requests.
+- Queue generation requests, select a deterministic vocabulary sample,
+  generate a structured story through an OpenAI-compatible provider, validate
+  vocabulary coverage, and persist the completed story and its vocabulary
+  usage.
+- Run one or more durable workers safely: database-level claiming prevents two
+  workers from processing the same request. Stale running requests are
+  reclaimed when a worker starts.
+- Retain redacted provider request/response payloads and generation metadata
+  for debugging. Failed requests can be retried up to three attempts.
+- Compare OpenAI-compatible providers against a shared evaluation set before
+  allowing one to be used by the worker.
 - Version the PostgreSQL schema with SQLAlchemy and Alembic.
-
-The repository does not yet expose story-generation endpoints, run a
-generation worker, or call an LLM provider. Those are the remaining parts of
-the story-generation milestone.
 
 ## API
 
@@ -36,16 +39,27 @@ Start the application and open the interactive documentation at
 | `GET` | `/stories` | Returns paginated saved-story summaries. |
 | `GET` | `/stories/{story_id}` | Returns a saved story and its selected vocabulary. |
 | `GET` | `/sync-status` | Returns the most recent Skritter sync run, or `{"latest_run": null}`. |
+| `POST` | `/story-generations` | Queues a story-generation request and returns `202 Accepted`. |
+| `GET` | `/story-generations/{generation_request_id}` | Returns the request status and completed story ID, if available. |
+| `POST` | `/story-generations/{generation_request_id}/retry` | Requeues an eligible failed request and returns `202 Accepted`. |
 
 The collection endpoints accept `limit` (1–100, default `50`) and `offset`
-(default `0`). Unknown story and vocabulary-list IDs return `404`.
+(default `0`). Unknown story, vocabulary-list, and generation-request IDs
+return `404`.
+
+To queue a story, submit a vocabulary list ID, target HSK level (1–6), target
+word count (1–1000), requested vocabulary count (1–15), and optionally a
+topic. The API returns immediately; a separate worker performs the provider
+call. A request moves through `queued` → `running` → `succeeded` or `failed`.
+Only failed requests may be retried, and no request may be attempted more than
+three times.
 
 ## Project structure
 
 ```text
 API client → FastAPI routes → services → PostgreSQL
                                   ↓
-                         Skritter API / future LLM provider
+                    Skritter API / OpenAI-compatible provider
 ```
 
 - `main.py` is the web-server entry point.
@@ -55,10 +69,12 @@ API client → FastAPI routes → services → PostgreSQL
 - `story_generator/vocabulary` owns vocabulary parsing, services, and
   persistence.
 - `story_generator/stories` owns saved-story queries and persistence.
-- `story_generator/generation` contains the durable generation-request
-  lifecycle and redaction logic; it is not yet an API or worker.
+- `story_generator/generation` contains generation request lifecycle,
+  vocabulary selection, versioned prompts, provider adapters, validation, and
+  the durable worker.
 - `story_generator/database` contains shared SQLAlchemy setup.
-- `story_generator/cli/ingestion.py` provides the manual sync command.
+- `story_generator/cli` provides manual vocabulary sync, generation-worker,
+  and provider-comparison commands.
 
 Services coordinate workflows, repositories read and write PostgreSQL, and
 external clients make HTTP calls. Keeping these responsibilities separate
@@ -79,12 +95,19 @@ Create a `.env` file in the repository root; do not commit it.
 DATABASE_URL=postgresql+psycopg://USER:PASSWORD@localhost:5432/chinese_story_generator
 TEST_DATABASE_URL=postgresql+psycopg://USER:PASSWORD@localhost:5432/chinese_story_generator_test
 SKRITTER_ACCESS_TOKEN=your-token
+OPENAI_API_KEY=your-provider-key
+# Required for the worker; see “Configure a generation provider”.
+OPENAI_PROVIDER_LABEL=groq
+OPENAI_MODEL=openai/gpt-oss-120b
+OPENAI_BASE_URL=https://api.groq.com/openai/v1/chat/completions
 ```
 
 `DATABASE_URL` is required by database-backed API endpoints, migrations, and
 the importer. `SKRITTER_ACCESS_TOKEN` is required only for a Skritter import.
 `TEST_DATABASE_URL` must refer to a separate database whose name includes
 `test`; the test suite refuses to use the development database.
+`OPENAI_API_KEY` and the three `OPENAI_*` provider settings are required only
+by the generation worker and live-provider smoke test.
 
 ## Run the API
 
@@ -100,6 +123,72 @@ Check the health endpoint:
 ```bash
 curl http://127.0.0.1:8000/health
 ```
+
+## Generate a story
+
+Start the API and, in a separate terminal, start a worker. The worker can run
+continuously or process at most one queued request with `--once`:
+
+```bash
+.venv/bin/python -m story_generator.cli.generation_worker
+.venv/bin/python -m story_generator.cli.generation_worker --once
+```
+
+Queue a request using the ID from `GET /vocabulary-lists`, then poll its
+status. Replace `1` with an existing vocabulary-list ID and the returned
+generation request ID.
+
+```bash
+curl -X POST http://127.0.0.1:8000/story-generations \
+  -H 'content-type: application/json' \
+  -d '{
+    "vocabulary_list_id": 1,
+    "target_hsk_level": 2,
+    "target_word_count": 150,
+    "target_vocabulary_count": 10,
+    "topic": "a trip to the market"
+  }'
+
+curl http://127.0.0.1:8000/story-generations/1
+```
+
+On success, the status response includes `story_id`; retrieve the completed
+story at `GET /stories/{story_id}`. A failed request may be requeued while it
+has fewer than three attempts:
+
+```bash
+curl -X POST http://127.0.0.1:8000/story-generations/1/retry
+```
+
+### Configure a generation provider
+
+The worker uses an OpenAI-compatible Chat Completions endpoint. It will start
+only when the exact `(OPENAI_PROVIDER_LABEL, OPENAI_MODEL, OPENAI_BASE_URL)`
+combination appears in the reviewed allowlist in
+`story_generator/generation/providers/provider_registry.py`. This prevents an
+unreviewed model or endpoint from being used by accident.
+
+The repository currently approves the Groq example shown in `.env` above.
+Although the code defaults to OpenAI's `gpt-4o` endpoint when these settings
+are absent, that default is not currently approved and the worker will reject
+it until it is evaluated and added to the allowlist.
+
+To evaluate another provider or model, run the comparison harness, review the
+generated transcripts, add `manual_quality_notes` to its JSON report, render
+the report again, and then add the reviewed report to the allowlist:
+
+```bash
+.venv/bin/python -m story_generator.cli.provider_comparison run \
+  --provider 'provider-label|https://provider.example/v1/chat/completions|model-name|API_KEY_ENV_VAR'
+
+# Edit manual_quality_notes in the generated JSON report, then:
+.venv/bin/python -m story_generator.cli.provider_comparison render \
+  --input reports/provider-comparisons/TIMESTAMP.json
+```
+
+The comparison command does not write to the application database. For local
+OpenAI-compatible servers that do not require a key, the final part of the
+provider specification may name an unset environment variable.
 
 ## Database migrations
 
@@ -153,9 +242,17 @@ Run database integration tests against `TEST_DATABASE_URL`:
 .venv/bin/python -m pytest -m db
 ```
 
+Live provider smoke tests are skipped by default because they require real
+credentials and may incur cost. Run them explicitly only after configuring an
+approved provider:
+
+```bash
+RUN_SMOKE_TESTS=1 .venv/bin/python -m pytest -m smoke
+```
+
 ## Roadmap
 
 The detailed delivery plan is in [docs/milestones.md](docs/milestones.md).
-Vocabulary ingestion and the read API are implemented. The current work is
-Milestone 3: completing the provider-backed, asynchronous story-generation
-workflow and its API.
+Vocabulary ingestion, the backend API, and the durable story-generation
+workflow are implemented. The next planned product milestone is a frontend
+for selecting vocabulary, requesting stories, and reading completed results.

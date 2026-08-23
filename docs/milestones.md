@@ -70,7 +70,7 @@
 ### Product and technical decisions
 
 - A generation is requested with a vocabulary-list ID, target HSK level, and optional controls such as topic and target length. The server selects a bounded set of vocabulary from that list; the client never supplies the prompt or arbitrary vocabulary IDs.
-- `POST /story-generations` creates a durable request and returns `202 Accepted` with its ID and `queued` status. A backend worker processes queued requests. `GET /story-generations/{id}` exposes lifecycle state; `GET /stories/{id}` returns a completed story. This is also the frontend contract for Milestone 5.
+- `POST /story-generations` creates a durable request and returns `202 Accepted` with its ID and `queued` status. A backend worker processes queued requests. `GET /story-generations/{id}` exposes lifecycle state; `GET /stories/{id}` returns a completed story. This is also the frontend contract for Milestone 4.
 - A story has a stable, provider-independent shape: Chinese title and body, requested/used target vocabulary, validation results, and generation provenance. The complete provider response is retained separately for debugging; it is not the public API contract.
 - Start with OpenAI behind a provider-neutral interface. Add Ollama-compatible Chinese-model providers only after the evaluation harness is in place, so models are compared against the same prompts and checks rather than selected by anecdote.
 - Generation is accepted when every selected target word is present and the generated text passes structural checks. HSK level is a target, not a guarantee: automated checks should flag unsupported vocabulary for review rather than claim formal HSK certification.
@@ -94,47 +94,48 @@
 
 ---
 
-## 4. Reader enrichment
+## 4. Frontend
 
-**Goal:** Turn a completed story into a stable reader document that the frontend can render without per-token work.
-
-### Definition of done
-
-- A successful story-generation event triggers an idempotent enrichment job; it records `pending`, `running`, `succeeded`, or `failed` status separately from generation.
-- Chinese text is segmented into ordered tokens and punctuation using a selected, documented tokenizer.
-- Vocabulary occurrences are matched using deterministic longest-match rules against the selected list and all known vocabulary; unmatched lexical tokens are marked as unknown candidates.
-- Pinyin and English definitions are attached from the vocabulary database when available; a documented fallback/enrichment source is used only for missing data and its provenance is stored.
-- A versioned reader-document payload is persisted for efficient frontend rendering, including stable token IDs, character offsets, sentence boundaries, vocabulary links, and known/unknown status.
-- `GET /stories/{id}/reader` returns the persisted reader document, with clear `409`/`422` behaviour while enrichment is incomplete or failed.
-- Tests cover segmentation edge cases, repeated and overlapping vocabulary, Unicode offsets, idempotent reprocessing, and API serialization.
-
-### Learning outcomes
-
-- Text processing.
-- Tokenisation.
-- Data enrichment pipelines.
-- Backend preparation for frontend performance.
-
----
-
-## 5. Frontend
-
-**Goal:** Provide a simple web interface for generating and reading stories.
+**Goal:** Provide a simple end-to-end interface for selecting vocabulary, generating a story, and reading it.
 
 ### Definition of done
 
-- A Next.js application displays vocabulary, sync status, story generation, and saved stories.
-- The reader supports toggling pinyin and English translations.
-- Known and unknown vocabulary are visually distinguishable.
+- A Next.js application displays vocabulary lists, sync status, saved stories, and story-generation controls.
+- A learner can choose a vocabulary list, target HSK level, and optional topic/length, then start a story-generation request.
+- The interface observes queued, running, succeeded, and failed generation states, including retry where eligible.
+- A completed story is readable in Chinese and shows its selected-vocabulary glossary using the existing pinyin and English definitions.
 - The interface handles loading, empty, and failure states accessibly.
+- Frontend tests cover the generation flow and story reading against the published API contract.
 
 ### Learning outcomes
 
 - React state management.
-- Data fetching.
+- Data fetching and asynchronous workflow UI.
 - Component design.
 - Accessible UI development.
 - Frontend-backend contracts.
+
+---
+
+## 5. Interactive reader enrichment
+
+**Goal:** Enrich completed stories for an interactive Chinese-learning reading experience, informed by the first frontend release.
+
+### Definition of done
+
+- A selected tokenizer segments story text into ordered tokens and punctuation, preserving character offsets and sentence boundaries.
+- Vocabulary occurrences are matched deterministically against the story's selected vocabulary and known vocabulary; unmatched lexical tokens are marked as unknown candidates.
+- Pinyin and English definitions are attached from the vocabulary database when available. Any fallback enrichment source and its provenance are persisted.
+- A versioned reader-document payload is persisted and exposed at `GET /stories/{id}/reader` for efficient frontend rendering.
+- The reader supports inline pinyin/English toggles and visually distinguishes known, selected, and unknown vocabulary.
+- Tests cover segmentation edge cases, repeated and overlapping vocabulary, Unicode offsets, matching, API serialization, and safe reprocessing.
+
+### Learning outcomes
+
+- Text processing.
+- Chinese tokenisation and vocabulary matching.
+- Data enrichment pipelines.
+- Evidence-based backend optimisation for frontend performance.
 
 ---
 

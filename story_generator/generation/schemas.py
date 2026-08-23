@@ -6,6 +6,26 @@ from pydantic import BaseModel, Field, field_validator
 # layers deliberately; see StoryGenerationRequest docstring.
 MAX_TARGET_WORD_COUNT = 1000
 
+# Error codes we generate ourselves — their error_message is written
+# by us and safe to expose verbatim via the API. Anything else (e.g.
+# a raw ProviderXxxError class name) may echo provider-side text we
+# didn't design for external display, so it's collapsed to a generic
+# message instead. error_code itself is always exposed either way.
+_SAFE_DIAGNOSTIC_ERROR_CODES = {
+    "InsufficientVocabularyCoverage",
+    "StaleWorkerRetryLimitExceeded",
+}
+
+_GENERIC_ERROR_MESSAGE = "Story generation failed. You may retry this request."
+
+
+def safe_error_message(error_code: str | None, error_message: str | None) -> str | None:
+    if error_code is None:
+        return None
+    if error_code in _SAFE_DIAGNOSTIC_ERROR_CODES:
+        return error_message
+    return _GENERIC_ERROR_MESSAGE
+
 
 class CreateGenerationRequestSchema(BaseModel):
     """
@@ -18,9 +38,7 @@ class CreateGenerationRequestSchema(BaseModel):
 
     provider/model are deliberately NOT accepted here — they're
     resolved from trusted server configuration in
-    GenerationRequestService.create(), not chosen by the caller, so
-    StoryGenerationRequest.provider/.model remain a trustworthy record
-    of what actually ran rather than an unvalidated client claim.
+    GenerationRequestService.create(), not chosen by the caller.
     """
 
     vocabulary_list_id: int
@@ -37,17 +55,28 @@ class CreateGenerationRequestSchema(BaseModel):
         return value
 
 
-class GenerationRequestDetail(BaseModel):
-    id: int
-    vocabulary_list_id: int
-    target_hsk_level: int
-    topic: str | None
-    target_word_count: int
-    target_vocabulary_count: int
-    selected_vocabulary_snapshot: list[dict]
-    status: str
-    prompt_version: str
-    provider: str
-    model: str
+class GenerationCreatedResponse(BaseModel):
+    """Returned immediately by POST /story-generations, before any provider call."""
 
-    model_config = {"from_attributes": True}
+    id: int
+    status: str
+
+
+class GenerationStatusResponse(BaseModel):
+    """Returned by GET /story-generations/{id} and the retry endpoint."""
+
+    id: int
+    status: str
+    error_code: str | None
+    error_message: str | None
+    story_id: int | None
+
+    @classmethod
+    def from_request(cls, request, story_id: int | None) -> "GenerationStatusResponse":
+        return cls(
+            id=request.id,
+            status=request.status,
+            error_code=request.error_code,
+            error_message=safe_error_message(request.error_code, request.error_message),
+            story_id=story_id,
+        )
