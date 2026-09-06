@@ -127,3 +127,56 @@ describe("fetchAllVocabularyLists", () => {
     expect(fetchMock).toHaveBeenCalledTimes(1);
   });
 });
+
+describe("fetchStories / fetchAllStories", () => {
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  it("fetchStories sends the given limit and offset as query params", async () => {
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({ items: [], total: 0, limit: 10, offset: 0 }),
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    const { fetchStories } = await import("./api");
+    await fetchStories({ limit: 10, offset: 0 });
+
+    expect(fetchMock).toHaveBeenCalledWith(
+      "http://127.0.0.1:8000/stories?limit=10&offset=0",
+      undefined,
+    );
+  });
+
+  it("fetchAllStories paginates across multiple pages, reusing the same guard as vocabulary lists", async () => {
+    const pageOne = {
+      items: [
+        { id: 1, title: "Story 1", created_at: "2026-01-01", target_hsk: 1 },
+        { id: 2, title: "Story 2", created_at: "2026-01-02", target_hsk: 2 },
+      ],
+      total: 3,
+      limit: 2,
+      offset: 0,
+    };
+    const pageTwo = {
+      items: [
+        { id: 3, title: "Story 3", created_at: "2026-01-03", target_hsk: 3 },
+      ],
+      total: 3,
+      limit: 2,
+      offset: 2,
+    };
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce({ ok: true, json: async () => pageOne })
+      .mockResolvedValueOnce({ ok: true, json: async () => pageTwo });
+    vi.stubGlobal("fetch", fetchMock);
+
+    const { fetchAllStories } = await import("./api");
+    const items = await fetchAllStories(2);
+
+    expect(items).toEqual([...pageOne.items, ...pageTwo.items]);
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+  });
+});

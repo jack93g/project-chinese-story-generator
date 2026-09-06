@@ -95,6 +95,17 @@ describe("StoryPage", () => {
     expect(screen.getByText("to rain")).toBeInTheDocument();
   });
 
+  it("omits the HSK badge when target_hsk is null but still shows the date", async () => {
+    useParams.mockReturnValue({ id: "5" });
+    fetchStory.mockResolvedValueOnce({ ...STORY, target_hsk: null });
+    render(<StoryPage />);
+
+    await screen.findByRole("heading", { name: "天气小记" });
+
+    expect(screen.queryByText(/HSK/)).not.toBeInTheDocument();
+    expect(screen.getByText(/September 6, 2026/)).toBeInTheDocument();
+  });
+
   it("omits pinyin parentheses and shows an explicit missing-definition note for null glossary fields", async () => {
     useParams.mockReturnValue({ id: "5" });
     fetchStory.mockResolvedValueOnce({

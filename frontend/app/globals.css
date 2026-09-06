@@ -190,3 +190,33 @@ a {
   font-style: italic;
   color: rgba(128, 128, 128, 1);
 }
+
+.story-list {
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.story-list-item {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  padding: 0.75rem 1rem;
+  border: 1px solid rgba(128, 128, 128, 0.3);
+  border-radius: 0.5rem;
+}
+
+.story-list-item:hover {
+  border-color: rgba(128, 128, 128, 0.6);
+}
+
+.story-list-title {
+  font-weight: 600;
+  font-size: 1.1rem;
+}
+
+.story-list-meta {
+  color: rgba(128, 128, 128, 1);
+  font-size: 0.85rem;
+}

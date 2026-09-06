@@ -93,7 +93,8 @@ export default function StoryPage() {
           {story.title}
         </h1>
         <p className="story-meta">
-          HSK {story.target_hsk} &middot; {formatDate(story.created_at)}
+          {story.target_hsk !== null && <>HSK {story.target_hsk} &middot; </>}
+          {formatDate(story.created_at)}
         </p>
       </header>
 

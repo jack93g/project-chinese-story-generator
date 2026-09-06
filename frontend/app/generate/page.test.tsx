@@ -1,4 +1,5 @@
 import {
+  act,
   fireEvent,
   render,
   screen,
@@ -9,17 +10,36 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { ApiError } from "@/lib/api";
 import GeneratePage from "./page";
 
-const { fetchAllVocabularyLists, createStoryGeneration } = vi.hoisted(() => ({
+const {
+  fetchAllVocabularyLists,
+  createStoryGeneration,
+  fetchGenerationStatus,
+  retryStoryGeneration,
+  routerPush,
+} = vi.hoisted(() => ({
   fetchAllVocabularyLists: vi.fn(),
   createStoryGeneration: vi.fn(),
+  fetchGenerationStatus: vi.fn(),
+  retryStoryGeneration: vi.fn(),
+  routerPush: vi.fn(),
 }));
 
 vi.mock("@/lib/api", async () => {
   const actual = await vi.importActual<typeof import("@/lib/api")>(
     "@/lib/api",
   );
-  return { ...actual, fetchAllVocabularyLists, createStoryGeneration };
+  return {
+    ...actual,
+    fetchAllVocabularyLists,
+    createStoryGeneration,
+    fetchGenerationStatus,
+    retryStoryGeneration,
+  };
 });
+
+vi.mock("next/navigation", () => ({
+  useRouter: () => ({ push: routerPush }),
+}));
 
 const LISTS = [
   { id: 1, name: "Love & Relationships", item_count: 12 },
@@ -35,6 +55,7 @@ async function renderReady() {
 describe("GeneratePage", () => {
   afterEach(() => {
     vi.clearAllMocks();
+    vi.useRealTimers();
   });
 
   it("shows a loading state while vocabulary lists are fetched", () => {
@@ -206,8 +227,8 @@ describe("GeneratePage", () => {
     });
 
     expect(
-      await screen.findByText(/Generation request #42 is queued/),
-    ).toBeInTheDocument();
+      await screen.findByRole("status"),
+    ).toHaveTextContent("Queued");
   });
 
   it("caps the requested vocabulary count to the list's item count and sends null for a blank topic", async () => {
@@ -254,5 +275,259 @@ describe("GeneratePage", () => {
     expect(
       await screen.findByText("Vocabulary list 1 not found"),
     ).toBeInTheDocument();
+  });
+
+  async function flush() {
+    await act(async () => {
+      await Promise.resolve();
+    });
+  }
+
+  // Fake timers must be active *before* the Generate click, since that's
+  // what schedules the polling effect's first setTimeout — enabling fake
+  // timers afterwards can't retroactively take over a timer that was
+  // already scheduled against the real clock.
+  async function submitReadyFormWithFakeTimers() {
+    vi.useFakeTimers();
+    fetchAllVocabularyLists.mockResolvedValueOnce(LISTS);
+    const result = render(<GeneratePage />);
+    await flush();
+
+    fireEvent.change(screen.getByLabelText("Vocabulary list"), {
+      target: { value: "1" },
+    });
+    fireEvent.change(screen.getByLabelText("Target HSK level"), {
+      target: { value: "2" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Generate" }));
+    await flush();
+
+    return result;
+  }
+
+  it("polls generation status and redirects to the story once it succeeds", async () => {
+    createStoryGeneration.mockResolvedValueOnce({ id: 50, status: "queued" });
+    await submitReadyFormWithFakeTimers();
+    expect(screen.getByRole("status")).toHaveTextContent("Queued");
+
+    fetchGenerationStatus.mockResolvedValueOnce({
+      id: 50,
+      status: "running",
+      error_code: null,
+      error_message: null,
+      story_id: null,
+    });
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(2500);
+    });
+    expect(screen.getByRole("status")).toHaveTextContent(
+      "Generating your story",
+    );
+
+    fetchGenerationStatus.mockResolvedValueOnce({
+      id: 50,
+      status: "succeeded",
+      error_code: null,
+      error_message: null,
+      story_id: 99,
+    });
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(2500);
+    });
+
+    expect(routerPush).toHaveBeenCalledWith("/stories/99");
+  });
+
+  it("shows the safe failure message and stops polling once a request fails", async () => {
+    createStoryGeneration.mockResolvedValueOnce({ id: 51, status: "queued" });
+    await submitReadyFormWithFakeTimers();
+
+    fetchGenerationStatus.mockResolvedValueOnce({
+      id: 51,
+      status: "failed",
+      error_code: "GenericFailure",
+      error_message: "Story generation failed. You may retry this request.",
+      story_id: null,
+    });
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(2500);
+    });
+
+    expect(screen.getByRole("alert")).toHaveTextContent(
+      "Story generation failed. You may retry this request.",
+    );
+    expect(screen.getByRole("button", { name: "Retry" })).toBeInTheDocument();
+
+    const callsAfterFailure = fetchGenerationStatus.mock.calls.length;
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(10_000);
+    });
+    expect(fetchGenerationStatus).toHaveBeenCalledTimes(callsAfterFailure);
+  });
+
+  it("stops polling immediately and shows a clear error on a 404 status response", async () => {
+    createStoryGeneration.mockResolvedValueOnce({ id: 60, status: "queued" });
+    await submitReadyFormWithFakeTimers();
+
+    fetchGenerationStatus.mockRejectedValueOnce(
+      new ApiError("Generation request 60 not found", 404),
+    );
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(2500);
+    });
+
+    expect(screen.getByRole("alert")).toHaveTextContent(
+      "This generation request could not be found.",
+    );
+
+    const callsAfterNotFound = fetchGenerationStatus.mock.calls.length;
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(10_000);
+    });
+    expect(fetchGenerationStatus).toHaveBeenCalledTimes(callsAfterNotFound);
+  });
+
+  it("stops polling immediately on any other 4xx status response", async () => {
+    createStoryGeneration.mockResolvedValueOnce({ id: 61, status: "queued" });
+    await submitReadyFormWithFakeTimers();
+
+    fetchGenerationStatus.mockRejectedValueOnce(
+      new ApiError("Bad request", 400),
+    );
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(2500);
+    });
+
+    expect(screen.getByRole("alert")).toHaveTextContent("Bad request");
+    expect(fetchGenerationStatus).toHaveBeenCalledTimes(1);
+  });
+
+  it("retries transient network/5xx status failures a bounded number of times before giving up", async () => {
+    createStoryGeneration.mockResolvedValueOnce({ id: 62, status: "queued" });
+    await submitReadyFormWithFakeTimers();
+
+    fetchGenerationStatus.mockRejectedValue(new TypeError("Failed to fetch"));
+
+    for (let i = 0; i < 4; i += 1) {
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(2500);
+      });
+      expect(screen.getByRole("status")).toHaveTextContent("Queued");
+    }
+
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(2500);
+    });
+    expect(screen.getByRole("alert")).toHaveTextContent(
+      "Lost connection while checking on this request.",
+    );
+    expect(fetchGenerationStatus).toHaveBeenCalledTimes(5);
+
+    const callsAfterGivingUp = fetchGenerationStatus.mock.calls.length;
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(10_000);
+    });
+    expect(fetchGenerationStatus).toHaveBeenCalledTimes(callsAfterGivingUp);
+  });
+
+  it("resets the transient-failure count after a successful poll", async () => {
+    createStoryGeneration.mockResolvedValueOnce({ id: 63, status: "queued" });
+    await submitReadyFormWithFakeTimers();
+
+    // Three failures, then a success, then two more failures — none of
+    // this should add up to the bound of 5, since the successful poll
+    // in between resets the counter.
+    fetchGenerationStatus
+      .mockRejectedValueOnce(new TypeError("Failed to fetch"))
+      .mockRejectedValueOnce(new TypeError("Failed to fetch"))
+      .mockRejectedValueOnce(new TypeError("Failed to fetch"))
+      .mockResolvedValueOnce({
+        id: 63,
+        status: "running",
+        error_code: null,
+        error_message: null,
+        story_id: null,
+      })
+      .mockRejectedValueOnce(new TypeError("Failed to fetch"))
+      .mockRejectedValueOnce(new TypeError("Failed to fetch"));
+
+    for (let i = 0; i < 6; i += 1) {
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(2500);
+      });
+    }
+
+    expect(screen.queryByRole("alert")).not.toBeInTheDocument();
+    expect(fetchGenerationStatus).toHaveBeenCalledTimes(6);
+  });
+
+  it("retries a failed request and resumes polling on success", async () => {
+    createStoryGeneration.mockResolvedValueOnce({ id: 52, status: "queued" });
+    await submitReadyFormWithFakeTimers();
+
+    fetchGenerationStatus.mockResolvedValueOnce({
+      id: 52,
+      status: "failed",
+      error_code: "GenericFailure",
+      error_message: "Story generation failed. You may retry this request.",
+      story_id: null,
+    });
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(2500);
+    });
+    expect(screen.getByRole("button", { name: "Retry" })).toBeInTheDocument();
+
+    retryStoryGeneration.mockResolvedValueOnce({
+      id: 52,
+      status: "queued",
+      error_code: null,
+      error_message: null,
+      story_id: null,
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Retry" }));
+    await flush();
+
+    expect(screen.getByRole("status")).toHaveTextContent("Queued");
+    expect(retryStoryGeneration).toHaveBeenCalledWith(52);
+  });
+
+  it("shows a retry-specific error when the request is not eligible for retry", async () => {
+    createStoryGeneration.mockResolvedValueOnce({ id: 53, status: "queued" });
+    await submitReadyFormWithFakeTimers();
+
+    fetchGenerationStatus.mockResolvedValueOnce({
+      id: 53,
+      status: "failed",
+      error_code: "GenericFailure",
+      error_message: "Story generation failed. You may retry this request.",
+      story_id: null,
+    });
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(2500);
+    });
+    expect(screen.getByRole("button", { name: "Retry" })).toBeInTheDocument();
+
+    retryStoryGeneration.mockRejectedValueOnce(
+      new ApiError(
+        "Request 53 is not eligible for retry (current status: 'failed')",
+        409,
+      ),
+    );
+    fireEvent.click(screen.getByRole("button", { name: "Retry" }));
+    await flush();
+
+    expect(screen.getByText(/not eligible for retry/)).toBeInTheDocument();
+  });
+
+  it("stops polling once the page is left", async () => {
+    createStoryGeneration.mockResolvedValueOnce({ id: 54, status: "queued" });
+    const { unmount } = await submitReadyFormWithFakeTimers();
+
+    unmount();
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(10_000);
+    });
+
+    expect(fetchGenerationStatus).not.toHaveBeenCalled();
   });
 });

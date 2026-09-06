@@ -1,10 +1,14 @@
 "use client";
 
 import { useEffect, useState, type FormEvent } from "react";
+import { useRouter } from "next/navigation";
 import {
   ApiError,
   createStoryGeneration,
   fetchAllVocabularyLists,
+  fetchGenerationStatus,
+  retryStoryGeneration,
+  type GenerationStatusValue,
   type VocabularyListSummary,
 } from "@/lib/api";
 
@@ -12,6 +16,8 @@ const HSK_LEVELS = [1, 2, 3, 4, 5, 6];
 const DEFAULT_TARGET_WORD_COUNT = 150;
 const DEFAULT_TARGET_VOCABULARY_COUNT = 10;
 const MAX_TARGET_WORD_COUNT = 1000;
+const POLL_INTERVAL_MS = 2500;
+const MAX_TRANSIENT_STATUS_FAILURES = 5;
 
 type ListsState =
   | { status: "loading" }
@@ -21,8 +27,12 @@ type ListsState =
 type SubmitState =
   | { status: "idle" }
   | { status: "submitting" }
-  | { status: "error"; message: string }
-  | { status: "success"; id: number };
+  | { status: "error"; message: string };
+
+type GenerationState =
+  | { phase: "polling"; id: number; status: GenerationStatusValue }
+  | { phase: "failed"; id: number; message: string }
+  | { phase: "error"; id: number; message: string };
 
 type TargetWordCountResult =
   | { value: number; error: null }
@@ -50,6 +60,7 @@ function parseTargetWordCount(input: string): TargetWordCountResult {
 }
 
 export default function GeneratePage() {
+  const router = useRouter();
   const [listsState, setListsState] = useState<ListsState>({
     status: "loading",
   });
@@ -62,6 +73,9 @@ export default function GeneratePage() {
   const [submitState, setSubmitState] = useState<SubmitState>({
     status: "idle",
   });
+  const [generation, setGeneration] = useState<GenerationState | null>(null);
+  const [isRetrying, setIsRetrying] = useState(false);
+  const [retryError, setRetryError] = useState<string | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -88,6 +102,86 @@ export default function GeneratePage() {
       cancelled = true;
     };
   }, []);
+
+  useEffect(() => {
+    if (generation === null || generation.phase !== "polling") {
+      return;
+    }
+    const { id } = generation;
+    let cancelled = false;
+    let timeoutId: ReturnType<typeof setTimeout>;
+    let consecutiveFailures = 0;
+
+    const poll = () => {
+      fetchGenerationStatus(id)
+        .then((result) => {
+          if (cancelled) {
+            return;
+          }
+          consecutiveFailures = 0;
+          if (result.status === "succeeded" && result.story_id !== null) {
+            router.push(`/stories/${result.story_id}`);
+            return;
+          }
+          if (result.status === "failed") {
+            setGeneration({
+              phase: "failed",
+              id,
+              message:
+                result.error_message ??
+                "Story generation failed. You may retry this request.",
+            });
+            return;
+          }
+          setGeneration({ phase: "polling", id, status: result.status });
+          timeoutId = setTimeout(poll, POLL_INTERVAL_MS);
+        })
+        .catch((error: unknown) => {
+          if (cancelled) {
+            return;
+          }
+          // A 4xx means this request will never resolve by retrying
+          // identically (e.g. 404 — the ID doesn't exist) — stop immediately
+          // with a clear error instead of polling forever.
+          if (
+            error instanceof ApiError &&
+            error.status >= 400 &&
+            error.status < 500
+          ) {
+            setGeneration({
+              phase: "error",
+              id,
+              message:
+                error.status === 404
+                  ? "This generation request could not be found."
+                  : error.message,
+            });
+            return;
+          }
+          // Otherwise treat it as a transient network/5xx hiccup, but only
+          // up to a bounded number of consecutive failures.
+          consecutiveFailures += 1;
+          if (consecutiveFailures >= MAX_TRANSIENT_STATUS_FAILURES) {
+            setGeneration({
+              phase: "error",
+              id,
+              message:
+                "Lost connection while checking on this request. Refresh the page to try again.",
+            });
+            return;
+          }
+          timeoutId = setTimeout(poll, POLL_INTERVAL_MS);
+        });
+    };
+
+    timeoutId = setTimeout(poll, POLL_INTERVAL_MS);
+
+    return () => {
+      cancelled = true;
+      clearTimeout(timeoutId);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- only the phase transition (not `status`) should restart polling
+  }, [generation?.phase, generation?.id, router]);
 
   const selectedList =
     listsState.status === "ready"
@@ -124,7 +218,8 @@ export default function GeneratePage() {
         target_vocabulary_count: vocabularyCount,
         topic: trimmedTopic === "" ? null : trimmedTopic,
       });
-      setSubmitState({ status: "success", id: result.id });
+      setSubmitState({ status: "idle" });
+      setGeneration({ phase: "polling", id: result.id, status: "queued" });
     } catch (error) {
       setSubmitState({
         status: "error",
@@ -133,6 +228,44 @@ export default function GeneratePage() {
             ? error.message
             : "Could not start the story generation.",
       });
+    }
+  }
+
+  async function handleRetry() {
+    if (generation === null || generation.phase !== "failed") {
+      return;
+    }
+    setIsRetrying(true);
+    setRetryError(null);
+    try {
+      const result = await retryStoryGeneration(generation.id);
+      if (result.status === "succeeded" && result.story_id !== null) {
+        router.push(`/stories/${result.story_id}`);
+        return;
+      }
+      if (result.status === "failed") {
+        setGeneration({
+          phase: "failed",
+          id: generation.id,
+          message:
+            result.error_message ??
+            "Story generation failed. You may retry this request.",
+        });
+        return;
+      }
+      setGeneration({
+        phase: "polling",
+        id: generation.id,
+        status: result.status,
+      });
+    } catch (error) {
+      setRetryError(
+        error instanceof ApiError
+          ? error.message
+          : "Could not retry this request.",
+      );
+    } finally {
+      setIsRetrying(false);
     }
   }
 
@@ -168,14 +301,38 @@ export default function GeneratePage() {
     );
   }
 
-  if (submitState.status === "success") {
+  if (generation !== null) {
     return (
       <div className="page-content">
         <h1>Generate a story</h1>
-        <p role="status">
-          Generation request #{submitState.id} is queued. Check the saved
-          stories page once it finishes.
-        </p>
+        {generation.phase === "polling" && (
+          <p role="status">
+            {generation.status === "running"
+              ? "Generating your story…"
+              : "Queued — waiting for a worker to pick this up…"}{" "}
+            This page will update automatically.
+          </p>
+        )}
+        {generation.phase === "failed" && (
+          <>
+            <p role="alert" className="field-error">
+              {generation.message}
+            </p>
+            <button type="button" onClick={handleRetry} disabled={isRetrying}>
+              {isRetrying ? "Retrying…" : "Retry"}
+            </button>
+            {retryError && (
+              <p role="alert" className="field-error">
+                {retryError}
+              </p>
+            )}
+          </>
+        )}
+        {generation.phase === "error" && (
+          <p role="alert" className="field-error">
+            {generation.message}
+          </p>
+        )}
       </div>
     );
   }
