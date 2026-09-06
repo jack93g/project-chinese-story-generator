@@ -46,3 +46,13 @@ def get_openai_provider_label() -> str:
     StoryGenerationRequest.provider for accurate provenance.
     """
     return os.getenv("OPENAI_PROVIDER_LABEL", "openai")
+
+
+def get_cors_allowed_origins() -> list[str]:
+    """
+    Comma-separated browser origins allowed to call this API
+    (e.g. "http://localhost:3000,https://app.example.com"). Defaults
+    to the local Next.js dev server.
+    """
+    raw = os.getenv("CORS_ALLOWED_ORIGINS", "http://localhost:3000,http://127.0.0.1:3000")
+    return [origin.strip() for origin in raw.split(",") if origin.strip()]
