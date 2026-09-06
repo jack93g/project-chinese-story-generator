@@ -81,3 +81,112 @@ a {
   flex-direction: column;
   gap: 0.75rem;
 }
+
+.generate-form {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.form-field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+
+.form-field label {
+  font-weight: 600;
+}
+
+.form-field select,
+.form-field input {
+  padding: 0.5rem;
+  border: 1px solid rgba(128, 128, 128, 0.5);
+  border-radius: 0.375rem;
+  background: var(--background);
+  color: var(--foreground);
+  font: inherit;
+}
+
+.generate-form button {
+  align-self: flex-start;
+  padding: 0.6rem 1.25rem;
+  border: 1px solid rgba(128, 128, 128, 0.5);
+  border-radius: 0.375rem;
+  background: var(--foreground);
+  color: var(--background);
+  font: inherit;
+  cursor: pointer;
+}
+
+.generate-form button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.field-error {
+  color: #d9342b;
+}
+
+@media (prefers-color-scheme: dark) {
+  .field-error {
+    color: #ff6b60;
+  }
+}
+
+.story {
+  max-width: 42rem;
+  gap: 1.5rem;
+}
+
+.story-header {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+
+.story-title {
+  font-size: 1.75rem;
+  line-height: 1.4;
+}
+
+.story-meta {
+  color: rgba(128, 128, 128, 1);
+  font-size: 0.9rem;
+}
+
+.story-body {
+  white-space: pre-wrap;
+  font-size: 1.25rem;
+  line-height: 2;
+}
+
+.story-glossary dl {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 0.5rem 1rem;
+  margin-top: 0.75rem;
+}
+
+.glossary-item {
+  display: contents;
+}
+
+.glossary-item dt {
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.glossary-reading {
+  font-weight: 400;
+  color: rgba(128, 128, 128, 1);
+}
+
+.glossary-item dd {
+  margin: 0;
+}
+
+.glossary-missing {
+  font-style: italic;
+  color: rgba(128, 128, 128, 1);
+}
