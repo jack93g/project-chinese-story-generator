@@ -1,4 +1,7 @@
 from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
+
+from story_generator.config import get_cors_allowed_origins
 
 from story_generator.api.routers.health import router as health_router
 from story_generator.api.routers.vocabulary import router as vocabulary_router
@@ -14,6 +17,13 @@ def create_app() -> FastAPI:
     app = FastAPI(
         title="Chinese Story Generator API",
         version="0.1.0",
+    )
+
+    app.add_middleware(
+        CORSMiddleware,
+        allow_origins=get_cors_allowed_origins(),
+        allow_methods=["*"],
+        allow_headers=["*"],
     )
 
     app.include_router(health_router)
