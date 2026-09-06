@@ -250,9 +250,16 @@ approved provider:
 RUN_SMOKE_TESTS=1 .venv/bin/python -m pytest -m smoke
 ```
 
+## Frontend
+
+A Next.js frontend lives in [frontend/](frontend/README.md). It talks only to
+the FastAPI endpoints above — see that README for setup and for the commands
+to run the API, worker, and frontend together.
+
 ## Roadmap
 
 The detailed delivery plan is in [docs/milestones.md](docs/milestones.md).
 Vocabulary ingestion, the backend API, and the durable story-generation
-workflow are implemented. The next planned product milestone is a frontend
-for selecting vocabulary, requesting stories, and reading completed results.
+workflow are implemented. The current milestone is a frontend for selecting
+vocabulary, requesting stories, and reading completed results; see
+[docs/milestone-4-frontend-backlog.md](docs/milestone-4-frontend-backlog.md).
