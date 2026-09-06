@@ -43,6 +43,16 @@ export type StoryGenerationCreated = {
   status: string;
 };
 
+export type GenerationStatusValue = "queued" | "running" | "succeeded" | "failed";
+
+export type GenerationStatus = {
+  id: number;
+  status: GenerationStatusValue;
+  error_code: string | null;
+  error_message: string | null;
+  story_id: number | null;
+};
+
 export type VocabularyGlossaryItem = {
   id: number;
   skritter_vocab_id: string;
@@ -52,11 +62,21 @@ export type VocabularyGlossaryItem = {
   definition_en: string | null;
 };
 
-export type StoryDetail = {
+export type StorySummary = {
   id: number;
   title: string;
   created_at: string;
-  target_hsk: number;
+  target_hsk: number | null;
+};
+
+export type StoriesResponse = {
+  items: StorySummary[];
+  total: number;
+  limit: number;
+  offset: number;
+};
+
+export type StoryDetail = StorySummary & {
   content: string;
   selected_vocabulary: VocabularyGlossaryItem[];
 };
@@ -90,11 +110,10 @@ async function requestJson<T>(path: string, init?: RequestInit): Promise<T> {
   return response.json() as Promise<T>;
 }
 
-const VOCABULARY_LISTS_PAGE_SIZE = 100;
-
-export function fetchVocabularyLists(
-  params: { limit?: number; offset?: number } = {},
-): Promise<VocabularyListsResponse> {
+function buildQueryPath(
+  path: string,
+  params: { limit?: number; offset?: number },
+): string {
   const query = new URLSearchParams();
   if (params.limit !== undefined) {
     query.set("limit", String(params.limit));
@@ -103,19 +122,21 @@ export function fetchVocabularyLists(
     query.set("offset", String(params.offset));
   }
   const queryString = query.toString();
-  return requestJson<VocabularyListsResponse>(
-    `/vocabulary-lists${queryString ? `?${queryString}` : ""}`,
-  );
+  return `${path}${queryString ? `?${queryString}` : ""}`;
 }
 
-export async function fetchAllVocabularyLists(
-  pageSize: number = VOCABULARY_LISTS_PAGE_SIZE,
-): Promise<VocabularyListSummary[]> {
-  const items: VocabularyListSummary[] = [];
+async function fetchAllPages<TItem>(
+  fetchPage: (params: {
+    limit: number;
+    offset: number;
+  }) => Promise<{ items: TItem[]; total: number }>,
+  pageSize: number,
+): Promise<TItem[]> {
+  const items: TItem[] = [];
   let offset = 0;
 
   while (true) {
-    const page = await fetchVocabularyLists({ limit: pageSize, offset });
+    const page = await fetchPage({ limit: pageSize, offset });
     items.push(...page.items);
     offset += page.items.length;
     // A short page (fewer items than requested) means we've reached the
@@ -129,6 +150,36 @@ export async function fetchAllVocabularyLists(
   return items;
 }
 
+const VOCABULARY_LISTS_PAGE_SIZE = 100;
+
+export function fetchVocabularyLists(
+  params: { limit?: number; offset?: number } = {},
+): Promise<VocabularyListsResponse> {
+  return requestJson<VocabularyListsResponse>(
+    buildQueryPath("/vocabulary-lists", params),
+  );
+}
+
+export function fetchAllVocabularyLists(
+  pageSize: number = VOCABULARY_LISTS_PAGE_SIZE,
+): Promise<VocabularyListSummary[]> {
+  return fetchAllPages(fetchVocabularyLists, pageSize);
+}
+
+const STORIES_PAGE_SIZE = 100;
+
+export function fetchStories(
+  params: { limit?: number; offset?: number } = {},
+): Promise<StoriesResponse> {
+  return requestJson<StoriesResponse>(buildQueryPath("/stories", params));
+}
+
+export function fetchAllStories(
+  pageSize: number = STORIES_PAGE_SIZE,
+): Promise<StorySummary[]> {
+  return fetchAllPages(fetchStories, pageSize);
+}
+
 export function fetchStory(id: number | string): Promise<StoryDetail> {
   return requestJson<StoryDetail>(`/stories/${id}`);
 }
@@ -140,5 +191,15 @@ export function createStoryGeneration(
     method: "POST",
     headers: { "content-type": "application/json" },
     body: JSON.stringify(payload),
+  });
+}
+
+export function fetchGenerationStatus(id: number): Promise<GenerationStatus> {
+  return requestJson<GenerationStatus>(`/story-generations/${id}`);
+}
+
+export function retryStoryGeneration(id: number): Promise<GenerationStatus> {
+  return requestJson<GenerationStatus>(`/story-generations/${id}/retry`, {
+    method: "POST",
   });
 }

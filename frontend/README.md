@@ -50,14 +50,25 @@ migrations, and provider configuration.
 
 ## Project structure
 
-- `app/` — routes (App Router). `app/generate` and `app/stories` are
-  placeholders pending later milestones.
+- `app/generate/page.tsx` — picks a vocabulary list and HSK level, submits a
+  story-generation request, then polls it to completion. Shows a safe error
+  and a retry option if generation fails, and stops polling on a
+  non-recoverable status error (e.g. an unknown request) or on unmount.
+- `app/stories/page.tsx` — saved-stories list, linking to each story's
+  reader page.
+- `app/stories/[id]/page.tsx` — story reader: Chinese title and body with a
+  vocabulary glossary (pinyin and English definition), including a
+  not-found state for an unknown story ID.
 - `app/components/` — shared UI, e.g. the top navigation.
-- `lib/api.ts` — resolves `NEXT_PUBLIC_API_BASE_URL` for API calls.
+- `lib/api.ts` — typed fetch helpers for every backend endpoint the frontend
+  calls (vocabulary lists, story generations, saved stories), including
+  pagination and error handling.
 
 ## Status
 
-This is the Milestone 4 scaffold (app shell, navigation, environment
-config). Fetching vocabulary lists, submitting a generation request, polling
-for status, and reading saved stories are implemented in later milestones —
-see [docs/milestone-4-frontend-backlog.md](../docs/milestone-4-frontend-backlog.md).
+Milestone 4 is complete: a learner can select a vocabulary list, submit a
+story-generation request, watch it complete (or retry a failure), and read
+the resulting story with its vocabulary glossary from the saved-stories
+list. See
+[docs/milestone-4-frontend-backlog.md](../docs/milestone-4-frontend-backlog.md)
+for the ticket-by-ticket breakdown.
