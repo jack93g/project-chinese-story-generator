@@ -258,8 +258,8 @@ to run the API, worker, and frontend together.
 
 ## Roadmap
 
-The detailed delivery plan is in [docs/milestones.md](docs/milestones.md).
+The milestone-level delivery plan is in [docs/milestones.md](docs/milestones.md).
 Vocabulary ingestion, the backend API, and the durable story-generation
-workflow are implemented. The current milestone is a frontend for selecting
-vocabulary, requesting stories, and reading completed results; see
-[docs/milestone-4-frontend-backlog.md](docs/milestone-4-frontend-backlog.md).
+workflow are implemented. Individual tickets are tracked on the
+[GitHub Project board](https://github.com/users/jack93g/projects/1), not in
+markdown.

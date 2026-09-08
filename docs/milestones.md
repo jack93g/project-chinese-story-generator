@@ -1,5 +1,10 @@
 # Milestones
 
+This file describes the milestone-level goals, scope, and learning outcomes
+for the project. Individual tickets are tracked on the
+[GitHub Project board](https://github.com/users/jack93g/projects/1), not here
+and not in per-milestone backlog markdown files.
+
 ## 0. Foundation
 
 **Goal:** Establish shared project direction before application code exists.
@@ -106,6 +111,7 @@
 - A completed story is readable in Chinese and shows its selected-vocabulary glossary using the existing pinyin and English definitions.
 - The interface handles loading, empty, and failure states accessibly.
 - Frontend tests cover the generation flow and story reading against the published API contract.
+- The interface has a coherent, polished visual design (layout, typography, spacing, and color) rather than unstyled defaults.
 
 ### Learning outcomes
 
@@ -117,9 +123,54 @@
 
 ---
 
-## 5. Interactive reader enrichment
+## 5. Orchestration and delivery
+
+**Goal:** Make the MVP repeatable to run, test, deploy, and schedule.
+
+### Definition of done
+
+- Docker Compose provisions local development services.
+- GitHub Actions runs automated tests, quality checks, and deploys the frontend (for example, a static export to GitHub Pages behind a purchased domain).
+- Terraform defines the deployment infrastructure for the backend API, worker, and database.
+- Airflow schedules and monitors the existing vocabulary sync.
+- Structured logging and operational documentation support debugging and maintenance.
+- Infrastructure changes are reproducible and version controlled.
+
+### Learning outcomes
+
+- Containerised development.
+- Continuous integration and continuous deployment.
+- Infrastructure as code.
+- Deployment trade-offs.
+- Workflow orchestration.
+- Observability.
+- Operating production-style services.
+
+---
+
+## 6. Analytics
+
+**Goal:** Extend the stable product with analytics on top of the infrastructure from Milestone 5.
+
+### Definition of done
+
+- Operational data is exported to BigQuery for analytics while PostgreSQL remains the operational system of record.
+- Web tracking captures frontend usage (page views, story opens, generation requests started) and lands in BigQuery alongside operational data.
+- Dashboards answer agreed learner and product questions.
+
+### Learning outcomes
+
+- Analytical modelling.
+- Web/product analytics instrumentation.
+- Metrics-driven product development.
+
+---
+
+## 7. Interactive reader enrichment
 
 **Goal:** Enrich completed stories for an interactive Chinese-learning reading experience, informed by the first frontend release.
+
+**Note:** Deliberately sequenced after Orchestration/Delivery and Analytics. It has no hard dependency on either, but it's the most open-ended remaining milestone (tokenizer choice, offset tracking, matching logic), so the stable MVP is hardened and extended first.
 
 ### Definition of done
 
@@ -136,44 +187,3 @@
 - Chinese tokenisation and vocabulary matching.
 - Data enrichment pipelines.
 - Evidence-based backend optimisation for frontend performance.
-
----
-
-## 6. Orchestration and delivery
-
-**Goal:** Make the MVP repeatable to run, test, and schedule.
-
-### Definition of done
-
-- Docker Compose provisions local development services.
-- GitHub Actions runs automated tests and quality checks.
-- Airflow schedules and monitors the existing vocabulary sync.
-- Structured logging and operational documentation support debugging and maintenance.
-
-### Learning outcomes
-
-- Containerised development.
-- Continuous integration.
-- Workflow orchestration.
-- Observability.
-- Operating production-style services.
-
----
-
-## 7. Analytics and infrastructure
-
-**Goal:** Extend the stable product with analytics and deployable infrastructure.
-
-### Definition of done
-
-- Operational data is exported to BigQuery for analytics while PostgreSQL remains the operational system of record.
-- Terraform defines deployment infrastructure.
-- Dashboards answer agreed learner and product questions.
-- Infrastructure changes are reproducible and version controlled.
-
-### Learning outcomes
-
-- Analytical modelling.
-- Infrastructure as code.
-- Deployment trade-offs.
-- Metrics-driven product development.
