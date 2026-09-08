@@ -66,9 +66,9 @@ migrations, and provider configuration.
 
 ## Status
 
-Milestone 4 is complete: a learner can select a vocabulary list, submit a
-story-generation request, watch it complete (or retry a failure), and read
-the resulting story with its vocabulary glossary from the saved-stories
-list. See
-[docs/milestone-4-frontend-backlog.md](../docs/milestone-4-frontend-backlog.md)
-for the ticket-by-ticket breakdown.
+The core Milestone 4 flow is implemented: a learner can select a vocabulary
+list, submit a story-generation request, watch it complete (or retry a
+failure), and read the resulting story with its vocabulary glossary from the
+saved-stories list. Visual polish (M4-6) is still open. Tickets are tracked
+on the [GitHub Project board](https://github.com/users/jack93g/projects/1),
+not in markdown.
