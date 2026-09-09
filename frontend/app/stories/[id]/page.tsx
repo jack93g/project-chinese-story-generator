@@ -56,7 +56,9 @@ export default function StoryPage() {
   if (state.status === "loading") {
     return (
       <div className="page-content">
-        <p role="status">Loading story…</p>
+        <p role="status" className="state">
+          Loading story…
+        </p>
       </div>
     );
   }
@@ -65,7 +67,7 @@ export default function StoryPage() {
     return (
       <div className="page-content">
         <h1>Story not found</h1>
-        <p>
+        <p className="state">
           There&rsquo;s no saved story with this ID. It may have been removed,
           or the link may be incorrect.
         </p>
@@ -77,7 +79,7 @@ export default function StoryPage() {
     return (
       <div className="page-content">
         <h1>Something went wrong</h1>
-        <p role="alert" className="field-error">
+        <p role="alert" className="state state-error">
           {state.message}
         </p>
       </div>

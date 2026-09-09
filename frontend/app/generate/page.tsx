@@ -273,7 +273,9 @@ export default function GeneratePage() {
     return (
       <div className="page-content">
         <h1>Generate a story</h1>
-        <p role="status">Loading vocabulary lists…</p>
+        <p role="status" className="state">
+          Loading vocabulary lists…
+        </p>
       </div>
     );
   }
@@ -282,7 +284,7 @@ export default function GeneratePage() {
     return (
       <div className="page-content">
         <h1>Generate a story</h1>
-        <p role="alert" className="field-error">
+        <p role="alert" className="state state-error">
           {listsState.message}
         </p>
       </div>
@@ -293,7 +295,7 @@ export default function GeneratePage() {
     return (
       <div className="page-content">
         <h1>Generate a story</h1>
-        <p>
+        <p className="state">
           No vocabulary lists are available yet. Sync a list from Skritter
           before generating a story.
         </p>
@@ -306,7 +308,7 @@ export default function GeneratePage() {
       <div className="page-content">
         <h1>Generate a story</h1>
         {generation.phase === "polling" && (
-          <p role="status">
+          <p role="status" className="state">
             {generation.status === "running"
               ? "Generating your story…"
               : "Queued — waiting for a worker to pick this up…"}{" "}
@@ -315,21 +317,26 @@ export default function GeneratePage() {
         )}
         {generation.phase === "failed" && (
           <>
-            <p role="alert" className="field-error">
+            <p role="alert" className="state state-error">
               {generation.message}
             </p>
-            <button type="button" onClick={handleRetry} disabled={isRetrying}>
+            <button
+              type="button"
+              className="button"
+              onClick={handleRetry}
+              disabled={isRetrying}
+            >
               {isRetrying ? "Retrying…" : "Retry"}
             </button>
             {retryError && (
-              <p role="alert" className="field-error">
+              <p role="alert" className="state state-error">
                 {retryError}
               </p>
             )}
           </>
         )}
         {generation.phase === "error" && (
-          <p role="alert" className="field-error">
+          <p role="alert" className="state state-error">
             {generation.message}
           </p>
         )}
@@ -426,12 +433,12 @@ export default function GeneratePage() {
         </div>
 
         {submitState.status === "error" && (
-          <p role="alert" className="field-error">
+          <p role="alert" className="state state-error">
             {submitState.message}
           </p>
         )}
 
-        <button type="submit" disabled={!canSubmit}>
+        <button type="submit" className="button" disabled={!canSubmit}>
           {submitState.status === "submitting" ? "Generating…" : "Generate"}
         </button>
       </form>
