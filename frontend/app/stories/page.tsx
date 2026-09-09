@@ -50,7 +50,9 @@ export default function StoriesPage() {
     return (
       <div className="page-content">
         <h1>Saved stories</h1>
-        <p role="status">Loading saved stories…</p>
+        <p role="status" className="state">
+          Loading saved stories…
+        </p>
       </div>
     );
   }
@@ -59,7 +61,7 @@ export default function StoriesPage() {
     return (
       <div className="page-content">
         <h1>Saved stories</h1>
-        <p role="alert" className="field-error">
+        <p role="alert" className="state state-error">
           {state.message}
         </p>
       </div>
@@ -70,7 +72,7 @@ export default function StoriesPage() {
     return (
       <div className="page-content">
         <h1>Saved stories</h1>
-        <p>
+        <p className="state">
           No stories yet. <Link href="/generate">Generate one</Link> to get
           started.
         </p>
