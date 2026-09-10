@@ -180,6 +180,24 @@ h2 {
   text-decoration: underline;
 }
 
+.home-title-zh {
+  font-family: var(--font-zh-sans);
+  font-size: 1rem;
+  font-weight: 500;
+  color: var(--muted-foreground);
+}
+
+.page-content .home-actions a {
+  color: var(--muted-foreground);
+  font-weight: 500;
+  transition: color 0.15s ease;
+}
+
+.page-content .home-actions a:hover {
+  color: var(--foreground);
+  text-decoration: underline;
+}
+
 /* Forms */
 
 .generate-form {

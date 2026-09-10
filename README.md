@@ -38,6 +38,7 @@ Start the application and open the interactive documentation at
 | `GET` | `/vocabulary-lists/{list_id}` | Returns a vocabulary list and its items. |
 | `GET` | `/stories` | Returns paginated saved-story summaries. |
 | `GET` | `/stories/{story_id}` | Returns a saved story and its selected vocabulary. |
+| `DELETE` | `/stories/{story_id}` | Permanently deletes a saved story and its vocabulary associations. Returns `204 No Content`. |
 | `GET` | `/sync-status` | Returns the most recent Skritter sync run, or `{"latest_run": null}`. |
 | `POST` | `/story-generations` | Queues a story-generation request and returns `202 Accepted`. |
 | `GET` | `/story-generations/{generation_request_id}` | Returns the request status and completed story ID, if available. |
