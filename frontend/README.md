@@ -50,6 +50,8 @@ migrations, and provider configuration.
 
 ## Project structure
 
+- `app/page.tsx` — home page: introduces the app and links to the generate
+  and saved-stories pages.
 - `app/generate/page.tsx` — picks a vocabulary list and HSK level, submits a
   story-generation request, then polls it to completion. Shows a safe error
   and a retry option if generation fails, and stops polling on a
@@ -66,9 +68,9 @@ migrations, and provider configuration.
 
 ## Status
 
-The core Milestone 4 flow is implemented: a learner can select a vocabulary
-list, submit a story-generation request, watch it complete (or retry a
-failure), and read the resulting story with its vocabulary glossary from the
-saved-stories list. Visual polish (M4-6) is still open. Tickets are tracked
+Milestone 4 is implemented: a learner can select a vocabulary list, submit a
+story-generation request, watch it complete (or retry a failure), and read
+the resulting story with its vocabulary glossary from the saved-stories
+list, with visual polish (M4-6) applied across the app. Tickets are tracked
 on the [GitHub Project board](https://github.com/users/jack93g/projects/1),
 not in markdown.
