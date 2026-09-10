@@ -180,3 +180,37 @@ describe("fetchStories / fetchAllStories", () => {
     expect(fetchMock).toHaveBeenCalledTimes(2);
   });
 });
+
+describe("deleteStory", () => {
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  it("sends a DELETE request to the story's URL", async () => {
+    const fetchMock = vi.fn().mockResolvedValue({ ok: true });
+    vi.stubGlobal("fetch", fetchMock);
+
+    const { deleteStory } = await import("./api");
+    await deleteStory(7);
+
+    expect(fetchMock).toHaveBeenCalledWith(
+      "http://127.0.0.1:8000/stories/7",
+      { method: "DELETE" },
+    );
+  });
+
+  it("throws an ApiError with the response detail when the request fails", async () => {
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: false,
+      status: 404,
+      json: async () => ({ detail: "Story 7 not found" }),
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    const { deleteStory, ApiError } = await import("./api");
+
+    await expect(deleteStory(7)).rejects.toMatchObject(
+      new ApiError("Story 7 not found", 404),
+    );
+  });
+});

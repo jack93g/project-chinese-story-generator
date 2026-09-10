@@ -2,12 +2,23 @@
 
 import Link from "next/link";
 import { useEffect, useState } from "react";
-import { ApiError, fetchAllStories, type StorySummary } from "@/lib/api";
+import {
+  ApiError,
+  deleteStory,
+  fetchAllStories,
+  type StorySummary,
+} from "@/lib/api";
 
 type StoriesState =
   | { status: "loading" }
   | { status: "error"; message: string }
   | { status: "ready"; stories: StorySummary[] };
+
+type DeleteState =
+  | { status: "idle" }
+  | { status: "confirming" }
+  | { status: "deleting" }
+  | { status: "error"; message: string };
 
 function formatDate(isoDate: string): string {
   return new Date(isoDate).toLocaleDateString("en-US", {
@@ -19,6 +30,9 @@ function formatDate(isoDate: string): string {
 
 export default function StoriesPage() {
   const [state, setState] = useState<StoriesState>({ status: "loading" });
+  const [deleteStates, setDeleteStates] = useState<
+    Record<number, DeleteState>
+  >({});
 
   useEffect(() => {
     let cancelled = false;
@@ -45,6 +59,49 @@ export default function StoriesPage() {
       cancelled = true;
     };
   }, []);
+
+  function getDeleteState(storyId: number): DeleteState {
+    return deleteStates[storyId] ?? { status: "idle" };
+  }
+
+  function requestDelete(storyId: number) {
+    setDeleteStates((prev) => ({ ...prev, [storyId]: { status: "confirming" } }));
+  }
+
+  function cancelDelete(storyId: number) {
+    setDeleteStates((prev) => ({ ...prev, [storyId]: { status: "idle" } }));
+  }
+
+  async function confirmDelete(storyId: number) {
+    setDeleteStates((prev) => ({ ...prev, [storyId]: { status: "deleting" } }));
+    try {
+      await deleteStory(storyId);
+      setState((prev) =>
+        prev.status === "ready"
+          ? {
+              status: "ready",
+              stories: prev.stories.filter((story) => story.id !== storyId),
+            }
+          : prev,
+      );
+      setDeleteStates((prev) => {
+        const next = { ...prev };
+        delete next[storyId];
+        return next;
+      });
+    } catch (error) {
+      setDeleteStates((prev) => ({
+        ...prev,
+        [storyId]: {
+          status: "error",
+          message:
+            error instanceof ApiError
+              ? error.message
+              : "Could not delete this story.",
+        },
+      }));
+    }
+  }
 
   if (state.status === "loading") {
     return (
@@ -84,21 +141,68 @@ export default function StoriesPage() {
     <div className="page-content">
       <h1>Saved stories</h1>
       <ul className="story-list">
-        {state.stories.map((story) => (
-          <li key={story.id}>
-            <Link href={`/stories/${story.id}`} className="story-list-item">
-              <span lang="zh" className="story-list-title">
-                {story.title}
-              </span>
-              <span className="story-list-meta">
-                {story.target_hsk !== null && (
-                  <>HSK {story.target_hsk} &middot; </>
+        {state.stories.map((story) => {
+          const deleteState = getDeleteState(story.id);
+
+          return (
+            <li key={story.id} className="story-list-row">
+              <Link
+                href={`/stories/${story.id}`}
+                className="story-list-item"
+              >
+                <span lang="zh" className="story-list-title">
+                  {story.title}
+                </span>
+                <span className="story-list-meta">
+                  {story.target_hsk !== null && (
+                    <>HSK {story.target_hsk} &middot; </>
+                  )}
+                  {formatDate(story.created_at)}
+                </span>
+              </Link>
+
+              <div className="story-list-actions">
+                {deleteState.status === "confirming" ? (
+                  <>
+                    <span className="story-list-confirm-text">
+                      Delete this story?
+                    </span>
+                    <button
+                      type="button"
+                      className="button button-danger"
+                      onClick={() => confirmDelete(story.id)}
+                    >
+                      Confirm delete
+                    </button>
+                    <button
+                      type="button"
+                      className="button-plain"
+                      onClick={() => cancelDelete(story.id)}
+                    >
+                      Cancel
+                    </button>
+                  </>
+                ) : (
+                  <button
+                    type="button"
+                    className="button-plain"
+                    onClick={() => requestDelete(story.id)}
+                    disabled={deleteState.status === "deleting"}
+                  >
+                    {deleteState.status === "deleting"
+                      ? "Deleting…"
+                      : "Delete"}
+                  </button>
                 )}
-                {formatDate(story.created_at)}
-              </span>
-            </Link>
-          </li>
-        ))}
+                {deleteState.status === "error" && (
+                  <p role="alert" className="field-error">
+                    {deleteState.message}
+                  </p>
+                )}
+              </div>
+            </li>
+          );
+        })}
       </ul>
     </div>
   );
