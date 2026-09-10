@@ -26,3 +26,6 @@ class StoryRepository:
 
     def get_by_id(self, story_id: int) -> Story | None:
         return self.session.get(Story, story_id)
+
+    def delete(self, story: Story) -> None:
+        self.session.delete(story)

@@ -39,3 +39,22 @@ def get_story(
         return service.get(story_id)
     except StoryNotFoundError:
         raise HTTPException(status_code=404, detail=f"Story {story_id} not found")
+
+
+@router.delete(
+    "/stories/{story_id}",
+    status_code=204,
+)
+def delete_story(
+    story_id: int,
+    db: Session = Depends(get_db),
+) -> None:
+    repository = StoryRepository(db)
+    service = StoryService(repository)
+
+    try:
+        service.delete(story_id)
+    except StoryNotFoundError:
+        raise HTTPException(status_code=404, detail=f"Story {story_id} not found")
+
+    db.commit()
