@@ -184,6 +184,13 @@ export function fetchStory(id: number | string): Promise<StoryDetail> {
   return requestJson<StoryDetail>(`/stories/${id}`);
 }
 
+export async function deleteStory(id: number | string): Promise<void> {
+  const response = await fetch(apiUrl(`/stories/${id}`), { method: "DELETE" });
+  if (!response.ok) {
+    throw new ApiError(await parseErrorMessage(response), response.status);
+  }
+}
+
 export function createStoryGeneration(
   payload: CreateStoryGenerationPayload,
 ): Promise<StoryGenerationCreated> {
