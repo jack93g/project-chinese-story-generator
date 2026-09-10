@@ -62,3 +62,11 @@ class StoryService:
                 for item in story.vocabulary_items
             ],
         )
+
+    def delete(self, story_id: int) -> None:
+        story = self.repository.get_by_id(story_id)
+
+        if story is None:
+            raise StoryNotFoundError(story_id)
+
+        self.repository.delete(story)

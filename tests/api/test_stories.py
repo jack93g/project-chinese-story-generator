@@ -1,6 +1,6 @@
 import pytest
 
-from story_generator.stories.persistence.models import Story
+from story_generator.stories.persistence.models import Story, StoryVocabularyItem
 from story_generator.vocabulary.persistence.models import VocabularyItem
 
 
@@ -196,6 +196,41 @@ def test_get_story_returns_detail_with_no_vocabulary(client, db_session):
 
 def test_get_story_returns_404_for_unknown_id(client):
     response = client.get("/stories/999999")
+
+    assert response.status_code == 404
+    assert response.json() == {"detail": "Story 999999 not found"}
+
+
+def test_delete_story_removes_story_and_vocabulary_associations(client, db_session):
+    story = Story(title="第一次点菜", content="我们去饭馆点菜。", target_hsk=2)
+    item = VocabularyItem(
+        id=30,
+        skritter_vocab_id="zh-菜单-0",
+        language="zh",
+        writing="菜单",
+        reading="cai4 dan1",
+        definition_en="menu",
+    )
+    story.vocabulary_items.append(item)
+
+    db_session.add(story)
+    db_session.flush()
+    story_id = story.id
+
+    response = client.delete(f"/stories/{story_id}")
+
+    assert response.status_code == 204
+    assert response.content == b""
+
+    assert db_session.get(Story, story_id) is None
+    assert db_session.query(StoryVocabularyItem).filter_by(story_id=story_id).count() == 0
+
+    get_response = client.get(f"/stories/{story_id}")
+    assert get_response.status_code == 404
+
+
+def test_delete_story_returns_404_for_unknown_id(client):
+    response = client.delete("/stories/999999")
 
     assert response.status_code == 404
     assert response.json() == {"detail": "Story 999999 not found"}
