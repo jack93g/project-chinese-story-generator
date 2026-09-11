@@ -20,7 +20,7 @@ import urllib.request
 
 GITHUB_API = "https://api.github.com"
 GEMINI_API = "https://generativelanguage.googleapis.com/v1beta/openai/chat/completions"
-GEMINI_MODEL = "gemini-3.8-flash"
+GEMINI_MODEL = "gemini-2.5-flash"
 MAX_DIFF_CHARS = 300_000
 RETRY_STATUS_CODES = {429, 500, 502, 503, 504}
 MAX_ATTEMPTS = 4
