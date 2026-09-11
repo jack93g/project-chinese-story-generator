@@ -19,7 +19,12 @@ jobs:
     if: github.event.pull_request.head.repo.full_name == github.repository
     runs-on: ubuntu-latest
     steps:
+      # Check out the base branch's SHA, never the PR's own code - the PR
+      # diff is fetched separately over the API. Otherwise a same-repo (not
+      # just fork) PR could edit this script to exfiltrate the secrets below.
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.base.sha }}
 
       - uses: actions/setup-python@v5
         with:

@@ -14,7 +14,9 @@ its configuration from environment variables so it needs no CLI arguments:
 
 The PR diff itself is still attacker-controlled text fed to the model, so
 its output is a suggestion for a human to weigh, not something acted on
-automatically.
+automatically. The workflow checks out the PR's base SHA (not the PR's own
+code) before running this script, so a PR cannot modify the script itself
+to exfiltrate the secrets in its environment.
 
 Uses only the standard library so the workflow needs no pip install step.
 """
@@ -24,10 +26,12 @@ import os
 import sys
 import time
 import urllib.error
+import urllib.parse
 import urllib.request
 
 GITHUB_API = "https://api.github.com"
 OPENROUTER_API = "https://openrouter.ai/api/v1/chat/completions"
+# Verified against OpenRouter's live /models catalog on 2026-09-11.
 OPENROUTER_MODEL = "deepseek/deepseek-v4.1-flash"
 MAX_DIFF_CHARS = 60_000
 REQUEST_TIMEOUT = 30
@@ -88,17 +92,24 @@ def github_request(url: str, token: str, accept: str) -> bytes:
 
 
 def fetch_pr_diff(repo: str, pr_number: str, token: str) -> str:
+    if not pr_number.isdigit():
+        raise ValueError(f"PR_NUMBER must be numeric, got: {pr_number!r}")
     url = f"{GITHUB_API}/repos/{repo}/pulls/{pr_number}"
     diff = github_request(url, token, "application/vnd.github.v3.diff").decode("utf-8")
     return truncate(diff, MAX_DIFF_CHARS)
 
 
 def load_claude_md(repo: str, token: str, base_ref: str) -> str:
-    url = f"{GITHUB_API}/repos/{repo}/contents/CLAUDE.md?ref={base_ref}"
+    url = f"{GITHUB_API}/repos/{repo}/contents/CLAUDE.md?ref={urllib.parse.quote(base_ref, safe='')}"
     try:
         return github_request(url, token, "application/vnd.github.v3.raw").decode("utf-8")
     except urllib.error.HTTPError as error:
         if error.code == 404:
+            print(
+                f"Warning: no CLAUDE.md found at ref {base_ref!r}, "
+                "reviewing without repo-specific context.",
+                file=sys.stderr,
+            )
             return "(no CLAUDE.md found in this repo)"
         raise
 
@@ -145,10 +156,24 @@ def call_openrouter(api_key: str, diff: str, claude_md: str) -> str:
                 continue
             print(f"OpenRouter API error {error.code}: {detail}", file=sys.stderr)
             raise
+        except (urllib.error.URLError, TimeoutError) as error:
+            if attempt < MAX_ATTEMPTS:
+                wait = 2**attempt
+                print(
+                    f"OpenRouter request failed ({error}) (attempt {attempt}/{MAX_ATTEMPTS}), "
+                    f"retrying in {wait}s",
+                    file=sys.stderr,
+                )
+                time.sleep(wait)
+                continue
+            raise
 
         try:
             payload = json.loads(raw)
-            return payload["choices"][0]["message"]["content"]
+            content = payload["choices"][0]["message"]["content"]
+            if not isinstance(content, str):
+                raise TypeError(f"content is {type(content).__name__}, not str")
+            return content
         except (json.JSONDecodeError, KeyError, IndexError, TypeError) as error:
             raise RuntimeError(
                 f"Unexpected OpenRouter response shape: {raw.decode('utf-8', errors='replace')}"
@@ -159,7 +184,12 @@ def call_openrouter(api_key: str, diff: str, claude_md: str) -> str:
 
 def post_comment(repo: str, pr_number: str, token: str, body: str) -> None:
     url = f"{GITHUB_API}/repos/{repo}/issues/{pr_number}/comments"
-    comment_body = f"### 🤖 DeepSeek review\n\n{body}"
+    comment_body = (
+        "### 🤖 DeepSeek review\n\n"
+        "_Automated, unverified output generated from this PR's diff - "
+        "weigh it like a first-pass opinion, not a verdict._\n\n"
+        f"{body}"
+    )
     request = urllib.request.Request(
         url,
         data=json.dumps({"body": comment_body}).encode("utf-8"),
