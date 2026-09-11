@@ -8,8 +8,15 @@ permissions:
   contents: read
   pull-requests: write
 
+concurrency:
+  group: openrouter-review-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
 jobs:
   review:
+    # Fork PRs don't get repo secrets or a write-scoped GITHUB_TOKEN, so the
+    # job can't authenticate to either API - skip rather than fail red.
+    if: github.event.pull_request.head.repo.full_name == github.repository
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4

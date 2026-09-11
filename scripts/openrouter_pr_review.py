@@ -7,6 +7,14 @@ its configuration from environment variables so it needs no CLI arguments:
     GITHUB_TOKEN        Token with pull-requests: write (Actions provides this)
     GITHUB_REPOSITORY   "owner/repo" (Actions provides this)
     PR_NUMBER           Pull request number to review
+    GITHUB_BASE_REF     PR base branch (Actions provides this for pull_request
+                         events); CLAUDE.md is read from here, not the PR
+                         branch, so a PR can't rewrite the review criteria
+                         it's judged against
+
+The PR diff itself is still attacker-controlled text fed to the model, so
+its output is a suggestion for a human to weigh, not something acted on
+automatically.
 
 Uses only the standard library so the workflow needs no pip install step.
 """
@@ -21,7 +29,8 @@ import urllib.request
 GITHUB_API = "https://api.github.com"
 OPENROUTER_API = "https://openrouter.ai/api/v1/chat/completions"
 OPENROUTER_MODEL = "deepseek/deepseek-v4.1-flash"
-MAX_DIFF_CHARS = 300_000
+MAX_DIFF_CHARS = 60_000
+REQUEST_TIMEOUT = 30
 RETRY_STATUS_CODES = {429, 500, 502, 503, 504}
 MAX_ATTEMPTS = 4
 
@@ -56,6 +65,15 @@ def env(name: str) -> str:
     return value
 
 
+def truncate(text: str, max_chars: int) -> str:
+    if len(text) <= max_chars:
+        return text
+    cutoff = text.rfind("\n", 0, max_chars)
+    if cutoff == -1:
+        cutoff = max_chars
+    return text[:cutoff] + "\n\n... [truncated, too large to review in full]"
+
+
 def github_request(url: str, token: str, accept: str) -> bytes:
     request = urllib.request.Request(
         url,
@@ -65,28 +83,28 @@ def github_request(url: str, token: str, accept: str) -> bytes:
             "X-GitHub-Api-Version": "2022-11-28",
         },
     )
-    with urllib.request.urlopen(request) as response:
+    with urllib.request.urlopen(request, timeout=REQUEST_TIMEOUT) as response:
         return response.read()
 
 
 def fetch_pr_diff(repo: str, pr_number: str, token: str) -> str:
     url = f"{GITHUB_API}/repos/{repo}/pulls/{pr_number}"
     diff = github_request(url, token, "application/vnd.github.v3.diff").decode("utf-8")
-    if len(diff) > MAX_DIFF_CHARS:
-        diff = diff[:MAX_DIFF_CHARS] + "\n\n... [diff truncated, too large to review in full]"
-    return diff
+    return truncate(diff, MAX_DIFF_CHARS)
 
 
-def load_claude_md() -> str:
+def load_claude_md(repo: str, token: str, base_ref: str) -> str:
+    url = f"{GITHUB_API}/repos/{repo}/contents/CLAUDE.md?ref={base_ref}"
     try:
-        with open("CLAUDE.md", encoding="utf-8") as f:
-            return f.read()
-    except FileNotFoundError:
-        return "(no CLAUDE.md found in this repo)"
+        return github_request(url, token, "application/vnd.github.v3.raw").decode("utf-8")
+    except urllib.error.HTTPError as error:
+        if error.code == 404:
+            return "(no CLAUDE.md found in this repo)"
+        raise
 
 
-def call_openrouter(api_key: str, diff: str) -> str:
-    system_prompt = REVIEW_SYSTEM_PROMPT.format(claude_md=load_claude_md())
+def call_openrouter(api_key: str, diff: str, claude_md: str) -> str:
+    system_prompt = REVIEW_SYSTEM_PROMPT.format(claude_md=claude_md)
     body = json.dumps(
         {
             "model": OPENROUTER_MODEL,
@@ -112,9 +130,8 @@ def call_openrouter(api_key: str, diff: str) -> str:
 
     for attempt in range(1, MAX_ATTEMPTS + 1):
         try:
-            with urllib.request.urlopen(request) as response:
-                payload = json.loads(response.read())
-            return payload["choices"][0]["message"]["content"]
+            with urllib.request.urlopen(request, timeout=REQUEST_TIMEOUT) as response:
+                raw = response.read()
         except urllib.error.HTTPError as error:
             detail = error.read().decode("utf-8", errors="replace")
             if error.code in RETRY_STATUS_CODES and attempt < MAX_ATTEMPTS:
@@ -128,6 +145,14 @@ def call_openrouter(api_key: str, diff: str) -> str:
                 continue
             print(f"OpenRouter API error {error.code}: {detail}", file=sys.stderr)
             raise
+
+        try:
+            payload = json.loads(raw)
+            return payload["choices"][0]["message"]["content"]
+        except (json.JSONDecodeError, KeyError, IndexError, TypeError) as error:
+            raise RuntimeError(
+                f"Unexpected OpenRouter response shape: {raw.decode('utf-8', errors='replace')}"
+            ) from error
 
     raise RuntimeError("unreachable")
 
@@ -145,7 +170,8 @@ def post_comment(repo: str, pr_number: str, token: str, body: str) -> None:
         },
         method="POST",
     )
-    urllib.request.urlopen(request)
+    with urllib.request.urlopen(request, timeout=REQUEST_TIMEOUT):
+        pass
 
 
 def main() -> None:
@@ -153,13 +179,15 @@ def main() -> None:
     github_token = env("GITHUB_TOKEN")
     repo = env("GITHUB_REPOSITORY")
     pr_number = env("PR_NUMBER")
+    base_ref = os.environ.get("GITHUB_BASE_REF") or "main"
 
     diff = fetch_pr_diff(repo, pr_number, github_token)
     if not diff.strip():
         print("Empty diff, nothing to review.")
         return
 
-    review = call_openrouter(openrouter_api_key, diff)
+    claude_md = load_claude_md(repo, github_token, base_ref)
+    review = call_openrouter(openrouter_api_key, diff, claude_md)
     post_comment(repo, pr_number, github_token, review)
     print("Posted DeepSeek review comment.")
 
