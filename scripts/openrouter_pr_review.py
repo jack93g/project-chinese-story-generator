@@ -1,9 +1,9 @@
-"""Post an automated code review comment on a PR using the Gemini API.
+"""Post an automated code review comment on a PR using DeepSeek via OpenRouter.
 
-Run from GitHub Actions (see .github/workflows/gemini-review.yml). Reads
+Run from GitHub Actions (see .github/workflows/openrouter-review.yml). Reads
 its configuration from environment variables so it needs no CLI arguments:
 
-    GEMINI_API_KEY      Google AI Studio API key (repo secret)
+    OPENROUTER_API_KEY  OpenRouter API key (repo secret)
     GITHUB_TOKEN        Token with pull-requests: write (Actions provides this)
     GITHUB_REPOSITORY   "owner/repo" (Actions provides this)
     PR_NUMBER           Pull request number to review
@@ -19,8 +19,8 @@ import urllib.error
 import urllib.request
 
 GITHUB_API = "https://api.github.com"
-GEMINI_API = "https://generativelanguage.googleapis.com/v1beta/openai/chat/completions"
-GEMINI_MODEL = "gemini-3.6-flash"
+OPENROUTER_API = "https://openrouter.ai/api/v1/chat/completions"
+OPENROUTER_MODEL = "deepseek/deepseek-v4.1-flash"
 MAX_DIFF_CHARS = 300_000
 RETRY_STATUS_CODES = {429, 500, 502, 503, 504}
 MAX_ATTEMPTS = 4
@@ -85,11 +85,11 @@ def load_claude_md() -> str:
         return "(no CLAUDE.md found in this repo)"
 
 
-def call_gemini(api_key: str, diff: str) -> str:
+def call_openrouter(api_key: str, diff: str) -> str:
     system_prompt = REVIEW_SYSTEM_PROMPT.format(claude_md=load_claude_md())
     body = json.dumps(
         {
-            "model": GEMINI_MODEL,
+            "model": OPENROUTER_MODEL,
             "temperature": 0.2,
             "messages": [
                 {"role": "system", "content": system_prompt},
@@ -99,11 +99,13 @@ def call_gemini(api_key: str, diff: str) -> str:
     ).encode("utf-8")
 
     request = urllib.request.Request(
-        GEMINI_API,
+        OPENROUTER_API,
         data=body,
         headers={
             "Authorization": f"Bearer {api_key}",
             "Content-Type": "application/json",
+            "HTTP-Referer": "https://github.com/jack93g/project-chinese-story-generator",
+            "X-Title": "project-chinese-story-generator PR review",
         },
         method="POST",
     )
@@ -118,13 +120,13 @@ def call_gemini(api_key: str, diff: str) -> str:
             if error.code in RETRY_STATUS_CODES and attempt < MAX_ATTEMPTS:
                 wait = 2**attempt
                 print(
-                    f"Gemini API returned {error.code} (attempt {attempt}/{MAX_ATTEMPTS}), "
+                    f"OpenRouter API returned {error.code} (attempt {attempt}/{MAX_ATTEMPTS}), "
                     f"retrying in {wait}s: {detail}",
                     file=sys.stderr,
                 )
                 time.sleep(wait)
                 continue
-            print(f"Gemini API error {error.code}: {detail}", file=sys.stderr)
+            print(f"OpenRouter API error {error.code}: {detail}", file=sys.stderr)
             raise
 
     raise RuntimeError("unreachable")
@@ -132,7 +134,7 @@ def call_gemini(api_key: str, diff: str) -> str:
 
 def post_comment(repo: str, pr_number: str, token: str, body: str) -> None:
     url = f"{GITHUB_API}/repos/{repo}/issues/{pr_number}/comments"
-    comment_body = f"### 🤖 Gemini review\n\n{body}"
+    comment_body = f"### 🤖 DeepSeek review\n\n{body}"
     request = urllib.request.Request(
         url,
         data=json.dumps({"body": comment_body}).encode("utf-8"),
@@ -147,7 +149,7 @@ def post_comment(repo: str, pr_number: str, token: str, body: str) -> None:
 
 
 def main() -> None:
-    gemini_api_key = env("GEMINI_API_KEY")
+    openrouter_api_key = env("OPENROUTER_API_KEY")
     github_token = env("GITHUB_TOKEN")
     repo = env("GITHUB_REPOSITORY")
     pr_number = env("PR_NUMBER")
@@ -157,9 +159,9 @@ def main() -> None:
         print("Empty diff, nothing to review.")
         return
 
-    review = call_gemini(gemini_api_key, diff)
+    review = call_openrouter(openrouter_api_key, diff)
     post_comment(repo, pr_number, github_token, review)
-    print("Posted Gemini review comment.")
+    print("Posted DeepSeek review comment.")
 
 
 if __name__ == "__main__":

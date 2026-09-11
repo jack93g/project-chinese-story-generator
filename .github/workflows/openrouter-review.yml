@@ -1,4 +1,4 @@
-name: Gemini PR Review
+name: OpenRouter PR Review
 
 on:
   pull_request:
@@ -18,9 +18,9 @@ jobs:
         with:
           python-version: "3.12"
 
-      - name: Run Gemini review
+      - name: Run DeepSeek review (via OpenRouter)
         env:
-          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           PR_NUMBER: ${{ github.event.pull_request.number }}
-        run: python scripts/gemini_pr_review.py
+        run: python scripts/openrouter_pr_review.py
