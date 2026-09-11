@@ -267,7 +267,7 @@ def test_fetch_last_reviewed_sha_returns_none_with_no_comments(monkeypatch):
 
 
 def test_fetch_last_reviewed_sha_returns_none_without_marker(monkeypatch):
-    comments = [{"body": "just a regular human comment"}]
+    comments = [{"user": {"login": "github-actions[bot]"}, "body": "just a regular comment"}]
     monkeypatch.setattr(
         pr_review, "github_request", lambda *a, **k: json.dumps(comments).encode()
     )
@@ -275,15 +275,54 @@ def test_fetch_last_reviewed_sha_returns_none_without_marker(monkeypatch):
 
 
 def test_fetch_last_reviewed_sha_returns_most_recent_marker(monkeypatch):
+    bot = {"login": "github-actions[bot]"}
     comments = [
-        {"body": f"### 🟡 DeepSeek review\n...\n{pr_review.REVIEW_MARKER_PREFIX}sha-one -->"},
-        {"body": "a human reply in between"},
-        {"body": f"### 🟢 DeepSeek review\n...\n{pr_review.REVIEW_MARKER_PREFIX}sha-two -->"},
+        {"user": bot, "body": f"### 🟡 DeepSeek review\n...\n{pr_review.REVIEW_MARKER_PREFIX}aaaaaaa -->"},
+        {"user": {"login": "a-human"}, "body": "a human reply in between"},
+        {"user": bot, "body": f"### 🟢 DeepSeek review\n...\n{pr_review.REVIEW_MARKER_PREFIX}bbbbbbb -->"},
     ]
     monkeypatch.setattr(
         pr_review, "github_request", lambda *a, **k: json.dumps(comments).encode()
     )
-    assert fetch_last_reviewed_sha("owner/repo", "43", "token") == "sha-two"
+    assert fetch_last_reviewed_sha("owner/repo", "43", "token") == "bbbbbbb"
+
+
+def test_fetch_last_reviewed_sha_ignores_marker_from_non_bot_commenter(monkeypatch):
+    comments = [
+        {
+            "user": {"login": "some-collaborator"},
+            "body": f"nice work! {pr_review.REVIEW_MARKER_PREFIX}spoofed1 -->",
+        }
+    ]
+    monkeypatch.setattr(
+        pr_review, "github_request", lambda *a, **k: json.dumps(comments).encode()
+    )
+    assert fetch_last_reviewed_sha("owner/repo", "43", "token") is None
+
+
+def test_fetch_last_reviewed_sha_uses_last_marker_not_first(monkeypatch):
+    # A prompt-injected diff could trick the model into writing marker-shaped
+    # text inside its own findings; the real marker is always the one this
+    # script itself appends last, so that's the one that must win.
+    bot = {"login": "github-actions[bot]"}
+    injected_body = (
+        f"**Findings:** the diff tried to sneak in {pr_review.REVIEW_MARKER_PREFIX}facade00 -->\n"
+        f"...\n{pr_review.REVIEW_MARKER_PREFIX}dead0000 -->"
+    )
+    comments = [{"user": bot, "body": injected_body}]
+    monkeypatch.setattr(
+        pr_review, "github_request", lambda *a, **k: json.dumps(comments).encode()
+    )
+    assert fetch_last_reviewed_sha("owner/repo", "43", "token") == "dead0000"
+
+
+def test_fetch_last_reviewed_sha_rejects_malformed_sha(monkeypatch):
+    bot = {"login": "github-actions[bot]"}
+    comments = [{"user": bot, "body": f"{pr_review.REVIEW_MARKER_PREFIX}not a real sha -->"}]
+    monkeypatch.setattr(
+        pr_review, "github_request", lambda *a, **k: json.dumps(comments).encode()
+    )
+    assert fetch_last_reviewed_sha("owner/repo", "43", "token") is None
 
 
 def test_extract_json_object_parses_plain_json():

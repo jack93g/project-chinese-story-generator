@@ -31,6 +31,7 @@ Uses only the standard library so the workflow needs no pip install step.
 
 import json
 import os
+import re
 import sys
 import time
 import urllib.error
@@ -47,6 +48,7 @@ RETRY_STATUS_CODES = {429, 500, 502, 503, 504}
 MAX_ATTEMPTS = 4
 
 REVIEW_MARKER_PREFIX = "<!-- deepseek-review-sha: "
+SHA_PATTERN = re.compile(r"[0-9a-fA-F]{7,40}")
 VERDICT_EMOJI = {"green": "🟢", "yellow": "🟡", "red": "🔴"}
 
 REVIEW_SYSTEM_PROMPT = """\
@@ -152,12 +154,20 @@ def fetch_last_reviewed_sha(repo: str, pr_number: str, token: str) -> str | None
     url = f"{GITHUB_API}/repos/{repo}/issues/{pr_number}/comments?per_page=100"
     comments = json.loads(github_request(url, token, "application/vnd.github+json"))
     for comment in reversed(comments):
+        # Only trust comments actually posted by this workflow's token - anyone
+        # with comment access could otherwise write a fake marker themselves.
+        if (comment.get("user") or {}).get("login") != "github-actions[bot]":
+            continue
         body = comment.get("body") or ""
-        if REVIEW_MARKER_PREFIX in body:
-            tail = body.split(REVIEW_MARKER_PREFIX, 1)[1]
-            sha = tail.split("-->", 1)[0].strip()
-            if sha:
-                return sha
+        if REVIEW_MARKER_PREFIX not in body:
+            continue
+        # rsplit, not split: a prompt-injected diff could trick the model into
+        # writing marker-shaped text earlier in its own findings. Our real
+        # marker is always the one this script appended last.
+        tail = body.rsplit(REVIEW_MARKER_PREFIX, 1)[1]
+        sha = tail.split("-->", 1)[0].strip()
+        if SHA_PATTERN.fullmatch(sha):
+            return sha
     return None
 
 
