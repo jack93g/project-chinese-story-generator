@@ -14,12 +14,16 @@ Uses only the standard library so the workflow needs no pip install step.
 import json
 import os
 import sys
+import time
+import urllib.error
 import urllib.request
 
 GITHUB_API = "https://api.github.com"
 GEMINI_API = "https://generativelanguage.googleapis.com/v1beta/openai/chat/completions"
 GEMINI_MODEL = "gemini-3.8-flash"
 MAX_DIFF_CHARS = 300_000
+RETRY_STATUS_CODES = {429, 500, 502, 503, 504}
+MAX_ATTEMPTS = 4
 
 REVIEW_SYSTEM_PROMPT = """\
 You are an independent code reviewer for a Python/FastAPI backend + Next.js \
@@ -103,9 +107,27 @@ def call_gemini(api_key: str, diff: str) -> str:
         },
         method="POST",
     )
-    with urllib.request.urlopen(request) as response:
-        payload = json.loads(response.read())
-    return payload["choices"][0]["message"]["content"]
+
+    for attempt in range(1, MAX_ATTEMPTS + 1):
+        try:
+            with urllib.request.urlopen(request) as response:
+                payload = json.loads(response.read())
+            return payload["choices"][0]["message"]["content"]
+        except urllib.error.HTTPError as error:
+            detail = error.read().decode("utf-8", errors="replace")
+            if error.code in RETRY_STATUS_CODES and attempt < MAX_ATTEMPTS:
+                wait = 2**attempt
+                print(
+                    f"Gemini API returned {error.code} (attempt {attempt}/{MAX_ATTEMPTS}), "
+                    f"retrying in {wait}s: {detail}",
+                    file=sys.stderr,
+                )
+                time.sleep(wait)
+                continue
+            print(f"Gemini API error {error.code}: {detail}", file=sys.stderr)
+            raise
+
+    raise RuntimeError("unreachable")
 
 
 def post_comment(repo: str, pr_number: str, token: str, body: str) -> None:
