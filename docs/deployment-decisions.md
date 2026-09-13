@@ -30,6 +30,17 @@ container, one self-hosted Postgres container with a persistent volume.
 - Provisioned manually first to prove the setup works, then expressed in
   Terraform (M5-4) so the same infrastructure is reproducible from code.
 
+The frontend build needs to know the API's URL, and the API needs to allow
+the frontend's origin:
+
+- The API base URL is baked into the static export at build time via a
+  Next.js public environment variable (`NEXT_PUBLIC_API_URL` or similar),
+  set per environment in the GitHub Actions build step — never hardcoded
+  to `localhost`.
+- The API's CORS allow-list includes the production frontend origin (the
+  purchased domain, over HTTPS) alongside the existing local dev origin,
+  configured explicitly rather than left open (`*`).
+
 ## Secrets
 
 GitHub Secrets holds exactly one thing: the deployment SSH key used by
@@ -50,6 +61,12 @@ secrets (so a leaked Actions secret can't expose the OpenAI key or database
 credentials) is worth more here than the convenience of auto-synced
 secrets, given how rarely these values actually change.
 
+This includes `DATABASE_URL`: GitHub Actions never holds the production
+database credential and never connects to the database directly, including
+for migrations. Anything that needs a production secret — running
+`alembic upgrade head` included — runs on the Droplet itself, reading the
+on-box `.env`, reached only via the deploy SSH key. See Release path below.
+
 Mitigation for the obvious weakness (secrets existing only on one box): the
 names above are documented here and in the M5-5 runbook, and the actual
 values are also kept in a password manager, so recreating the Droplet means
@@ -65,31 +82,40 @@ Actions secrets — they gate CI only and never touch production data.
 PR → tests + lint (M5-2 CI) → code review → merge to main
   → GitHub Actions builds a Docker image, tagged with the git SHA
   → image pushed to GitHub Container Registry (ghcr.io)
-  → GitHub Actions runs `alembic upgrade head` against the production
-    database before new code starts serving
-  → GitHub Actions SSHes to the Droplet
-  → `docker compose pull` + `docker compose up -d` restarts BOTH the
-    API and worker services on the new image
+  → GitHub Actions SSHes to the Droplet (deploy key only — no DB
+    credential leaves the box)
+  → on the Droplet: `docker compose pull` fetches the new image, then
+    `docker compose run --rm api alembic upgrade head` runs the
+    migration using the on-box `.env`
+  → only once that migration succeeds: `docker compose up -d` restarts
+    BOTH the API and worker services on the new image
 ```
 
 GHCR rather than Docker Hub: it authenticates with the `GITHUB_TOKEN`
 Actions already has, so no extra registry credential is needed. Both
-application services are restarted, not just one — the API and worker run
-from the same image and both must pick up a new version.
+application services are restarted, not just one, and neither starts until
+the migration step completes — the API and worker run from the same image
+and both assume the new schema is already in place.
 
 ## Rollback
 
 Rollback reuses the forward-deploy job rather than being a separate
 procedure: the deploy workflow accepts a `workflow_dispatch` ref/SHA input,
 defaulting to the triggering commit. Rolling back means running that same
-workflow pointed at an older, already-built SHA tag:
+workflow pointed at an older, already-built SHA tag. `docker compose pull`
+takes service names, not a tag, so the tag is injected via an `IMAGE_TAG`
+variable the compose file reads, then services are recreated on it:
 
 ```
-docker compose pull <previous-sha-tag> && docker compose up -d
+# on the Droplet, with docker-compose.yml referencing ${IMAGE_TAG}
+export IMAGE_TAG=<previous-sha>
+docker compose pull
+docker compose up -d
 ```
 
 No rebuild is required, since every past image remains in `ghcr.io` tagged
-by SHA.
+by SHA. A rollback does not re-run migrations — see the additive-migration
+policy below for why that's safe.
 
 Database schema is the part code rollback can't fix by itself. Migrations
 are kept additive/backward-compatible by default (new columns rather than
