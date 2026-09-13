@@ -43,8 +43,12 @@ the frontend's origin:
 
 ## Secrets
 
-GitHub Secrets holds exactly one thing: the deployment SSH key used by
-GitHub Actions to reach the Droplet. It never holds application secrets.
+GitHub Secrets holds exactly one production-facing thing: the deployment
+SSH key used by GitHub Actions to reach the Droplet. It never holds
+application or database secrets for production. (A separate, ordinary
+GitHub Actions secret, `TEST_DATABASE_URL`, exists purely to gate the M5-2
+CI test job against a throwaway test database — see below for why that's a
+different concern.)
 
 Application secrets live only in a `.env` file on the Droplet:
 
@@ -91,11 +95,23 @@ PR → tests + lint (M5-2 CI) → code review → merge to main
     BOTH the API and worker services on the new image
 ```
 
-GHCR rather than Docker Hub: it authenticates with the `GITHUB_TOKEN`
-Actions already has, so no extra registry credential is needed. Both
-application services are restarted, not just one, and neither starts until
-the migration step completes — the API and worker run from the same image
-and both assume the new schema is already in place.
+GHCR rather than Docker Hub: pushing from Actions authenticates with the
+`GITHUB_TOKEN` Actions already has, so no extra registry credential is
+needed on that side. Pulling from the Droplet needs its own answer: the
+GHCR package is set to **public** visibility — it contains only application
+code, no secrets — so `docker compose pull` on the Droplet works with no
+registry credential at all. This keeps the Droplet's only credential
+surface the deploy SSH key; a private package would instead require a
+read-only registry token stored in the Droplet's Docker config, which is
+deliberately avoided.
+
+Both application services are restarted, not just one, and neither starts
+until the migration step completes — the API and worker run from the same
+image and both assume the new schema is already in place. The additive
+migration policy (below) covers this window too, not only rollback: the
+old API/worker containers are still serving requests while
+`alembic upgrade head` runs, so the migration must stay compatible with the
+version still running, not just the version being deployed.
 
 ## Rollback
 
