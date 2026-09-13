@@ -105,6 +105,12 @@ surface the deploy SSH key; a private package would instead require a
 read-only registry token stored in the Droplet's Docker config, which is
 deliberately avoided.
 
+Public visibility is only safe because the image never contains secrets in
+the first place — the M5-1 Dockerfile must not `COPY` `.env` or bake any
+credential into a layer; all secrets are injected at container start via
+Compose's `env_file`/`environment`, never at build time. This is a hard
+constraint on the M5-1 Dockerfile design, not just a Droplet-side detail.
+
 Both application services are restarted, not just one, and neither starts
 until the migration step completes — the API and worker run from the same
 image and both assume the new schema is already in place. The additive
