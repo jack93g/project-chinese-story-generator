@@ -127,6 +127,10 @@ and not in per-milestone backlog markdown files.
 
 **Goal:** Make the MVP repeatable to run, test, deploy, and schedule.
 
+Hosting, secrets, release path, cost, and rollback decisions are recorded in
+[docs/deployment-decisions.md](deployment-decisions.md) (M5-0), made before
+the rest of this milestone's tickets.
+
 ### Definition of done
 
 - Docker Compose provisions local development services.
