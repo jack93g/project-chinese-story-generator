@@ -1,7 +1,7 @@
 from datetime import datetime, timezone
 
 import pytest
-from sqlalchemy.exc import InternalError
+from sqlalchemy.exc import DBAPIError
 
 from story_generator.generation.persistence.models import StoryGenerationRequest
 from story_generator.vocabulary.persistence.models import VocabularyList
@@ -34,7 +34,7 @@ def test_selected_vocabulary_snapshot_cannot_be_mutated_after_creation(db_sessio
         {"id": 2, "writing": "再见", "reading": "zai4 jian4", "definition_en": "goodbye"}
     ]
 
-    with pytest.raises(InternalError, match="immutable"):
+    with pytest.raises(DBAPIError, match="immutable"):
         db_session.flush()
 
     # The session is left in a failed-transaction state after the DB

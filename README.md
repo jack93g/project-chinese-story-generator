@@ -24,6 +24,8 @@ durable background workflow.
 - Compare OpenAI-compatible providers against a shared evaluation set before
   allowing one to be used by the worker.
 - Version the PostgreSQL schema with SQLAlchemy and Alembic.
+- Run PostgreSQL, migrations, the API, and the worker locally with one
+  `docker compose up` (see [Quick start](#quick-start-with-docker-compose)).
 
 ## API
 
@@ -64,6 +66,9 @@ API client → FastAPI routes → services → PostgreSQL
 ```
 
 - `main.py` is the web-server entry point.
+- `Dockerfile` builds the image shared by the API, worker, and migration
+  services; `docker-compose.yml` wires those together with PostgreSQL, and
+  `.dockerignore` keeps `.env` and local artefacts out of the image.
 - `story_generator/api` contains thin FastAPI routes and request-scoped
   database dependencies.
 - `story_generator/ingestion` contains the Skritter client and sync workflow.
@@ -81,9 +86,71 @@ Services coordinate workflows, repositories read and write PostgreSQL, and
 external clients make HTTP calls. Keeping these responsibilities separate
 makes the import process and API straightforward to test.
 
+## Quick start with Docker Compose
+
+One command starts PostgreSQL, applies migrations, and runs the API and the
+generation worker. You need [Docker](https://docs.docker.com/get-docker/) and
+nothing else installed. (The frontend dev server runs separately; see
+[Frontend](#frontend).)
+
+1. Create a `.env` file in the repository root; do not commit it.
+
+   ```dotenv
+   # Used by Docker Compose to create the database and build the containers' DATABASE_URL.
+   POSTGRES_USER=story
+   POSTGRES_PASSWORD=choose-a-letters-and-digits-password
+   POSTGRES_DB=chinese_story_generator
+
+   SKRITTER_ACCESS_TOKEN=your-token
+   OPENAI_API_KEY=your-provider-key
+   OPENAI_PROVIDER_LABEL=groq
+   OPENAI_MODEL=openai/gpt-oss-120b
+   OPENAI_BASE_URL=https://api.groq.com/openai/v1/chat/completions
+   ```
+
+   The password is embedded in database URLs, so use only letters and digits
+   (no `/`, `+`, `=`, `@`). Add the two host-side URLs from [Setup](#setup)
+   only if you also want to run tools or tests from a local `.venv`.
+
+2. Start everything:
+
+   ```bash
+   docker compose up --build -d
+   ```
+
+   A one-shot `migrate` service applies the Alembic migrations once
+   PostgreSQL is healthy; the API and worker start only after it succeeds.
+   Check with `docker compose ps -a` (`migrate` should show `Exited (0)`).
+
+3. Import your vocabulary from Skritter (safe to repeat):
+
+   ```bash
+   docker compose run --rm api sync-skritter --all
+   ```
+
+4. Generate a story. Follow [Generate a story](#generate-a-story) starting from
+   the `curl` commands (the API is on `http://127.0.0.1:8000` and the worker is
+   already running), then read the result at `GET /stories/{story_id}`. To read
+   it in the browser instead, start the frontend as described in
+   [Frontend](#frontend).
+
+Useful commands:
+
+```bash
+docker compose logs -f worker    # follow the worker
+docker compose down              # stop; data is kept in the postgres_data volume
+docker compose down -v           # stop AND DELETE all database data
+```
+
+The image never contains secrets: `.env` is excluded by `.dockerignore` and
+supplied to the containers only at runtime. PostgreSQL is also published on
+`127.0.0.1:5432` for local tools, so stop any other PostgreSQL using that port.
+
 ## Setup
 
-The project requires Python 3.12+ and PostgreSQL.
+Use this section to run the API, worker, and tests directly from a local
+Python environment instead of Docker. It requires Python 3.12+ and a
+PostgreSQL server (the Docker `db` service works: `docker compose up -d db`).
 
 ```bash
 python3.12 -m venv .venv
@@ -103,6 +170,11 @@ OPENAI_MODEL=openai/gpt-oss-120b
 OPENAI_BASE_URL=https://api.groq.com/openai/v1/chat/completions
 ```
 
+Use the `postgresql+psycopg://` scheme (plain `postgresql://` selects a
+different driver that is not installed). When using the Docker database, use
+the same user, password and database name as `POSTGRES_*` in your `.env`, with
+host `localhost`; the containers get their own `DATABASE_URL` from Compose.
+
 `DATABASE_URL` is required by database-backed API endpoints, migrations, and
 the importer. `SKRITTER_ACCESS_TOKEN` is required only for a Skritter import.
 `TEST_DATABASE_URL` must refer to a separate database whose name includes
@@ -112,7 +184,9 @@ by the generation worker and live-provider smoke test.
 
 ## Run the API
 
-Apply migrations first, then start the development server:
+If you are using Docker Compose, the API is already running on port 8000 and
+you can skip this section. To run it directly from your `.venv` instead, apply
+migrations first, then start the development server:
 
 ```bash
 .venv/bin/alembic upgrade head
@@ -127,8 +201,10 @@ curl http://127.0.0.1:8000/health
 
 ## Generate a story
 
-Start the API and, in a separate terminal, start a worker. The worker can run
-continuously or process at most one queued request with `--once`:
+With Docker Compose the worker is already running, so go straight to the
+`curl` commands below. Otherwise, start the API and, in a separate terminal,
+start a worker. The worker can run continuously or process at most one queued
+request with `--once`:
 
 ```bash
 .venv/bin/python -m story_generator.cli.generation_worker
@@ -203,7 +279,18 @@ Alembic versions the schema in `alembic/versions`.
 .venv/bin/alembic check
 ```
 
-After changing ORM models, create and inspect a migration before applying it:
+When using Docker Compose, the `migrate` service applies pending migrations
+automatically on every `docker compose up`. To apply them manually:
+
+```bash
+docker compose run --rm api alembic upgrade head
+docker compose run --rm api alembic current    # current revision
+```
+
+After changing ORM models, create and inspect a migration before applying it.
+Create it from your local `.venv`, not with `docker compose run`: the image
+holds a build-time copy of `alembic/`, so a file generated in a throwaway
+container never reaches your working tree.
 
 ```bash
 .venv/bin/alembic revision --autogenerate -m "describe the change"
@@ -242,6 +329,25 @@ Run database integration tests against `TEST_DATABASE_URL`:
 ```bash
 .venv/bin/python -m pytest -m db
 ```
+
+### Test database with Docker
+
+Database tests run from your local `.venv` (not inside a container) against a
+separate, empty database whose name contains `test`. Docker Compose only
+creates `POSTGRES_DB`, so create the test database once:
+
+```bash
+docker compose up -d db
+docker compose exec db createdb -U <POSTGRES_USER> chinese_story_generator_test
+```
+
+Then set `TEST_DATABASE_URL` in `.env` with the same user and password as
+`DATABASE_URL`, host `localhost`, and the `_test` database name (see
+[Setup](#setup)). You never migrate the test database by hand: the test
+fixtures apply the migrations when the session starts and roll back each test.
+
+`docker compose down -v` deletes the test database along with the dev one, so
+create it again afterwards. `pytest -m "not db"` needs none of this.
 
 Live provider smoke tests are skipped by default because they require real
 credentials and may incur cost. Run them explicitly only after configuring an

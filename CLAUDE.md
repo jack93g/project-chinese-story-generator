@@ -45,12 +45,37 @@ Migrations, after changing an ORM model:
 .venv/bin/alembic check     # detect drift between models and schema
 ```
 
+Docker Compose (repo root; runs `db` Postgres 17, `api`, `worker` — the
+frontend dev server stays separate):
+
+```bash
+docker compose up --build -d                      # start everything
+docker compose run --rm api alembic upgrade head  # apply migrations (fresh db has no tables)
+docker compose run --rm api sync-skritter --all   # import vocabulary
+docker compose exec db createdb -U "$POSTGRES_USER" chinese_story_generator_test   # once, for host-run db tests
+docker compose down                               # stop; data persists in the `postgres_data` volume (`down -v` wipes it)
+```
+
 Frontend (`cd frontend`): `npm run dev`, `npm run build`, `npm run lint`, `npm run test`.
 
 Environment (`.env` in repo root, never commit it): `DATABASE_URL`,
 `TEST_DATABASE_URL` (must contain `test` and differ from `DATABASE_URL` — the
 test suite refuses to run otherwise), `SKRITTER_ACCESS_TOKEN`, `OPENAI_API_KEY`,
-`OPENAI_PROVIDER_LABEL`, `OPENAI_MODEL`, `OPENAI_BASE_URL`.
+`OPENAI_PROVIDER_LABEL`, `OPENAI_MODEL`, `OPENAI_BASE_URL`, plus
+`POSTGRES_USER`, `POSTGRES_PASSWORD`, `POSTGRES_DB` (used by Compose to
+create the database and build the containers' `DATABASE_URL`).
+
+- Database URLs must use the `postgresql+psycopg://` scheme (psycopg 3 is the
+  only declared driver; plain `postgresql://` selects psycopg2, which isn't
+  installed in the Docker image).
+- `.env` URLs use `localhost` for tools run from `.venv` on the host. Compose
+  overrides `DATABASE_URL` for `api`/`worker` to use the `db` service host, so
+  don't change `.env` for that.
+- The password is embedded in the URLs, so keep it URL-safe (letters and
+  digits; no `/`, `+`, `=`, `@`).
+- The image must never contain secrets (it is planned to be published to a
+  public GHCR package — see `docs/deployment-decisions.md`): `.env` is
+  excluded by `.dockerignore` and injected only at runtime via `env_file`.
 
 ## Architecture
 
