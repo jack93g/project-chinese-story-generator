@@ -34,8 +34,10 @@ def test_selected_vocabulary_snapshot_cannot_be_mutated_after_creation(db_sessio
         {"id": 2, "writing": "再见", "reading": "zai4 jian4", "definition_en": "goodbye"}
     ]
 
-    with pytest.raises(DBAPIError, match="immutable"):
+    with pytest.raises(DBAPIError, match="immutable") as exc_info:
         db_session.flush()
+
+    assert exc_info.value.orig.sqlstate == "P0001"  # RAISE EXCEPTION in the trigger
 
     # The session is left in a failed-transaction state after the DB
     # error; roll back explicitly so the db_session fixture's own
