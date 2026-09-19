@@ -31,8 +31,17 @@ npm run test    # vitest
 ## Running the full stack
 
 The frontend calls the FastAPI backend, which requires PostgreSQL and (for
-generation) a running worker. From the repository root, in separate
-terminals:
+generation) a running worker.
+
+**With Docker Compose (simplest).** From the repository root, start the
+database, migrations, API, and worker, then run the frontend:
+
+```bash
+docker compose up --build -d
+cd frontend && npm run dev
+```
+
+**Without Docker.** From the repository root, in separate terminals:
 
 ```bash
 # 1. API (after `alembic upgrade head`)

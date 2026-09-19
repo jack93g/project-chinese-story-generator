@@ -1,0 +1,25 @@
+# Environments
+.env
+.envrc
+.venv
+env/
+venv/
+ENV/
+env.bak/
+venv.bak/
+
+# Python cache
+
+__pycache__/
+
+*.pyc
+
+# Not needed in the image (only specific paths are COPY'd; this shrinks the build context)
+.git/
+.github/
+.pytest_cache/
+frontend/
+tests/
+docs/
+reports/
+scripts/
