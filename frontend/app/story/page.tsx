@@ -51,7 +51,10 @@ function StoryNotFound() {
 }
 
 function StoryContent() {
-  const id = useSearchParams().get("id");
+  // The ID comes from the URL, so only accept plain digits; anything else
+  // (missing, or something like "../vocabulary") is treated as not found.
+  const rawId = useSearchParams().get("id");
+  const id = rawId !== null && /^\d+$/.test(rawId) ? rawId : null;
   const [state, setState] = useState<StoryState>({ status: "loading" });
 
   useEffect(() => {

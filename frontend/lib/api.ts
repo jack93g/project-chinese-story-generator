@@ -181,11 +181,13 @@ export function fetchAllStories(
 }
 
 export function fetchStory(id: number | string): Promise<StoryDetail> {
-  return requestJson<StoryDetail>(`/stories/${id}`);
+  return requestJson<StoryDetail>(`/stories/${encodeURIComponent(id)}`);
 }
 
 export async function deleteStory(id: number | string): Promise<void> {
-  const response = await fetch(apiUrl(`/stories/${id}`), { method: "DELETE" });
+  const response = await fetch(apiUrl(`/stories/${encodeURIComponent(id)}`), {
+    method: "DELETE",
+  });
   if (!response.ok) {
     throw new ApiError(await parseErrorMessage(response), response.status);
   }
