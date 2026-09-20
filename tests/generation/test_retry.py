@@ -1,8 +1,11 @@
+from datetime import UTC, datetime
+
 import pytest
-from datetime import datetime, timezone
 
 from story_generator.generation.persistence.models import StoryGenerationRequest
-from story_generator.generation.persistence.repository import GenerationRequestRepository
+from story_generator.generation.persistence.repository import (
+    GenerationRequestRepository,
+)
 from story_generator.generation.persistence.service import (
     MAX_ATTEMPTS,
     GenerationRequestService,
@@ -18,7 +21,7 @@ def test_retry_raises_once_max_attempts_reached(db_session):
     db_session.add(vocab_list)
     db_session.flush()
 
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     request = StoryGenerationRequest(
         vocabulary_list_id=vocab_list.id,
         target_hsk_level=2,

@@ -19,8 +19,7 @@ def get_openai_api_key() -> str:
     key = os.getenv("OPENAI_API_KEY")
     if key is None:
         raise RuntimeError(
-            "OPENAI_API_KEY environment variable is not set. "
-            "Add it to your .env file."
+            "OPENAI_API_KEY environment variable is not set. Add it to your .env file."
         )
     return key
 
@@ -38,6 +37,7 @@ def get_openai_base_url() -> str:
     """
     return os.getenv("OPENAI_BASE_URL", "https://api.openai.com/v1/chat/completions")
 
+
 def get_openai_provider_label() -> str:
     """
     Human-readable label for which backend OPENAI_BASE_URL actually
@@ -54,5 +54,7 @@ def get_cors_allowed_origins() -> list[str]:
     (e.g. "http://localhost:3000,https://app.example.com"). Defaults
     to the local Next.js dev server.
     """
-    raw = os.getenv("CORS_ALLOWED_ORIGINS", "http://localhost:3000,http://127.0.0.1:3000")
+    raw = os.getenv(
+        "CORS_ALLOWED_ORIGINS", "http://localhost:3000,http://127.0.0.1:3000"
+    )
     return [origin.strip() for origin in raw.split(",") if origin.strip()]

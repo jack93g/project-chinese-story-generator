@@ -37,8 +37,10 @@ def get_story(
 
     try:
         return service.get(story_id)
-    except StoryNotFoundError:
-        raise HTTPException(status_code=404, detail=f"Story {story_id} not found")
+    except StoryNotFoundError as exc:
+        raise HTTPException(
+            status_code=404, detail=f"Story {story_id} not found"
+        ) from exc
 
 
 @router.delete(
@@ -54,7 +56,9 @@ def delete_story(
 
     try:
         service.delete(story_id)
-    except StoryNotFoundError:
-        raise HTTPException(status_code=404, detail=f"Story {story_id} not found")
+    except StoryNotFoundError as exc:
+        raise HTTPException(
+            status_code=404, detail=f"Story {story_id} not found"
+        ) from exc
 
     db.commit()

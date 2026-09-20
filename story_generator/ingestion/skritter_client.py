@@ -53,10 +53,14 @@ class SkritterClient:
         response.raise_for_status()
 
         parsed = validate_skritter_response(
-            SkritterVocabularyListResponse, self._json(response, request_path), request_path
+            SkritterVocabularyListResponse,
+            self._json(response, request_path),
+            request_path,
         )
         vocab_list = parsed.vocab_list
-        vocab_ids = [row.vocabId for section in vocab_list.sections for row in section.rows]
+        vocab_ids = [
+            row.vocabId for section in vocab_list.sections for row in section.rows
+        ]
 
         return {
             "id": vocab_list.id,
@@ -112,4 +116,3 @@ class SkritterClient:
             }
             for vocab_list in all_lists
         ]
-    

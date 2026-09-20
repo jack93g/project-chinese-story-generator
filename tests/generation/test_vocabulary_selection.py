@@ -9,7 +9,9 @@ from story_generator.vocabulary.persistence.models import VocabularyItem, Vocabu
 pytestmark = pytest.mark.db
 
 
-def _make_list_with_items(db_session, *, skritter_list_id: str, n_items: int) -> VocabularyList:
+def _make_list_with_items(
+    db_session, *, skritter_list_id: str, n_items: int
+) -> VocabularyList:
     vocab_list = VocabularyList(skritter_list_id=skritter_list_id, name="Test list")
     db_session.add(vocab_list)
     db_session.flush()
@@ -46,7 +48,9 @@ def test_select_vocabulary_caps_short_list_to_available_items(db_session):
 
 
 def test_select_vocabulary_caps_oversized_list_to_target_count(db_session):
-    vocab_list = _make_list_with_items(db_session, skritter_list_id="oversized", n_items=20)
+    vocab_list = _make_list_with_items(
+        db_session, skritter_list_id="oversized", n_items=20
+    )
 
     result = select_vocabulary(db_session, vocab_list, target_vocabulary_count=5)
 
@@ -54,7 +58,9 @@ def test_select_vocabulary_caps_oversized_list_to_target_count(db_session):
 
 
 def test_select_vocabulary_is_deterministic_ordered_by_id(db_session):
-    vocab_list = _make_list_with_items(db_session, skritter_list_id="deterministic", n_items=5)
+    vocab_list = _make_list_with_items(
+        db_session, skritter_list_id="deterministic", n_items=5
+    )
 
     first = select_vocabulary(db_session, vocab_list, target_vocabulary_count=3)
     second = select_vocabulary(db_session, vocab_list, target_vocabulary_count=3)
@@ -64,7 +70,9 @@ def test_select_vocabulary_is_deterministic_ordered_by_id(db_session):
 
 
 def test_select_vocabulary_preserves_reading_and_definition(db_session):
-    vocab_list = _make_list_with_items(db_session, skritter_list_id="preserve", n_items=2)
+    vocab_list = _make_list_with_items(
+        db_session, skritter_list_id="preserve", n_items=2
+    )
 
     result = select_vocabulary(db_session, vocab_list, target_vocabulary_count=2)
 

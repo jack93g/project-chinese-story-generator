@@ -12,7 +12,9 @@ def test_parses_valid_structured_output_into_generation_result():
 
     result = parse_structured_result(raw, USAGE)
 
-    assert result == GenerationResult(title="菜单的故事", body="小明去饭馆点了一份菜。", usage=USAGE)
+    assert result == GenerationResult(
+        title="菜单的故事", body="小明去饭馆点了一份菜。", usage=USAGE
+    )
 
 
 def test_raises_on_invalid_json():
@@ -26,30 +28,48 @@ def test_raises_when_top_level_json_is_not_an_object():
 
 
 def test_raises_when_title_is_missing():
-    with pytest.raises(ProviderInvalidResponseError, match="missing required field.*title"):
+    with pytest.raises(
+        ProviderInvalidResponseError, match="missing required field.*title"
+    ):
         parse_structured_result('{"body": "小明去饭馆点了一份菜。"}', USAGE)
 
 
 def test_raises_when_body_is_missing():
-    with pytest.raises(ProviderInvalidResponseError, match="missing required field.*body"):
+    with pytest.raises(
+        ProviderInvalidResponseError, match="missing required field.*body"
+    ):
         parse_structured_result('{"title": "菜单的故事"}', USAGE)
 
 
 def test_raises_when_title_is_empty_string():
-    with pytest.raises(ProviderInvalidResponseError, match="'title' must be a non-empty string"):
-        parse_structured_result('{"title": "", "body": "小明去饭馆点了一份菜。"}', USAGE)
+    with pytest.raises(
+        ProviderInvalidResponseError, match="'title' must be a non-empty string"
+    ):
+        parse_structured_result(
+            '{"title": "", "body": "小明去饭馆点了一份菜。"}', USAGE
+        )
 
 
 def test_raises_when_body_is_wrong_type():
-    with pytest.raises(ProviderInvalidResponseError, match="'body' must be a non-empty string"):
+    with pytest.raises(
+        ProviderInvalidResponseError, match="'body' must be a non-empty string"
+    ):
         parse_structured_result('{"title": "菜单的故事", "body": 12345}', USAGE)
 
 
 def test_raises_when_title_has_no_chinese_characters():
-    with pytest.raises(ProviderInvalidResponseError, match="'title' must contain Chinese"):
-        parse_structured_result('{"title": "Menu Story", "body": "小明去饭馆点了一份菜。"}', USAGE)
+    with pytest.raises(
+        ProviderInvalidResponseError, match="'title' must contain Chinese"
+    ):
+        parse_structured_result(
+            '{"title": "Menu Story", "body": "小明去饭馆点了一份菜。"}', USAGE
+        )
 
 
 def test_raises_when_body_has_no_chinese_characters():
-    with pytest.raises(ProviderInvalidResponseError, match="'body' must contain Chinese"):
-        parse_structured_result('{"title": "菜单的故事", "body": "Xiao Ming went to a restaurant."}', USAGE)
+    with pytest.raises(
+        ProviderInvalidResponseError, match="'body' must contain Chinese"
+    ):
+        parse_structured_result(
+            '{"title": "菜单的故事", "body": "Xiao Ming went to a restaurant."}', USAGE
+        )

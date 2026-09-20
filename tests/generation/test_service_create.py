@@ -1,6 +1,8 @@
 import pytest
 
-from story_generator.generation.persistence.repository import GenerationRequestRepository
+from story_generator.generation.persistence.repository import (
+    GenerationRequestRepository,
+)
 from story_generator.generation.persistence.service import (
     GenerationRequestService,
     VocabularyListNotFoundError,
@@ -13,7 +15,9 @@ from story_generator.vocabulary.persistence.models import VocabularyItem, Vocabu
 pytestmark = pytest.mark.db
 
 
-def _make_list_with_items(db_session, *, skritter_list_id: str, n_items: int) -> VocabularyList:
+def _make_list_with_items(
+    db_session, *, skritter_list_id: str, n_items: int
+) -> VocabularyList:
     vocab_list = VocabularyList(skritter_list_id=skritter_list_id, name="Test list")
     db_session.add(vocab_list)
     db_session.flush()
@@ -35,7 +39,9 @@ def _make_list_with_items(db_session, *, skritter_list_id: str, n_items: int) ->
 
 
 def test_create_persists_request_with_prompt_version_and_snapshot(db_session):
-    vocab_list = _make_list_with_items(db_session, skritter_list_id="create-1", n_items=5)
+    vocab_list = _make_list_with_items(
+        db_session, skritter_list_id="create-1", n_items=5
+    )
     repository = GenerationRequestRepository(db_session)
     service = GenerationRequestService(repository)
 
@@ -55,11 +61,15 @@ def test_create_persists_request_with_prompt_version_and_snapshot(db_session):
     assert len(request.selected_vocabulary_snapshot) == 3
 
 
-def test_create_resolves_provider_and_model_from_server_config_not_client(db_session, monkeypatch):
+def test_create_resolves_provider_and_model_from_server_config_not_client(
+    db_session, monkeypatch
+):
     monkeypatch.setenv("OPENAI_PROVIDER_LABEL", "openrouter")
     monkeypatch.setenv("OPENAI_MODEL", "google/gemma-4-26b-a4b-it:free")
 
-    vocab_list = _make_list_with_items(db_session, skritter_list_id="create-provider", n_items=2)
+    vocab_list = _make_list_with_items(
+        db_session, skritter_list_id="create-provider", n_items=2
+    )
     repository = GenerationRequestRepository(db_session)
     service = GenerationRequestService(repository)
 
@@ -92,7 +102,9 @@ def test_create_raises_on_missing_vocabulary_list(db_session):
 
 
 def test_create_raises_on_empty_vocabulary_list(db_session):
-    vocab_list = _make_list_with_items(db_session, skritter_list_id="create-empty", n_items=0)
+    vocab_list = _make_list_with_items(
+        db_session, skritter_list_id="create-empty", n_items=0
+    )
     repository = GenerationRequestRepository(db_session)
     service = GenerationRequestService(repository)
 
@@ -108,7 +120,9 @@ def test_create_raises_on_empty_vocabulary_list(db_session):
 
 
 def test_create_caps_oversized_list_to_target_count(db_session):
-    vocab_list = _make_list_with_items(db_session, skritter_list_id="create-oversized", n_items=20)
+    vocab_list = _make_list_with_items(
+        db_session, skritter_list_id="create-oversized", n_items=20
+    )
     repository = GenerationRequestRepository(db_session)
     service = GenerationRequestService(repository)
 

@@ -1,7 +1,10 @@
 import pytest
 from pydantic import ValidationError
 
-from story_generator.generation.schemas import MAX_TARGET_WORD_COUNT, CreateGenerationRequestSchema
+from story_generator.generation.schemas import (
+    MAX_TARGET_WORD_COUNT,
+    CreateGenerationRequestSchema,
+)
 
 
 def test_rejects_missing_vocabulary_list_id():

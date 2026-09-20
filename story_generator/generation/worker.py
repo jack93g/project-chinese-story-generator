@@ -36,7 +36,9 @@ import time
 
 from sqlalchemy.orm import Session, sessionmaker
 
-from story_generator.generation.persistence.repository import GenerationRequestRepository
+from story_generator.generation.persistence.repository import (
+    GenerationRequestRepository,
+)
 from story_generator.generation.persistence.service import GenerationRequestService
 from story_generator.generation.providers.base import StoryGenerationProvider
 from story_generator.generation.providers.errors import ProviderError
@@ -73,7 +75,11 @@ class GenerationWorker:
             topic=request.topic,
         )
 
-        raw_exchange: dict = {"request_body": None, "response_status": None, "response_body": None}
+        raw_exchange: dict = {
+            "request_body": None,
+            "response_status": None,
+            "response_body": None,
+        }
 
         def _record_raw_exchange(request_body, response_status, response_body):
             raw_exchange["request_body"] = request_body
@@ -81,7 +87,9 @@ class GenerationWorker:
             raw_exchange["response_body"] = response_body
 
         try:
-            result = self._provider.generate(generation_input, on_raw_exchange=_record_raw_exchange)
+            result = self._provider.generate(
+                generation_input, on_raw_exchange=_record_raw_exchange
+            )
         except ProviderError as exc:
             repository.add_raw_payload(
                 generation_request_id=request.id,
@@ -91,7 +99,9 @@ class GenerationWorker:
                 response_status=raw_exchange["response_status"],
                 payload=raw_exchange["response_body"],
             )
-            service.fail(request.id, error_code=type(exc).__name__, error_message=str(exc))
+            service.fail(
+                request.id, error_code=type(exc).__name__, error_message=str(exc)
+            )
             db.commit()
             return True
 
@@ -170,7 +180,9 @@ class GenerationWorker:
                         f"(exhausted retry limit): {result['failed']}"
                     )
                 if result["requeued"]:
-                    print(f"Requeued {len(result['requeued'])} stale request(s): {result['requeued']}")
+                    print(
+                        f"Requeued {len(result['requeued'])} stale request(s): {result['requeued']}"
+                    )
 
             while True:
                 processed = self.run_once(db)

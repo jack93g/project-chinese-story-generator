@@ -13,7 +13,9 @@ logger = logging.getLogger(__name__)
 
 
 def main() -> None:
-    logging.basicConfig(level=logging.INFO, format="%(levelname)s %(name)s: %(message)s")
+    logging.basicConfig(
+        level=logging.INFO, format="%(levelname)s %(name)s: %(message)s"
+    )
     parser = argparse.ArgumentParser(
         description="Import vocabulary from Skritter into the database."
     )

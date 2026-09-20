@@ -1,5 +1,8 @@
+from story_generator.ingestion.schemas import (
+    SkritterVocabularyResponse,
+    validate_skritter_response,
+)
 from story_generator.vocabulary.types import SkritterVocabularyRecord
-from story_generator.ingestion.schemas import SkritterVocabularyResponse, validate_skritter_response
 
 
 def parse_vocab(response: dict) -> SkritterVocabularyRecord:
@@ -7,11 +10,7 @@ def parse_vocab(response: dict) -> SkritterVocabularyRecord:
         SkritterVocabularyResponse, response, "/vocabs"
     ).vocabs[0]
 
-    definition = (
-        vocab.customDefinition
-        or vocab.definitions.en
-        or ""
-    )
+    definition = vocab.customDefinition or vocab.definitions.en or ""
 
     return SkritterVocabularyRecord(
         skritter_vocab_id=vocab.id,

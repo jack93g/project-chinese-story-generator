@@ -5,10 +5,13 @@ from dotenv import load_dotenv
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 
+
 @lru_cache
 def _session_factory(database_url: str) -> sessionmaker:
     """Create one session factory per configured database URL."""
-    return sessionmaker(autocommit=False, autoflush=False, bind=create_engine(database_url))
+    return sessionmaker(
+        autocommit=False, autoflush=False, bind=create_engine(database_url)
+    )
 
 
 def get_session_factory() -> sessionmaker:
@@ -21,5 +24,3 @@ def get_session_factory() -> sessionmaker:
             "Configure it before using a database-backed endpoint."
         )
     return _session_factory(database_url)
-
-

@@ -77,20 +77,21 @@ class UnapprovedProviderError(Exception):
         )
 
 
-
 # groq did not pass the text as only 3/7 of the outputs were good, but we are still approving it for now to not block
 # base_url below MUST exactly match whatever OPENAI_BASE_URL is actually
 # set to in the environment(s) this stub is meant to cover — if you change
 # OPENAI_BASE_URL, update this key too, or the check will (correctly) start
 # failing.
 APPROVED_PROVIDERS: dict[tuple[str, str, str], ProviderApproval] = {
-    ("groq", "openai/gpt-oss-120b", "https://api.groq.com/openai/v1/chat/completions"): ProviderApproval(
+    (
+        "groq",
+        "openai/gpt-oss-120b",
+        "https://api.groq.com/openai/v1/chat/completions",
+    ): ProviderApproval(
         report_path="reports/provider-comparisons/2026-08-23T140047Z.md",
         reviewed_by="Jack",
         reviewed_at="2026-08-23",
-        notes=(
-            "3/7 look good, ran into rate limits with the others"
-        ),
+        notes=("3/7 look good, ran into rate limits with the others"),
     ),
 }
 
@@ -113,7 +114,11 @@ def assert_current_provider_approved() -> None:
     """
     # Imported here, not at module level, to avoid a config <-> providers
     # import cycle (config.py has no reason to import from generation.*).
-    from story_generator.config import get_openai_base_url, get_openai_model, get_openai_provider_label
+    from story_generator.config import (
+        get_openai_base_url,
+        get_openai_model,
+        get_openai_provider_label,
+    )
 
     assert_provider_approved(
         get_openai_provider_label(),

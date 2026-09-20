@@ -26,7 +26,9 @@ import argparse
 from sqlalchemy import select
 
 from story_generator.database.session import get_session_factory
-from story_generator.generation.persistence.repository import GenerationRequestRepository
+from story_generator.generation.persistence.repository import (
+    GenerationRequestRepository,
+)
 from story_generator.generation.persistence.service import GenerationRequestService
 from story_generator.generation.providers.errors import ProviderError
 from story_generator.generation.providers.openai import build_openai_provider
@@ -44,13 +46,20 @@ def _pick_vocabulary_list(db, list_id: int | None) -> VocabularyList:
 
     vocab_list = db.execute(select(VocabularyList).limit(1)).scalar_one_or_none()
     if vocab_list is None:
-        raise SystemExit("No VocabularyList found in the database. Pass --list-id or seed one first.")
+        raise SystemExit(
+            "No VocabularyList found in the database. Pass --list-id or seed one first."
+        )
     return vocab_list
 
 
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--list-id", type=int, default=None, help="VocabularyList id to use (defaults to the first list found)")
+    parser.add_argument(
+        "--list-id",
+        type=int,
+        default=None,
+        help="VocabularyList id to use (defaults to the first list found)",
+    )
     parser.add_argument("--hsk-level", type=int, default=2)
     parser.add_argument("--word-count", type=int, default=150)
     parser.add_argument("--vocab-count", type=int, default=5)
@@ -77,8 +86,12 @@ def main() -> None:
 
         request = service.create(db, payload)
         db.commit()
-        print(f"Created StoryGenerationRequest id={request.id}, status={request.status}")
-        print(f"Selected vocabulary ({len(request.selected_vocabulary_snapshot)} items):")
+        print(
+            f"Created StoryGenerationRequest id={request.id}, status={request.status}"
+        )
+        print(
+            f"Selected vocabulary ({len(request.selected_vocabulary_snapshot)} items):"
+        )
         for item in request.selected_vocabulary_snapshot:
             print(f"  - {item['writing']} ({item['reading']}): {item['definition_en']}")
         print()
@@ -103,11 +116,13 @@ def main() -> None:
         try:
             result = provider.generate(generation_request)
         except ProviderError as exc:
-            service.fail(request.id, error_code=type(exc).__name__, error_message=str(exc))
+            service.fail(
+                request.id, error_code=type(exc).__name__, error_message=str(exc)
+            )
             db.commit()
             print(f"FAILED: {type(exc).__name__}: {exc}")
             print(f"Status -> {request.status}")
-            raise SystemExit(1)
+            raise SystemExit(1) from exc
 
         service.succeed(
             request.id,
@@ -126,14 +141,18 @@ def main() -> None:
         print()
         print("-" * 60)
         print(f"Status -> {request.status}")
-        print(f"Usage: {result.usage.prompt_tokens} prompt + "
-              f"{result.usage.completion_tokens} completion = "
-              f"{result.usage.total_tokens} total tokens")
+        print(
+            f"Usage: {result.usage.prompt_tokens} prompt + "
+            f"{result.usage.completion_tokens} completion = "
+            f"{result.usage.total_tokens} total tokens"
+        )
         print(f"Latency: {result.usage.latency_ms}ms")
         print()
-        print("NOTE: the story text above was NOT persisted — Story "
-              "storage doesn't exist until M3-5. Only the "
-              "StoryGenerationRequest row (id={}) was saved.".format(request.id))
+        print(
+            "NOTE: the story text above was NOT persisted — Story "
+            "storage doesn't exist until M3-5. Only the "
+            f"StoryGenerationRequest row (id={request.id}) was saved."
+        )
 
     finally:
         db.close()

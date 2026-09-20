@@ -71,8 +71,28 @@ def test_import_list_counts_skipped_vocab():
         "vocab_ids": ["zh-你好-0", "zh-谢谢-0"],
     }
     client.get_vocab.side_effect = [
-        {"Vocabs": [{"id": "zh-你好-0", "language": "zh", "writing": "你好", "reading": "ni3 hao3", "definitions": {"en": "hello"}}]},
-        {"Vocabs": [{"id": "zh-谢谢-0", "language": "zh", "writing": "谢谢", "reading": "xie4 xie", "definitions": {"en": "thanks"}}]},
+        {
+            "Vocabs": [
+                {
+                    "id": "zh-你好-0",
+                    "language": "zh",
+                    "writing": "你好",
+                    "reading": "ni3 hao3",
+                    "definitions": {"en": "hello"},
+                }
+            ]
+        },
+        {
+            "Vocabs": [
+                {
+                    "id": "zh-谢谢-0",
+                    "language": "zh",
+                    "writing": "谢谢",
+                    "reading": "xie4 xie",
+                    "definitions": {"en": "thanks"},
+                }
+            ]
+        },
     ]
     repository.ensure_list.return_value = 1
     # first vocab is new, second already existed (conflict -> not inserted)
@@ -106,7 +126,7 @@ def test_import_list_rolls_back_on_failure():
 
     try:
         service.import_list("123")
-        assert False, "expected RuntimeError to propagate"
+        raise AssertionError("expected RuntimeError to propagate")
     except RuntimeError:
         pass
 
@@ -115,6 +135,7 @@ def test_import_list_rolls_back_on_failure():
 
 
 # --- Sync tracking (run_single_list / run_all_lists) -----------------------
+
 
 def _make_service_with_import_list(import_list_return):
     """Helper: a service whose import_list is stubbed directly, so these
@@ -142,8 +163,8 @@ def test_run_single_list_marks_sync_run_succeeded():
         "vocab_skipped": 0,
         "failures": [],
     }
-    service, client, tracking_repository, tracking_session = _make_service_with_import_list(
-        [success_result]
+    service, client, tracking_repository, tracking_session = (
+        _make_service_with_import_list([success_result])
     )
     tracking_repository.create_sync_run.return_value = sync_run
 
@@ -160,14 +181,14 @@ def test_run_single_list_marks_sync_run_succeeded():
 
 def test_run_single_list_marks_sync_run_failed_on_exception():
     sync_run = Mock(id=42)
-    service, client, tracking_repository, tracking_session = _make_service_with_import_list(
-        RuntimeError("boom")
+    service, client, tracking_repository, tracking_session = (
+        _make_service_with_import_list(RuntimeError("boom"))
     )
     tracking_repository.create_sync_run.return_value = sync_run
 
     try:
         service.run_single_list("123")
-        assert False, "expected RuntimeError to propagate"
+        raise AssertionError("expected RuntimeError to propagate")
     except RuntimeError:
         pass
 
@@ -206,7 +227,7 @@ def test_run_all_lists_marks_sync_run_failed_on_partial_failure():
 
     try:
         service.run_all_lists()
-        assert False, "expected SyncPartialFailureError to propagate"
+        raise AssertionError("expected SyncPartialFailureError to propagate")
     except SyncPartialFailureError:
         pass
 

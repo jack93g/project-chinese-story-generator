@@ -21,7 +21,9 @@ class SyncRun(Base):
     id = Column(BigInteger, primary_key=True)
     source = Column(Text, nullable=False, server_default="skritter")
     status = Column(Text, nullable=False)
-    started_at = Column(DateTime(timezone=True), nullable=False, server_default=func.now())
+    started_at = Column(
+        DateTime(timezone=True), nullable=False, server_default=func.now()
+    )
     completed_at = Column(DateTime(timezone=True), nullable=True)
     error_message = Column(Text, nullable=True)
     summary = Column(JSONB, nullable=False, server_default="{}")
@@ -53,7 +55,9 @@ class RawSkritterPayload(Base):
     request_params = Column(JSONB, nullable=False, server_default="{}")
     response_status = Column(Integer, nullable=False)
     payload = Column(JSONB, nullable=False)
-    fetched_at = Column(DateTime(timezone=True), nullable=False, server_default=func.now())
+    fetched_at = Column(
+        DateTime(timezone=True), nullable=False, server_default=func.now()
+    )
 
     sync_run = relationship("SyncRun", back_populates="payloads")
 

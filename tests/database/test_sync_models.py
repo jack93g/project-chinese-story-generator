@@ -1,8 +1,8 @@
 import pytest
 
 from story_generator.ingestion.persistence.models import (
-    SyncRun,
     RawSkritterPayload,
+    SyncRun,
 )
 
 
@@ -26,17 +26,9 @@ def test_create_sync_run_and_raw_payload(db_session):
     db_session.add(payload)
     db_session.commit()
 
-    saved_sync = (
-        db_session.query(SyncRun)
-        .filter_by(id=sync_run.id)
-        .one()
-    )
+    saved_sync = db_session.query(SyncRun).filter_by(id=sync_run.id).one()
 
-    saved_payload = (
-        db_session.query(RawSkritterPayload)
-        .filter_by(id=payload.id)
-        .one()
-    )
+    saved_payload = db_session.query(RawSkritterPayload).filter_by(id=payload.id).one()
 
     assert saved_sync.status == "running"
     assert saved_payload.sync_run_id == saved_sync.id

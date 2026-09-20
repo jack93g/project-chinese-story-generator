@@ -1,6 +1,8 @@
 import pytest
 
-from story_generator.generation.persistence.repository import GenerationRequestRepository
+from story_generator.generation.persistence.repository import (
+    GenerationRequestRepository,
+)
 from story_generator.generation.persistence.service import GenerationRequestService
 from story_generator.vocabulary.persistence.models import VocabularyItem, VocabularyList
 
@@ -32,7 +34,12 @@ def _make_queued_request(session, *, skritter_list_id: str):
         target_word_count=100,
         target_vocabulary_count=1,
         selected_vocabulary_snapshot=[
-            {"id": item.id, "writing": "你好", "reading": "ni3 hao3", "definition_en": "hello"}
+            {
+                "id": item.id,
+                "writing": "你好",
+                "reading": "ni3 hao3",
+                "definition_en": "hello",
+            }
         ],
         prompt_version="story-v1",
         provider="openai",

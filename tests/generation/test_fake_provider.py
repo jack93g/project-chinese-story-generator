@@ -9,7 +9,10 @@ from story_generator.generation.providers.errors import (
     ProviderTimeoutError,
 )
 from story_generator.generation.providers.fake import FakeStoryGenerationProvider
-from story_generator.generation.providers.types import GenerationRequestInput, UsageMetadata
+from story_generator.generation.providers.types import (
+    GenerationRequestInput,
+    UsageMetadata,
+)
 
 SAMPLE_REQUEST = GenerationRequestInput(
     target_hsk_level=3,
@@ -72,14 +75,18 @@ def test_provider_records_every_call():
 
 
 def test_malformed_scenario_raises_provider_invalid_response_error():
-    provider = FakeStoryGenerationProvider(scenario="malformed", raw_response="not json")
+    provider = FakeStoryGenerationProvider(
+        scenario="malformed", raw_response="not json"
+    )
 
     with pytest.raises(ProviderInvalidResponseError):
         provider.generate(SAMPLE_REQUEST)
 
 
 def test_malformed_scenario_with_missing_field_raises_provider_invalid_response_error():
-    provider = FakeStoryGenerationProvider(scenario="malformed", raw_response='{"title": "标题"}')
+    provider = FakeStoryGenerationProvider(
+        scenario="malformed", raw_response='{"title": "标题"}'
+    )
 
     with pytest.raises(ProviderInvalidResponseError, match="body"):
         provider.generate(SAMPLE_REQUEST)

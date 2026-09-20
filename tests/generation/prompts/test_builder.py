@@ -12,7 +12,12 @@ def _make_request(**overrides) -> GenerationRequestInput:
         target_word_count=150,
         target_vocabulary_count=2,
         vocabulary_snapshot=[
-            {"id": 1, "writing": "你好", "reading": "ni3 hao3", "definition_en": "hello"},
+            {
+                "id": 1,
+                "writing": "你好",
+                "reading": "ni3 hao3",
+                "definition_en": "hello",
+            },
             {"id": 2, "writing": "菜单", "reading": "càidān", "definition_en": "menu"},
         ],
         prompt_version="story-v1",
@@ -40,7 +45,7 @@ def test_build_prompt_raises_on_unknown_version():
 
     try:
         build_prompt(request)
-        assert False, "expected ValueError"
+        raise AssertionError("expected ValueError")
     except ValueError as exc:
         assert "story-v99" in str(exc)
 

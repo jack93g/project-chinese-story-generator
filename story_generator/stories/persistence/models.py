@@ -1,18 +1,31 @@
-from sqlalchemy import BigInteger, Boolean, Column, DateTime, ForeignKey, Integer, Text, func
+from sqlalchemy import (
+    BigInteger,
+    Boolean,
+    Column,
+    DateTime,
+    ForeignKey,
+    Integer,
+    Text,
+    func,
+)
 from sqlalchemy.ext.associationproxy import association_proxy
 from sqlalchemy.orm import relationship
 
-from story_generator.database.base import Base
-import story_generator.vocabulary.persistence.models  # noqa: F401
 import story_generator.generation.persistence.models  # noqa: F401
+import story_generator.vocabulary.persistence.models  # noqa: F401
+from story_generator.database.base import Base
 
 
 class StoryVocabularyItem(Base):
     __tablename__ = "story_vocabulary_items"
 
-    story_id = Column(BigInteger, ForeignKey("stories.id", ondelete="CASCADE"), primary_key=True)
+    story_id = Column(
+        BigInteger, ForeignKey("stories.id", ondelete="CASCADE"), primary_key=True
+    )
     vocabulary_item_id = Column(
-        BigInteger, ForeignKey("vocabulary_items.id", ondelete="CASCADE"), primary_key=True
+        BigInteger,
+        ForeignKey("vocabulary_items.id", ondelete="CASCADE"),
+        primary_key=True,
     )
     requested = Column(Boolean, nullable=False, server_default="false")
     used = Column(Boolean, nullable=False, server_default="false")
@@ -34,8 +47,12 @@ class Story(Base):
     title = Column(Text, nullable=False)
     content = Column(Text, nullable=False)
     target_hsk = Column(Integer, nullable=True)
-    created_at = Column(DateTime(timezone=True), nullable=False, server_default=func.now())
-    updated_at = Column(DateTime(timezone=True), nullable=False, server_default=func.now())
+    created_at = Column(
+        DateTime(timezone=True), nullable=False, server_default=func.now()
+    )
+    updated_at = Column(
+        DateTime(timezone=True), nullable=False, server_default=func.now()
+    )
 
     vocabulary_associations = relationship(
         "StoryVocabularyItem",

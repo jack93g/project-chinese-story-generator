@@ -1,14 +1,14 @@
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 
 from sqlalchemy import select, update
 from sqlalchemy.orm import Session
-from story_generator.stories.persistence.models import Story
 
 from story_generator.generation.persistence.models import (
     RawGenerationPayload,
     StoryGenerationRequest,
 )
 from story_generator.generation.redaction import redact
+from story_generator.stories.persistence.models import Story
 
 
 class GenerationRequestRepository:
@@ -53,12 +53,14 @@ class GenerationRequestRepository:
             return None
 
         request.status = "running"
-        request.started_at = datetime.now(timezone.utc)
+        request.started_at = datetime.now(UTC)
         request.attempt_count += 1
         self.session.commit()
         return request
 
-    def reclaim_stale_running(self, stale_after: timedelta, max_attempts: int) -> dict[str, list[int]]:
+    def reclaim_stale_running(
+        self, stale_after: timedelta, max_attempts: int
+    ) -> dict[str, list[int]]:
         """
         Crash-recovery path: for every "running" request whose started_at
         predates the staleness threshold —
@@ -73,7 +75,7 @@ class GenerationRequestRepository:
         machine) since this is an administrative sweep over potentially
         many rows, not a single-request transition.
         """
-        threshold = datetime.now(timezone.utc) - stale_after
+        threshold = datetime.now(UTC) - stale_after
 
         requeue_stmt = (
             update(StoryGenerationRequest)
@@ -85,7 +87,7 @@ class GenerationRequestRepository:
         )
         requeued_ids = [row[0] for row in self.session.execute(requeue_stmt)]
 
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
         exhaust_stmt = (
             update(StoryGenerationRequest)
             .where(StoryGenerationRequest.status == "running")
@@ -129,14 +131,16 @@ class GenerationRequestRepository:
         self.session.flush()
         return raw_payload
 
-    def list_raw_payloads(self, generation_request_id: int) -> list[RawGenerationPayload]:
+    def list_raw_payloads(
+        self, generation_request_id: int
+    ) -> list[RawGenerationPayload]:
         return (
             self.session.query(RawGenerationPayload)
             .filter_by(generation_request_id=generation_request_id)
             .order_by(RawGenerationPayload.attempt_number.asc())
             .all()
         )
-    
+
     def get_story_id_for_request(self, generation_request_id: int) -> int | None:
         story = (
             self.session.query(Story)

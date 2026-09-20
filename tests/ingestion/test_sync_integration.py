@@ -3,18 +3,17 @@ import pytest
 import respx
 
 from story_generator.ingestion.persistence.models import (
-    SyncRun,
     RawSkritterPayload,
-)
-from story_generator.vocabulary.persistence.models import (
-    VocabularyItem,
-    VocabularyList,
+    SyncRun,
 )
 from story_generator.ingestion.persistence.repository import SyncRunRepository
 from story_generator.ingestion.service import IngestionService
 from story_generator.ingestion.skritter_client import SkritterClient
+from story_generator.vocabulary.persistence.models import (
+    VocabularyItem,
+    VocabularyList,
+)
 from story_generator.vocabulary.persistence.repository import VocabularyRepository
-
 
 LIST_URL = "https://legacy.skritter.com/api/v0/vocablists/123"
 VOCAB_URL = "https://legacy.skritter.com/api/v0/vocabs"

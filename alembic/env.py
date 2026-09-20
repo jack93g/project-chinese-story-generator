@@ -1,23 +1,22 @@
-from logging.config import fileConfig
-
-from sqlalchemy import engine_from_config
-from sqlalchemy import pool
-
-from alembic import context
-
 import os
 import sys
+from logging.config import fileConfig
+
+from sqlalchemy import engine_from_config, pool
+
+from alembic import context
 
 # Make sure the project root is importable
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
 from dotenv import load_dotenv
+
 load_dotenv()
 
-from story_generator.database.base import Base
 import story_generator.ingestion.persistence.models  # noqa: F401
 import story_generator.stories.persistence.models  # noqa: F401
 import story_generator.vocabulary.persistence.models  # noqa: F401
+from story_generator.database.base import Base
 
 # this is the Alembic Config object, which provides
 # access to the values within the .ini file in use.
@@ -26,8 +25,7 @@ config = context.config
 # Now that config exists, override the DB URL from the environment
 
 config.set_main_option(
-    "sqlalchemy.url",
-    os.getenv("ALEMBIC_DATABASE_URL", os.getenv("DATABASE_URL"))
+    "sqlalchemy.url", os.getenv("ALEMBIC_DATABASE_URL", os.getenv("DATABASE_URL"))
 )
 
 # Interpret the config file for Python logging.
@@ -42,7 +40,6 @@ target_metadata = Base.metadata
 # can be acquired:
 # my_important_option = config.get_main_option("my_important_option")
 # ... etc.
-
 
 
 def run_migrations_offline() -> None:
@@ -70,6 +67,7 @@ def run_migrations_online() -> None:
         )
         with context.begin_transaction():
             context.run_migrations()
+
 
 if context.is_offline_mode():
     run_migrations_offline()

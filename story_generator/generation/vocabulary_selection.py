@@ -25,7 +25,9 @@ from story_generator.vocabulary.persistence.models import (
 class EmptyVocabularyListError(Exception):
     def __init__(self, vocabulary_list_id: int):
         self.vocabulary_list_id = vocabulary_list_id
-        super().__init__(f"Vocabulary list {vocabulary_list_id} has no vocabulary items")
+        super().__init__(
+            f"Vocabulary list {vocabulary_list_id} has no vocabulary items"
+        )
 
 
 def select_vocabulary(

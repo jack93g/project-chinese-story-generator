@@ -3,7 +3,6 @@ import pytest
 from story_generator.stories.persistence.models import Story, StoryVocabularyItem
 from story_generator.vocabulary.persistence.models import VocabularyItem
 
-
 pytestmark = pytest.mark.db
 
 
@@ -223,7 +222,9 @@ def test_delete_story_removes_story_and_vocabulary_associations(client, db_sessi
     assert response.content == b""
 
     assert db_session.get(Story, story_id) is None
-    assert db_session.query(StoryVocabularyItem).filter_by(story_id=story_id).count() == 0
+    assert (
+        db_session.query(StoryVocabularyItem).filter_by(story_id=story_id).count() == 0
+    )
 
     get_response = client.get(f"/stories/{story_id}")
     assert get_response.status_code == 404

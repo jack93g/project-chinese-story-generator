@@ -28,7 +28,10 @@ from pathlib import Path
 from story_generator.eval.fixtures import EvalFixture
 from story_generator.generation.providers.base import StoryGenerationProvider
 from story_generator.generation.providers.errors import ProviderError
-from story_generator.generation.providers.types import GenerationRequestInput, GenerationResult
+from story_generator.generation.providers.types import (
+    GenerationRequestInput,
+    GenerationResult,
+)
 from story_generator.generation.validation import VOCABULARY_COVERAGE_THRESHOLD
 
 
@@ -151,11 +154,14 @@ def run_single(fixture: EvalFixture, provider_spec: ProviderSpec) -> EvalOutcome
         requested_vocabulary_count=coverage_info["requested_vocabulary_count"],
         used_vocabulary_count=coverage_info["used_vocabulary_count"],
         coverage=coverage_info["coverage"],
-        meets_coverage_threshold=coverage_info["coverage"] >= VOCABULARY_COVERAGE_THRESHOLD,
+        meets_coverage_threshold=coverage_info["coverage"]
+        >= VOCABULARY_COVERAGE_THRESHOLD,
         missing_vocabulary=coverage_info["missing_vocabulary"],
         target_word_count=fixture.target_word_count,
         actual_character_count=actual_chars,
-        length_ratio=(actual_chars / fixture.target_word_count) if fixture.target_word_count else None,
+        length_ratio=(actual_chars / fixture.target_word_count)
+        if fixture.target_word_count
+        else None,
         latency_ms=result.usage.latency_ms,
         title=result.title,
         body=result.body,
@@ -172,7 +178,9 @@ def run_comparison(
 
 
 def to_json(outcomes: list[EvalOutcome]) -> str:
-    return json.dumps([dataclasses.asdict(o) for o in outcomes], indent=2, ensure_ascii=False)
+    return json.dumps(
+        [dataclasses.asdict(o) for o in outcomes], indent=2, ensure_ascii=False
+    )
 
 
 def load_outcomes(path: str | Path) -> list[EvalOutcome]:
@@ -216,11 +224,23 @@ def to_markdown(outcomes: list[EvalOutcome]) -> str:
 
     for o in outcomes:
         coverage_str = f"{o.coverage:.0%}" if o.coverage is not None else "—"
-        meets_str = "✅" if o.meets_coverage_threshold else ("❌" if o.meets_coverage_threshold is not None else "—")
-        chars_str = f"{o.actual_character_count}/{o.target_word_count}" if o.actual_character_count is not None else f"—/{o.target_word_count}"
+        meets_str = (
+            "✅"
+            if o.meets_coverage_threshold
+            else ("❌" if o.meets_coverage_threshold is not None else "—")
+        )
+        chars_str = (
+            f"{o.actual_character_count}/{o.target_word_count}"
+            if o.actual_character_count is not None
+            else f"—/{o.target_word_count}"
+        )
         latency_str = str(o.latency_ms) if o.latency_ms is not None else "—"
         error_str = o.error_code or "—"
-        notes_str = _markdown_table_cell(o.manual_quality_notes) if o.manual_quality_notes else "_(fill in)_"
+        notes_str = (
+            _markdown_table_cell(o.manual_quality_notes)
+            if o.manual_quality_notes
+            else "_(fill in)_"
+        )
         lines.append(
             f"| {o.fixture_name} | {o.category} | {o.provider_label} | {o.model} | `{o.base_url}` | "
             f"{'✅' if o.schema_valid else '❌'} | {coverage_str} | {meets_str} | "
@@ -246,7 +266,9 @@ def to_markdown(outcomes: list[EvalOutcome]) -> str:
 
     lines += ["## Transcripts", ""]
     for o in outcomes:
-        lines.append(f"### {o.fixture_name} — {o.provider_label} ({o.model} @ {o.base_url})")
+        lines.append(
+            f"### {o.fixture_name} — {o.provider_label} ({o.model} @ {o.base_url})"
+        )
         lines.append("")
         if not o.schema_valid:
             lines.append(f"**Failed:** `{o.error_code}` — {o.error_message}")
@@ -263,9 +285,11 @@ def to_markdown(outcomes: list[EvalOutcome]) -> str:
         if o.manual_quality_notes:
             lines.append(f"**Manual quality notes:** {o.manual_quality_notes}")
         else:
-            lines.append("**Manual quality notes:** _(fill in — correct sense of any "
-                          "ambiguous words? natural phrasing? does it read like it was "
-                          "written for the target HSK level?)_")
+            lines.append(
+                "**Manual quality notes:** _(fill in — correct sense of any "
+                "ambiguous words? natural phrasing? does it read like it was "
+                "written for the target HSK level?)_"
+            )
         lines.append("")
 
     return "\n".join(lines)

@@ -47,6 +47,6 @@ PROMPT_BUILDERS = {
 def build_prompt(request: GenerationRequestInput) -> str:
     try:
         builder = PROMPT_BUILDERS[request.prompt_version]
-    except KeyError:
-        raise ValueError(f"Unknown prompt version: {request.prompt_version!r}")
+    except KeyError as exc:
+        raise ValueError(f"Unknown prompt version: {request.prompt_version!r}") from exc
     return builder(request)
