@@ -66,6 +66,24 @@ describe("StoryPage", () => {
     ).toBeInTheDocument();
   });
 
+  it("shows not-found without calling the API when there is no id", () => {
+    useSearchParams.mockReturnValue(new URLSearchParams(""));
+    render(<StoryPage />);
+    expect(
+      screen.getByRole("heading", { name: "Story not found" }),
+    ).toBeInTheDocument();
+    expect(fetchStory).not.toHaveBeenCalled();
+  });
+
+  it("shows not-found without calling the API when the id is not numeric", () => {
+    useSearchParams.mockReturnValue(new URLSearchParams("id=../vocabulary"));
+    render(<StoryPage />);
+    expect(
+      screen.getByRole("heading", { name: "Story not found" }),
+    ).toBeInTheDocument();
+    expect(fetchStory).not.toHaveBeenCalled();
+  });
+
   it("shows an accessible error state for a non-404 failure", async () => {
     useSearchParams.mockReturnValue(new URLSearchParams("id=5"));
     fetchStory.mockRejectedValueOnce(new ApiError("boom", 500));

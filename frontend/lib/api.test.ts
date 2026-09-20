@@ -181,6 +181,28 @@ describe("fetchStories / fetchAllStories", () => {
   });
 });
 
+describe("fetchStory", () => {
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  it("URL-encodes the id so it cannot change the request path", async () => {
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({}),
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    const { fetchStory } = await import("./api");
+    await fetchStory("../vocabulary");
+
+    expect(fetchMock).toHaveBeenCalledWith(
+      "http://127.0.0.1:8000/stories/..%2Fvocabulary",
+      undefined,
+    );
+  });
+});
+
 describe("deleteStory", () => {
   afterEach(() => {
     vi.unstubAllGlobals();
@@ -195,6 +217,19 @@ describe("deleteStory", () => {
 
     expect(fetchMock).toHaveBeenCalledWith(
       "http://127.0.0.1:8000/stories/7",
+      { method: "DELETE" },
+    );
+  });
+
+  it("URL-encodes the id so it cannot change the request path", async () => {
+    const fetchMock = vi.fn().mockResolvedValue({ ok: true });
+    vi.stubGlobal("fetch", fetchMock);
+
+    const { deleteStory } = await import("./api");
+    await deleteStory("../vocabulary");
+
+    expect(fetchMock).toHaveBeenCalledWith(
+      "http://127.0.0.1:8000/stories/..%2Fvocabulary",
       { method: "DELETE" },
     );
   });
