@@ -3,9 +3,9 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { ApiError } from "@/lib/api";
 import StoryPage from "./page";
 
-const { fetchStory, useParams } = vi.hoisted(() => ({
+const { fetchStory, useSearchParams } = vi.hoisted(() => ({
   fetchStory: vi.fn(),
-  useParams: vi.fn(),
+  useSearchParams: vi.fn(),
 }));
 
 vi.mock("@/lib/api", async () => {
@@ -15,7 +15,7 @@ vi.mock("@/lib/api", async () => {
   return { ...actual, fetchStory };
 });
 
-vi.mock("next/navigation", () => ({ useParams }));
+vi.mock("next/navigation", () => ({ useSearchParams }));
 
 const STORY = {
   id: 5,
@@ -49,14 +49,14 @@ describe("StoryPage", () => {
   });
 
   it("shows a loading state while the story is fetched", () => {
-    useParams.mockReturnValue({ id: "5" });
+    useSearchParams.mockReturnValue(new URLSearchParams("id=5"));
     fetchStory.mockReturnValue(new Promise(() => {}));
     render(<StoryPage />);
     expect(screen.getByRole("status")).toHaveTextContent("Loading story");
   });
 
   it("shows a not-found state for an unknown story", async () => {
-    useParams.mockReturnValue({ id: "999999" });
+    useSearchParams.mockReturnValue(new URLSearchParams("id=999999"));
     fetchStory.mockRejectedValueOnce(
       new ApiError("Story 999999 not found", 404),
     );
@@ -67,14 +67,14 @@ describe("StoryPage", () => {
   });
 
   it("shows an accessible error state for a non-404 failure", async () => {
-    useParams.mockReturnValue({ id: "5" });
+    useSearchParams.mockReturnValue(new URLSearchParams("id=5"));
     fetchStory.mockRejectedValueOnce(new ApiError("boom", 500));
     render(<StoryPage />);
     expect(await screen.findByRole("alert")).toHaveTextContent("boom");
   });
 
   it("renders the title, body with preserved line breaks, and glossary", async () => {
-    useParams.mockReturnValue({ id: "5" });
+    useSearchParams.mockReturnValue(new URLSearchParams("id=5"));
     fetchStory.mockResolvedValueOnce(STORY);
     render(<StoryPage />);
 
@@ -96,7 +96,7 @@ describe("StoryPage", () => {
   });
 
   it("omits the HSK badge when target_hsk is null but still shows the date", async () => {
-    useParams.mockReturnValue({ id: "5" });
+    useSearchParams.mockReturnValue(new URLSearchParams("id=5"));
     fetchStory.mockResolvedValueOnce({ ...STORY, target_hsk: null });
     render(<StoryPage />);
 
@@ -107,7 +107,7 @@ describe("StoryPage", () => {
   });
 
   it("omits pinyin parentheses and shows an explicit missing-definition note for null glossary fields", async () => {
-    useParams.mockReturnValue({ id: "5" });
+    useSearchParams.mockReturnValue(new URLSearchParams("id=5"));
     fetchStory.mockResolvedValueOnce({
       ...STORY,
       selected_vocabulary: [
@@ -134,12 +134,12 @@ describe("StoryPage", () => {
   });
 
   it("refetches when the story id changes", async () => {
-    useParams.mockReturnValue({ id: "5" });
+    useSearchParams.mockReturnValue(new URLSearchParams("id=5"));
     fetchStory.mockResolvedValueOnce(STORY);
     const { rerender } = render(<StoryPage />);
     await screen.findByRole("heading", { name: "天气小记" });
 
-    useParams.mockReturnValue({ id: "6" });
+    useSearchParams.mockReturnValue(new URLSearchParams("id=6"));
     fetchStory.mockResolvedValueOnce({ ...STORY, id: 6, title: "换了故事" });
     rerender(<StoryPage />);
 

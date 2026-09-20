@@ -1,7 +1,7 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { useParams } from "next/navigation";
+import { Suspense, useEffect, useState } from "react";
+import { useSearchParams } from "next/navigation";
 import { ApiError, fetchStory, type StoryDetail } from "@/lib/api";
 
 type StoryState =
@@ -18,14 +18,50 @@ function formatDate(isoDate: string): string {
   });
 }
 
+// A static export can't pre-render one page per story ID (IDs are created at
+// runtime), so the story is addressed as /story?id=<id> and fetched client-side.
 export default function StoryPage() {
-  const params = useParams<{ id: string }>();
+  return (
+    <Suspense fallback={<StoryLoading />}>
+      <StoryContent />
+    </Suspense>
+  );
+}
+
+function StoryLoading() {
+  return (
+    <div className="page-content">
+      <p role="status" className="state">
+        Loading story…
+      </p>
+    </div>
+  );
+}
+
+function StoryNotFound() {
+  return (
+    <div className="page-content">
+      <h1>Story not found</h1>
+      <p className="state">
+        There&rsquo;s no saved story with this ID. It may have been removed, or
+        the link may be incorrect.
+      </p>
+    </div>
+  );
+}
+
+function StoryContent() {
+  const id = useSearchParams().get("id");
   const [state, setState] = useState<StoryState>({ status: "loading" });
 
   useEffect(() => {
+    if (!id) {
+      return;
+    }
+
     let cancelled = false;
 
-    fetchStory(params.id)
+    fetchStory(id)
       .then((story) => {
         if (!cancelled) {
           setState({ status: "ready", story });
@@ -51,28 +87,18 @@ export default function StoryPage() {
     return () => {
       cancelled = true;
     };
-  }, [params.id]);
+  }, [id]);
+
+  if (!id) {
+    return <StoryNotFound />;
+  }
 
   if (state.status === "loading") {
-    return (
-      <div className="page-content">
-        <p role="status" className="state">
-          Loading story…
-        </p>
-      </div>
-    );
+    return <StoryLoading />;
   }
 
   if (state.status === "not-found") {
-    return (
-      <div className="page-content">
-        <h1>Story not found</h1>
-        <p className="state">
-          There&rsquo;s no saved story with this ID. It may have been removed,
-          or the link may be incorrect.
-        </p>
-      </div>
-    );
+    return <StoryNotFound />;
   }
 
   if (state.status === "error") {

@@ -12,7 +12,7 @@ import { act, fireEvent, render, screen } from "@testing-library/react";
 import { useEffect, useState } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import GeneratePage from "./generate/page";
-import StoryPage from "./stories/[id]/page";
+import StoryPage from "./story/page";
 
 let currentPath = "/generate";
 let setCurrentPath: (path: string) => void = () => {};
@@ -24,10 +24,7 @@ vi.mock("next/navigation", () => ({
       setCurrentPath(path);
     },
   }),
-  useParams: () => {
-    const match = currentPath.match(/^\/stories\/(.+)$/);
-    return { id: match ? match[1] : "" };
-  },
+  useSearchParams: () => new URLSearchParams(currentPath.split("?")[1] ?? ""),
 }));
 
 function Harness() {
@@ -38,7 +35,7 @@ function Harness() {
       setCurrentPath = () => {};
     };
   }, [setPath]);
-  return path.startsWith("/stories/") ? <StoryPage /> : <GeneratePage />;
+  return path.startsWith("/story?") ? <StoryPage /> : <GeneratePage />;
 }
 
 function jsonResponse(body: unknown, status = 200): Response {
