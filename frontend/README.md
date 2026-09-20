@@ -33,13 +33,20 @@ npm run test    # vitest
 The frontend calls the FastAPI backend, which requires PostgreSQL and (for
 generation) a running worker.
 
-**With Docker Compose (simplest).** From the repository root, start the
-database, migrations, API, and worker, then run the frontend:
+**With Docker Compose (simplest).** First create the repository root `.env`
+(including the `POSTGRES_*` values) as described in the root README's
+[Quick start](../README.md#quick-start-with-docker-compose). Then, from the
+repository root, start the database, migrations, API, and worker, install the
+frontend dependencies once, and run the frontend:
 
 ```bash
 docker compose up --build -d
-cd frontend && npm run dev
+cd frontend && npm install && npm run dev
 ```
+
+A brand-new Docker database has no vocabulary, so the Generate page shows no
+vocabulary lists until you import them
+(`docker compose run --rm api sync-skritter --all`).
 
 **Without Docker.** From the repository root, in separate terminals:
 
@@ -66,20 +73,22 @@ migrations, and provider configuration.
   and a retry option if generation fails, and stops polling on a
   non-recoverable status error (e.g. an unknown request) or on unmount.
 - `app/stories/page.tsx` — saved-stories list, linking to each story's
-  reader page.
+  reader page, with a delete action that asks for inline confirmation and
+  shows an error if the deletion fails.
 - `app/stories/[id]/page.tsx` — story reader: Chinese title and body with a
   vocabulary glossary (pinyin and English definition), including a
   not-found state for an unknown story ID.
 - `app/components/` — shared UI, e.g. the top navigation.
 - `lib/api.ts` — typed fetch helpers for every backend endpoint the frontend
-  calls (vocabulary lists, story generations, saved stories), including
-  pagination and error handling.
+  calls (vocabulary lists, story generations, saved stories including
+  deletion), including pagination and error handling.
 
 ## Status
 
 Milestone 4 is implemented: a learner can select a vocabulary list, submit a
 story-generation request, watch it complete (or retry a failure), and read
 the resulting story with its vocabulary glossary from the saved-stories
-list, with visual polish (M4-6) applied across the app. Tickets are tracked
+list, with visual polish (M4-6) applied across the app. Saved stories can
+also be deleted from the list. Tickets are tracked
 on the [GitHub Project board](https://github.com/users/jack93g/projects/1),
 not in markdown.
