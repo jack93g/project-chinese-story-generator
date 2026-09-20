@@ -70,11 +70,11 @@ describe("StoriesPage", () => {
     render(<StoriesPage />);
 
     const withHsk = await screen.findByRole("link", { name: /天气小记/ });
-    expect(withHsk).toHaveAttribute("href", "/stories/5");
+    expect(withHsk).toHaveAttribute("href", "/story?id=5");
     expect(withHsk).toHaveTextContent("HSK 2");
 
     const withoutHsk = screen.getByRole("link", { name: /市场的颜色/ });
-    expect(withoutHsk).toHaveAttribute("href", "/stories/3");
+    expect(withoutHsk).toHaveAttribute("href", "/story?id=3");
     expect(withoutHsk).not.toHaveTextContent("HSK");
   });
 

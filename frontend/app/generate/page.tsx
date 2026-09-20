@@ -120,7 +120,7 @@ export default function GeneratePage() {
           }
           consecutiveFailures = 0;
           if (result.status === "succeeded" && result.story_id !== null) {
-            router.push(`/stories/${result.story_id}`);
+            router.push(`/story?id=${result.story_id}`);
             return;
           }
           if (result.status === "failed") {
@@ -240,7 +240,7 @@ export default function GeneratePage() {
     try {
       const result = await retryStoryGeneration(generation.id);
       if (result.status === "succeeded" && result.story_id !== null) {
-        router.push(`/stories/${result.story_id}`);
+        router.push(`/story?id=${result.story_id}`);
         return;
       }
       if (result.status === "failed") {

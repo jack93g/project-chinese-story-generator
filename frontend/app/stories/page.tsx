@@ -147,7 +147,7 @@ export default function StoriesPage() {
           return (
             <li key={story.id} className="story-list-row">
               <Link
-                href={`/stories/${story.id}`}
+                href={`/story?id=${story.id}`}
                 className="story-list-item"
               >
                 <span lang="zh" className="story-list-title">
