@@ -2,8 +2,6 @@ import pytest
 
 from story_generator.vocabulary.persistence.models import VocabularyItem, VocabularyList
 
-
-
 pytestmark = pytest.mark.db
 
 
@@ -153,7 +151,6 @@ def test_list_vocabulary_lists_returns_empty_result(client):
         "limit": 50,
         "offset": 0,
     }
-
 
 
 def test_list_vocabulary_lists_returns_items(client, db_session):

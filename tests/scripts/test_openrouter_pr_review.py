@@ -70,7 +70,9 @@ def _review_json(**overrides) -> bytes:
         "changes_since_last_review_markdown": None,
     }
     payload.update(overrides)
-    return json.dumps({"choices": [{"message": {"content": json.dumps(payload)}}]}).encode()
+    return json.dumps(
+        {"choices": [{"message": {"content": json.dumps(payload)}}]}
+    ).encode()
 
 
 def test_call_openrouter_retries_on_503_then_succeeds(monkeypatch):
@@ -120,7 +122,9 @@ def test_call_openrouter_does_not_retry_on_non_retryable_status(monkeypatch):
 def test_call_openrouter_raises_clear_error_on_unexpected_response_shape(monkeypatch):
     monkeypatch.setattr(
         "urllib.request.urlopen",
-        lambda request, timeout=None: _FakeResponse(json.dumps({"unexpected": "shape"}).encode()),
+        lambda request, timeout=None: _FakeResponse(
+            json.dumps({"unexpected": "shape"}).encode()
+        ),
     )
 
     with pytest.raises(RuntimeError, match="Unexpected OpenRouter response shape"):
@@ -152,7 +156,10 @@ def test_call_openrouter_retries_on_network_error_then_succeeds(monkeypatch):
     monkeypatch.setattr("urllib.request.urlopen", fake_urlopen)
     monkeypatch.setattr("time.sleep", lambda _seconds: None)
 
-    assert json.loads(call_openrouter("fake-key", "diff", "claude.md contents"))["verdict"] == "green"
+    assert (
+        json.loads(call_openrouter("fake-key", "diff", "claude.md contents"))["verdict"]
+        == "green"
+    )
 
 
 def test_call_openrouter_omits_since_block_when_not_given(monkeypatch):
@@ -221,7 +228,10 @@ def test_fetch_diff_since_builds_compare_url(monkeypatch):
 
     result = fetch_diff_since("owner/repo", "abc123", "def456", "token")
 
-    assert captured["url"] == "https://api.github.com/repos/owner/repo/compare/abc123...def456"
+    assert (
+        captured["url"]
+        == "https://api.github.com/repos/owner/repo/compare/abc123...def456"
+    )
     assert captured["accept"] == "application/vnd.github.v3.diff"
     assert "world" in result
 
@@ -267,7 +277,9 @@ def test_fetch_last_reviewed_sha_returns_none_with_no_comments(monkeypatch):
 
 
 def test_fetch_last_reviewed_sha_returns_none_without_marker(monkeypatch):
-    comments = [{"user": {"login": "github-actions[bot]"}, "body": "just a regular comment"}]
+    comments = [
+        {"user": {"login": "github-actions[bot]"}, "body": "just a regular comment"}
+    ]
     monkeypatch.setattr(
         pr_review, "github_request", lambda *a, **k: json.dumps(comments).encode()
     )
@@ -277,9 +289,15 @@ def test_fetch_last_reviewed_sha_returns_none_without_marker(monkeypatch):
 def test_fetch_last_reviewed_sha_returns_most_recent_marker(monkeypatch):
     bot = {"login": "github-actions[bot]"}
     comments = [
-        {"user": bot, "body": f"### 🟡 DeepSeek review\n...\n{pr_review.REVIEW_MARKER_PREFIX}aaaaaaa -->"},
+        {
+            "user": bot,
+            "body": f"### 🟡 DeepSeek review\n...\n{pr_review.REVIEW_MARKER_PREFIX}aaaaaaa -->",
+        },
         {"user": {"login": "a-human"}, "body": "a human reply in between"},
-        {"user": bot, "body": f"### 🟢 DeepSeek review\n...\n{pr_review.REVIEW_MARKER_PREFIX}bbbbbbb -->"},
+        {
+            "user": bot,
+            "body": f"### 🟢 DeepSeek review\n...\n{pr_review.REVIEW_MARKER_PREFIX}bbbbbbb -->",
+        },
     ]
     monkeypatch.setattr(
         pr_review, "github_request", lambda *a, **k: json.dumps(comments).encode()
@@ -318,7 +336,9 @@ def test_fetch_last_reviewed_sha_uses_last_marker_not_first(monkeypatch):
 
 def test_fetch_last_reviewed_sha_rejects_malformed_sha(monkeypatch):
     bot = {"login": "github-actions[bot]"}
-    comments = [{"user": bot, "body": f"{pr_review.REVIEW_MARKER_PREFIX}not a real sha -->"}]
+    comments = [
+        {"user": bot, "body": f"{pr_review.REVIEW_MARKER_PREFIX}not a real sha -->"}
+    ]
     monkeypatch.setattr(
         pr_review, "github_request", lambda *a, **k: json.dumps(comments).encode()
     )
@@ -428,7 +448,9 @@ def test_post_comment_sends_expected_request(monkeypatch):
 
     post_comment("owner/repo", "43", "token", "a fully rendered comment")
 
-    assert captured["url"] == "https://api.github.com/repos/owner/repo/issues/43/comments"
+    assert (
+        captured["url"] == "https://api.github.com/repos/owner/repo/issues/43/comments"
+    )
     assert captured["headers"]["Authorization"] == "Bearer token"
     assert captured["body"]["body"] == "a fully rendered comment"
 
@@ -522,7 +544,9 @@ def test_main_second_review_fetches_since_diff_and_includes_section(monkeypatch)
                 "verdict": "green",
                 "pr_summary": "does a thing",
                 "findings_markdown": "none",
-                "changes_since_last_review_markdown": "fixed the earlier bug" if since_diff else None,
+                "changes_since_last_review_markdown": "fixed the earlier bug"
+                if since_diff
+                else None,
             }
         ),
     )

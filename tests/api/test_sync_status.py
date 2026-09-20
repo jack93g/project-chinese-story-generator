@@ -2,7 +2,6 @@ import pytest
 
 from story_generator.ingestion.persistence.models import SyncRun
 
-
 pytestmark = pytest.mark.db
 
 

@@ -138,7 +138,9 @@ def fetch_diff_since(repo: str, prev_sha: str, head_sha: str, token: str) -> str
 def load_claude_md(repo: str, token: str, base_ref: str) -> str:
     url = f"{GITHUB_API}/repos/{repo}/contents/CLAUDE.md?ref={urllib.parse.quote(base_ref, safe='')}"
     try:
-        return github_request(url, token, "application/vnd.github.v3.raw").decode("utf-8")
+        return github_request(url, token, "application/vnd.github.v3.raw").decode(
+            "utf-8"
+        )
     except urllib.error.HTTPError as error:
         if error.code == 404:
             print(
@@ -171,7 +173,9 @@ def fetch_last_reviewed_sha(repo: str, pr_number: str, token: str) -> str | None
     return None
 
 
-def call_openrouter(api_key: str, diff: str, claude_md: str, since_diff: str | None = None) -> str:
+def call_openrouter(
+    api_key: str, diff: str, claude_md: str, since_diff: str | None = None
+) -> str:
     system_prompt = REVIEW_SYSTEM_PROMPT.format(claude_md=claude_md)
     user_content = f"Review this pull request diff:\n\n<diff>\n{diff}\n</diff>"
     if since_diff:
@@ -268,7 +272,9 @@ def parse_review(content: str) -> dict:
             raise ValueError("pr_summary/findings_markdown must be strings")
         since = data.get("changes_since_last_review_markdown")
         if since is not None and not isinstance(since, str):
-            raise ValueError("changes_since_last_review_markdown must be a string or null")
+            raise ValueError(
+                "changes_since_last_review_markdown must be a string or null"
+            )
         return {
             "verdict": verdict.lower(),
             "pr_summary": pr_summary,
@@ -350,7 +356,9 @@ def main() -> None:
     last_sha = fetch_last_reviewed_sha(repo, pr_number, github_token)
     if last_sha and last_sha != head_sha:
         try:
-            since_diff = fetch_diff_since(repo, last_sha, head_sha, github_token) or None
+            since_diff = (
+                fetch_diff_since(repo, last_sha, head_sha, github_token) or None
+            )
         except urllib.error.HTTPError as error:
             print(
                 f"Warning: could not diff against previous review ({last_sha}): {error}",

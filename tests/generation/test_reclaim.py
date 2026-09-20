@@ -1,16 +1,23 @@
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 
 import pytest
 
 from story_generator.generation.persistence.models import StoryGenerationRequest
-from story_generator.generation.persistence.repository import GenerationRequestRepository
-from story_generator.generation.persistence.service import MAX_ATTEMPTS, GenerationRequestService
+from story_generator.generation.persistence.repository import (
+    GenerationRequestRepository,
+)
+from story_generator.generation.persistence.service import (
+    MAX_ATTEMPTS,
+    GenerationRequestService,
+)
 from story_generator.vocabulary.persistence.models import VocabularyList
 
 pytestmark = pytest.mark.db
 
 
-def _make_running_request(session, *, skritter_list_id: str, started_at, attempt_count: int = 1):
+def _make_running_request(
+    session, *, skritter_list_id: str, started_at, attempt_count: int = 1
+):
     vocab_list = VocabularyList(skritter_list_id=skritter_list_id, name="Test list")
     session.add(vocab_list)
     session.flush()
@@ -34,9 +41,12 @@ def _make_running_request(session, *, skritter_list_id: str, started_at, attempt
 
 
 def test_reclaim_stale_requeues_old_running_requests_under_attempt_limit(db_session):
-    stale_started_at = datetime.now(timezone.utc) - timedelta(minutes=30)
+    stale_started_at = datetime.now(UTC) - timedelta(minutes=30)
     request = _make_running_request(
-        db_session, skritter_list_id="reclaim-stale", started_at=stale_started_at, attempt_count=1
+        db_session,
+        skritter_list_id="reclaim-stale",
+        started_at=stale_started_at,
+        attempt_count=1,
     )
     db_session.commit()
 
@@ -51,9 +61,12 @@ def test_reclaim_stale_requeues_old_running_requests_under_attempt_limit(db_sess
 
 
 def test_reclaim_stale_does_not_touch_recent_running_requests(db_session):
-    recent_started_at = datetime.now(timezone.utc) - timedelta(minutes=1)
+    recent_started_at = datetime.now(UTC) - timedelta(minutes=1)
     request = _make_running_request(
-        db_session, skritter_list_id="reclaim-recent", started_at=recent_started_at, attempt_count=1
+        db_session,
+        skritter_list_id="reclaim-recent",
+        started_at=recent_started_at,
+        attempt_count=1,
     )
     db_session.commit()
 
@@ -67,7 +80,7 @@ def test_reclaim_stale_does_not_touch_recent_running_requests(db_session):
 
 
 def test_reclaim_stale_fails_requests_that_have_exhausted_max_attempts(db_session):
-    stale_started_at = datetime.now(timezone.utc) - timedelta(minutes=30)
+    stale_started_at = datetime.now(UTC) - timedelta(minutes=30)
     request = _make_running_request(
         db_session,
         skritter_list_id="reclaim-exhausted",
@@ -96,7 +109,7 @@ def test_repeated_reclaim_cycles_eventually_exhaust_and_stop_reclaiming(db_sessi
     stale, and gets reclaimed — until the attempt cap is hit, at which
     point reclaim must stop requeuing it and fail it instead.
     """
-    stale_started_at = datetime.now(timezone.utc) - timedelta(minutes=30)
+    stale_started_at = datetime.now(UTC) - timedelta(minutes=30)
     request = _make_running_request(
         db_session,
         skritter_list_id="reclaim-repeated",

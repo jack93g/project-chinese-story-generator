@@ -2,7 +2,9 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 
 from story_generator.api.dependencies import get_db
-from story_generator.generation.persistence.repository import GenerationRequestRepository
+from story_generator.generation.persistence.repository import (
+    GenerationRequestRepository,
+)
 from story_generator.generation.persistence.service import (
     GenerationRequestNotFoundError,
     GenerationRequestService,
@@ -41,9 +43,9 @@ def create_story_generation(
     try:
         request = service.create(db, payload)
     except VocabularyListNotFoundError as exc:
-        raise HTTPException(status_code=404, detail=str(exc))
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
     except EmptyVocabularyListError as exc:
-        raise HTTPException(status_code=422, detail=str(exc))
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
 
     db.commit()
     return GenerationCreatedResponse(id=request.id, status=request.status)
@@ -63,7 +65,7 @@ def get_story_generation_status(
     try:
         request = service._get(generation_request_id)
     except GenerationRequestNotFoundError as exc:
-        raise HTTPException(status_code=404, detail=str(exc))
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
 
     story_id = repository.get_story_id_for_request(generation_request_id)
     return GenerationStatusResponse.from_request(request, story_id)
@@ -74,7 +76,6 @@ def get_story_generation_status(
     response_model=GenerationStatusResponse,
     status_code=202,
 )
-
 def retry_story_generation(
     generation_request_id: int,
     db: Session = Depends(get_db),
@@ -85,9 +86,9 @@ def retry_story_generation(
     try:
         request = service.retry(generation_request_id)
     except GenerationRequestNotFoundError as exc:
-        raise HTTPException(status_code=404, detail=str(exc))
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
     except RetryLimitExceededError as exc:
-        raise HTTPException(status_code=409, detail=str(exc))
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
     except InvalidTransitionError as exc:
         raise HTTPException(
             status_code=409,
@@ -95,7 +96,7 @@ def retry_story_generation(
                 f"Request {generation_request_id} is not eligible for retry "
                 f"(current status: '{exc.current_status}')"
             ),
-        )
+        ) from exc
 
     db.commit()
     story_id = repository.get_story_id_for_request(generation_request_id)

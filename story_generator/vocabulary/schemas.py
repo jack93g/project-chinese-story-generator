@@ -1,5 +1,6 @@
-from pydantic import BaseModel
 from datetime import datetime
+
+from pydantic import BaseModel
 
 
 class VocabularyResponse(BaseModel):
@@ -16,6 +17,7 @@ class PaginatedVocabularyResponse(BaseModel):
     total: int
     limit: int
     offset: int
+
 
 class VocabularyListSummary(BaseModel):
     id: int

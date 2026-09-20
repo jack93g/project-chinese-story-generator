@@ -60,5 +60,7 @@ def get_vocabulary_list(
 
     try:
         return service.get(list_id)
-    except VocabularyListNotFoundError:
-        raise HTTPException(status_code=404, detail=f"Vocabulary list {list_id} not found")
+    except VocabularyListNotFoundError as exc:
+        raise HTTPException(
+            status_code=404, detail=f"Vocabulary list {list_id} not found"
+        ) from exc

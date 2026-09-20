@@ -23,10 +23,19 @@ from story_generator.generation.providers.types import (
     UsageMetadata,
 )
 
-DEFAULT_RAW_RESPONSE = '{"title": "菜单的故事", "body": "小明去饭馆点了一份菜单上的菜。"}'
+DEFAULT_RAW_RESPONSE = (
+    '{"title": "菜单的故事", "body": "小明去饭馆点了一份菜单上的菜。"}'
+)
 DEFAULT_USAGE = UsageMetadata(prompt_tokens=120, completion_tokens=80, total_tokens=200)
 
-_SCENARIOS = ("success", "malformed", "timeout", "rate_limit", "auth_error", "api_error")
+_SCENARIOS = (
+    "success",
+    "malformed",
+    "timeout",
+    "rate_limit",
+    "auth_error",
+    "api_error",
+)
 
 
 class FakeStoryGenerationProvider:
@@ -60,7 +69,9 @@ class FakeStoryGenerationProvider:
         usage: UsageMetadata = DEFAULT_USAGE,
     ):
         if scenario not in _SCENARIOS:
-            raise ValueError(f"Unknown scenario '{scenario}', expected one of {_SCENARIOS}")
+            raise ValueError(
+                f"Unknown scenario '{scenario}', expected one of {_SCENARIOS}"
+            )
         self.scenario = scenario
         self.raw_response = raw_response
         self.usage = usage
@@ -72,7 +83,10 @@ class FakeStoryGenerationProvider:
         on_raw_exchange: RawExchangeCallback | None = None,
     ) -> GenerationResult:
         self.calls.append(request)
-        fake_request_body = {"model": "fake-model", "vocabulary_snapshot": request.vocabulary_snapshot}
+        fake_request_body = {
+            "model": "fake-model",
+            "vocabulary_snapshot": request.vocabulary_snapshot,
+        }
 
         if self.scenario == "timeout":
             if on_raw_exchange is not None:
@@ -89,7 +103,9 @@ class FakeStoryGenerationProvider:
         if self.scenario == "api_error":
             if on_raw_exchange is not None:
                 on_raw_exchange(fake_request_body, 500, {"error": "server error"})
-            raise ProviderAPIError("Fake provider returned a server error", status_code=500)
+            raise ProviderAPIError(
+                "Fake provider returned a server error", status_code=500
+            )
 
         if on_raw_exchange is not None:
             on_raw_exchange(fake_request_body, 200, {"content": self.raw_response})

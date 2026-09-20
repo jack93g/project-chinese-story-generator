@@ -1,14 +1,13 @@
 import os
 
 import pytest
-from alembic import command
 from alembic.config import Config
 from dotenv import load_dotenv
-from sqlalchemy import create_engine, event
-from sqlalchemy.orm import sessionmaker
-from sqlalchemy import text
 from fastapi.testclient import TestClient
+from sqlalchemy import create_engine, event, text
+from sqlalchemy.orm import sessionmaker
 
+from alembic import command
 from story_generator.api.app import create_app
 from story_generator.api.dependencies import get_db
 
@@ -92,6 +91,7 @@ def db_session(engine):
     transaction.rollback()
     connection.close()
 
+
 @pytest.fixture
 def two_sessions(engine):
     """
@@ -111,11 +111,14 @@ def two_sessions(engine):
     session_a.close()
     session_b.close()
     with engine.begin() as conn:
-        conn.execute(text(
-            "TRUNCATE TABLE raw_skritter_payloads, sync_runs, story_vocabulary_items, "
-            "stories, raw_generation_payloads, story_generation_requests, "
-            "list_vocabulary, vocabulary_items, vocabulary_lists RESTART IDENTITY CASCADE"
-        ))
+        conn.execute(
+            text(
+                "TRUNCATE TABLE raw_skritter_payloads, sync_runs, story_vocabulary_items, "
+                "stories, raw_generation_payloads, story_generation_requests, "
+                "list_vocabulary, vocabulary_items, vocabulary_lists RESTART IDENTITY CASCADE"
+            )
+        )
+
 
 @pytest.fixture
 def client(db_session):

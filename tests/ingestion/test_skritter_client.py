@@ -32,9 +32,7 @@ def test_get_list_returns_json():
         "statusCode": 200,
     }
 
-    respx.get(
-        "https://legacy.skritter.com/api/v0/vocablists/5667140514938880"
-    ).mock(
+    respx.get("https://legacy.skritter.com/api/v0/vocablists/5667140514938880").mock(
         return_value=httpx.Response(
             200,
             json=api_response,
@@ -106,6 +104,7 @@ def test_get_list_reports_malformed_response():
     with pytest.raises(SkritterResponseError, match="name: Field required"):
         client.get_list("123")
 
+
 @respx.mock
 def test_get_list_notifies_on_response():
     received = []
@@ -115,9 +114,9 @@ def test_get_list_notifies_on_response():
         "VocabList": {"id": "123", "name": "My List", "sections": []},
         "statusCode": 200,
     }
-    respx.get(
-        "https://legacy.skritter.com/api/v0/vocablists/123"
-    ).mock(return_value=httpx.Response(200, json=api_response))
+    respx.get("https://legacy.skritter.com/api/v0/vocablists/123").mock(
+        return_value=httpx.Response(200, json=api_response)
+    )
 
     client.get_list("123")
 
@@ -133,13 +132,13 @@ def test_get_list_notifies_on_response_even_when_request_fails():
     received = []
     client = SkritterClient("my_token", on_response=lambda *args: received.append(args))
 
-    respx.get(
-        "https://legacy.skritter.com/api/v0/vocablists/does-not-exist"
-    ).mock(return_value=httpx.Response(404, json={"error": "not found"}))
+    respx.get("https://legacy.skritter.com/api/v0/vocablists/does-not-exist").mock(
+        return_value=httpx.Response(404, json={"error": "not found"})
+    )
 
     try:
         client.get_list("does-not-exist")
-        assert False, "expected HTTPStatusError to propagate"
+        raise AssertionError("expected HTTPStatusError to propagate")
     except httpx.HTTPStatusError:
         pass
 

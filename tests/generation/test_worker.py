@@ -1,11 +1,13 @@
 import pytest
 
-from story_generator.generation.persistence.models import StoryGenerationRequest
+from story_generator.generation.persistence.models import (
+    RawGenerationPayload,
+    StoryGenerationRequest,
+)
 from story_generator.generation.providers.fake import FakeStoryGenerationProvider
 from story_generator.generation.worker import GenerationWorker
 from story_generator.stories.persistence.models import Story, StoryVocabularyItem
 from story_generator.vocabulary.persistence.models import VocabularyItem, VocabularyList
-from story_generator.generation.persistence.models import RawGenerationPayload
 
 pytestmark = pytest.mark.db
 
@@ -33,7 +35,12 @@ def _make_queued_request(session, *, skritter_list_id: str, writing: str = "你�
         target_word_count=100,
         target_vocabulary_count=1,
         selected_vocabulary_snapshot=[
-            {"id": item.id, "writing": writing, "reading": "ni3 hao3", "definition_en": "hello"}
+            {
+                "id": item.id,
+                "writing": writing,
+                "reading": "ni3 hao3",
+                "definition_en": "hello",
+            }
         ],
         prompt_version="story-v1",
         provider="openai",
@@ -51,7 +58,9 @@ def test_run_once_returns_false_when_queue_is_empty(db_session):
 
 
 def test_run_once_persists_story_and_marks_request_succeeded_atomically(db_session):
-    request = _make_queued_request(db_session, skritter_list_id="worker-success", writing="你好")
+    request = _make_queued_request(
+        db_session, skritter_list_id="worker-success", writing="你好"
+    )
     provider = FakeStoryGenerationProvider(
         scenario="success",
         raw_response='{"title": "问候", "body": "小明说你好。"}',
@@ -70,19 +79,29 @@ def test_run_once_persists_story_and_marks_request_succeeded_atomically(db_sessi
     assert story.title == "问候"
     assert story.content == "小明说你好。"
 
-    associations = db_session.query(StoryVocabularyItem).filter_by(story_id=story.id).all()
+    associations = (
+        db_session.query(StoryVocabularyItem).filter_by(story_id=story.id).all()
+    )
     assert len(associations) == 1
     assert associations[0].requested is True
     assert associations[0].used is True
 
-    raw_payloads = db_session.query(RawGenerationPayload).filter_by(generation_request_id=request.id).all()
+    raw_payloads = (
+        db_session.query(RawGenerationPayload)
+        .filter_by(generation_request_id=request.id)
+        .all()
+    )
     assert len(raw_payloads) == 1
     assert raw_payloads[0].response_status == 200
     assert raw_payloads[0].attempt_number == request.attempt_count
 
 
-def test_run_once_fails_request_and_creates_no_story_when_coverage_below_threshold(db_session):
-    request = _make_queued_request(db_session, skritter_list_id="worker-low-coverage", writing="菜单")
+def test_run_once_fails_request_and_creates_no_story_when_coverage_below_threshold(
+    db_session,
+):
+    request = _make_queued_request(
+        db_session, skritter_list_id="worker-low-coverage", writing="菜单"
+    )
     provider = FakeStoryGenerationProvider(
         scenario="success",
         raw_response='{"title": "故事", "body": "小明去了饭馆。"}',  # never uses 菜单 — 0/1 = 0% coverage
@@ -101,17 +120,26 @@ def test_run_once_fails_request_and_creates_no_story_when_coverage_below_thresho
     ]
 
     # no story should be created for a failed generation
-    assert db_session.query(Story).filter_by(generation_request_id=request.id).first() is None
+    assert (
+        db_session.query(Story).filter_by(generation_request_id=request.id).first()
+        is None
+    )
 
     # the raw exchange should still be captured for diagnosis, even
     # though the request ultimately failed on coverage, not a
     # provider-level error
-    raw_payloads = db_session.query(RawGenerationPayload).filter_by(generation_request_id=request.id).all()
+    raw_payloads = (
+        db_session.query(RawGenerationPayload)
+        .filter_by(generation_request_id=request.id)
+        .all()
+    )
     assert len(raw_payloads) == 1
     assert raw_payloads[0].response_status == 200
 
 
-def test_run_once_marks_request_failed_and_does_not_create_story_on_provider_error(db_session):
+def test_run_once_marks_request_failed_and_does_not_create_story_on_provider_error(
+    db_session,
+):
     request = _make_queued_request(db_session, skritter_list_id="worker-failure")
     provider = FakeStoryGenerationProvider(scenario="timeout")
     worker = GenerationWorker(provider=provider)
@@ -124,8 +152,15 @@ def test_run_once_marks_request_failed_and_does_not_create_story_on_provider_err
     assert request.error_code is not None
     assert request.error_message is not None
 
-    assert db_session.query(Story).filter_by(generation_request_id=request.id).first() is None
+    assert (
+        db_session.query(Story).filter_by(generation_request_id=request.id).first()
+        is None
+    )
 
-    raw_payloads = db_session.query(RawGenerationPayload).filter_by(generation_request_id=request.id).all()
+    raw_payloads = (
+        db_session.query(RawGenerationPayload)
+        .filter_by(generation_request_id=request.id)
+        .all()
+    )
     assert len(raw_payloads) == 1
     assert raw_payloads[0].response_status is None  # timeout: never got a response

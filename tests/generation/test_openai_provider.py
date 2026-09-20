@@ -11,12 +11,12 @@ from story_generator.generation.providers.errors import (
     ProviderRateLimitError,
     ProviderTimeoutError,
 )
-
 from story_generator.generation.providers.openai import (
     _DEFAULT_CHAT_COMPLETIONS_URL as _CHAT_COMPLETIONS_URL,
+)
+from story_generator.generation.providers.openai import (
     OpenAIStoryGenerationProvider,
 )
-
 from story_generator.generation.providers.types import GenerationRequestInput
 
 SAMPLE_REQUEST = GenerationRequestInput(
@@ -30,9 +30,12 @@ SAMPLE_REQUEST = GenerationRequestInput(
     topic="a restaurant",
 )
 
+
 def _make_provider() -> OpenAIStoryGenerationProvider:
     client = httpx.Client()
-    return OpenAIStoryGenerationProvider(client=client, api_key="sk-test", model="gpt-test")
+    return OpenAIStoryGenerationProvider(
+        client=client, api_key="sk-test", model="gpt-test"
+    )
 
 
 def _success_body(content: str) -> dict:
@@ -46,7 +49,10 @@ def _success_body(content: str) -> dict:
 def test_generate_returns_generation_result_on_success():
     respx.post(_CHAT_COMPLETIONS_URL).mock(
         return_value=httpx.Response(
-            200, json=_success_body('{"title": "菜单的故事", "body": "小明去饭馆点了一份菜。"}')
+            200,
+            json=_success_body(
+                '{"title": "菜单的故事", "body": "小明去饭馆点了一份菜。"}'
+            ),
         )
     )
     provider = _make_provider()
@@ -60,7 +66,9 @@ def test_generate_returns_generation_result_on_success():
 @respx.mock
 def test_generate_sends_bearer_auth_header_and_model():
     route = respx.post(_CHAT_COMPLETIONS_URL).mock(
-        return_value=httpx.Response(200, json=_success_body('{"title": "标题", "body": "正文内容。"}'))
+        return_value=httpx.Response(
+            200, json=_success_body('{"title": "标题", "body": "正文内容。"}')
+        )
     )
     provider = _make_provider()
 
@@ -75,7 +83,9 @@ def test_generate_sends_bearer_auth_header_and_model():
 @respx.mock
 def test_generate_does_not_allow_model_parameters_to_override_protected_fields():
     route = respx.post(_CHAT_COMPLETIONS_URL).mock(
-        return_value=httpx.Response(200, json=_success_body('{"title": "标题", "body": "正文内容。"}'))
+        return_value=httpx.Response(
+            200, json=_success_body('{"title": "标题", "body": "正文内容。"}')
+        )
     )
     provider = _make_provider()
     request = GenerationRequestInput(
@@ -101,7 +111,9 @@ def test_generate_does_not_allow_model_parameters_to_override_protected_fields()
 
 @respx.mock
 def test_generate_maps_timeout_error():
-    respx.post(_CHAT_COMPLETIONS_URL).mock(side_effect=httpx.TimeoutException("timed out"))
+    respx.post(_CHAT_COMPLETIONS_URL).mock(
+        side_effect=httpx.TimeoutException("timed out")
+    )
     provider = _make_provider()
 
     with pytest.raises(ProviderTimeoutError):
@@ -110,7 +122,9 @@ def test_generate_maps_timeout_error():
 
 @respx.mock
 def test_generate_maps_connection_error_to_provider_api_error():
-    respx.post(_CHAT_COMPLETIONS_URL).mock(side_effect=httpx.ConnectError("connection refused"))
+    respx.post(_CHAT_COMPLETIONS_URL).mock(
+        side_effect=httpx.ConnectError("connection refused")
+    )
     provider = _make_provider()
 
     with pytest.raises(ProviderAPIError):
@@ -154,7 +168,9 @@ def test_generate_maps_500_to_provider_api_error_with_status_code():
 @respx.mock
 def test_generate_raises_invalid_response_error_on_non_json_body():
     respx.post(_CHAT_COMPLETIONS_URL).mock(
-        return_value=httpx.Response(200, content=b"not json", headers={"content-type": "text/plain"})
+        return_value=httpx.Response(
+            200, content=b"not json", headers={"content-type": "text/plain"}
+        )
     )
     provider = _make_provider()
 
@@ -166,7 +182,10 @@ def test_generate_raises_invalid_response_error_on_non_json_body():
 def test_generate_raises_invalid_response_error_on_missing_choices():
     respx.post(_CHAT_COMPLETIONS_URL).mock(
         return_value=httpx.Response(
-            200, json={"usage": {"prompt_tokens": 1, "completion_tokens": 1, "total_tokens": 2}}
+            200,
+            json={
+                "usage": {"prompt_tokens": 1, "completion_tokens": 1, "total_tokens": 2}
+            },
         )
     )
     provider = _make_provider()
@@ -179,7 +198,12 @@ def test_generate_raises_invalid_response_error_on_missing_choices():
 def test_generate_raises_invalid_response_error_on_missing_usage():
     respx.post(_CHAT_COMPLETIONS_URL).mock(
         return_value=httpx.Response(
-            200, json={"choices": [{"message": {"content": '{"title": "标题", "body": "正文。"}'}}]}
+            200,
+            json={
+                "choices": [
+                    {"message": {"content": '{"title": "标题", "body": "正文。"}'}}
+                ]
+            },
         )
     )
     provider = _make_provider()
@@ -202,7 +226,9 @@ def test_generate_propagates_parser_error_for_malformed_model_output():
 @respx.mock
 def test_generate_invokes_on_raw_exchange_on_success():
     respx.post(_CHAT_COMPLETIONS_URL).mock(
-        return_value=httpx.Response(200, json=_success_body('{"title": "标题", "body": "正文内容。"}'))
+        return_value=httpx.Response(
+            200, json=_success_body('{"title": "标题", "body": "正文内容。"}')
+        )
     )
     provider = _make_provider()
     captured = {}
@@ -216,7 +242,10 @@ def test_generate_invokes_on_raw_exchange_on_success():
 
     assert captured["request_body"]["model"] == "gpt-test"
     assert captured["response_status"] == 200
-    assert captured["response_body"]["choices"][0]["message"]["content"] == '{"title": "标题", "body": "正文内容。"}'
+    assert (
+        captured["response_body"]["choices"][0]["message"]["content"]
+        == '{"title": "标题", "body": "正文内容。"}'
+    )
 
 
 @respx.mock
@@ -240,7 +269,9 @@ def test_generate_invokes_on_raw_exchange_on_error_status():
 
 @respx.mock
 def test_generate_invokes_on_raw_exchange_with_no_response_on_timeout():
-    respx.post(_CHAT_COMPLETIONS_URL).mock(side_effect=httpx.TimeoutException("timed out"))
+    respx.post(_CHAT_COMPLETIONS_URL).mock(
+        side_effect=httpx.TimeoutException("timed out")
+    )
     provider = _make_provider()
     captured = {}
 

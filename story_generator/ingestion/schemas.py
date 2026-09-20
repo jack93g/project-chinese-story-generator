@@ -1,7 +1,7 @@
+from datetime import datetime
 from typing import Any, Literal
 
 from pydantic import BaseModel, ConfigDict, Field, ValidationError, model_validator
-from datetime import datetime
 
 
 class SyncRunResponse(BaseModel):
@@ -22,7 +22,9 @@ class SkritterResponseError(ValueError):
     """A successful Skritter response did not match the expected API shape."""
 
 
-def validate_skritter_response(model: type[BaseModel], payload: object, endpoint: str) -> BaseModel:
+def validate_skritter_response(
+    model: type[BaseModel], payload: object, endpoint: str
+) -> BaseModel:
     try:
         return model.model_validate(payload)
     except ValidationError as exc:

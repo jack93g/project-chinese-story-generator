@@ -60,12 +60,16 @@ def _parse_json(raw_text: str):
     try:
         return json.loads(raw_text)
     except (TypeError, json.JSONDecodeError) as exc:
-        raise ProviderInvalidResponseError(f"Provider output was not valid JSON: {exc}") from exc
+        raise ProviderInvalidResponseError(
+            f"Provider output was not valid JSON: {exc}"
+        ) from exc
 
 
 def _require_chinese_text(value, *, field_name: str) -> str:
     if not isinstance(value, str) or not value.strip():
-        raise ProviderInvalidResponseError(f"Provider output '{field_name}' must be a non-empty string")
+        raise ProviderInvalidResponseError(
+            f"Provider output '{field_name}' must be a non-empty string"
+        )
     if not _CHINESE_CHARACTER_PATTERN.search(value):
         raise ProviderInvalidResponseError(
             f"Provider output '{field_name}' must contain Chinese characters"

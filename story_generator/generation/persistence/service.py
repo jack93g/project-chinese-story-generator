@@ -1,10 +1,12 @@
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 
 from sqlalchemy.orm import Session
 
 from story_generator.config import get_openai_model, get_openai_provider_label
 from story_generator.generation.persistence.models import StoryGenerationRequest
-from story_generator.generation.persistence.repository import GenerationRequestRepository
+from story_generator.generation.persistence.repository import (
+    GenerationRequestRepository,
+)
 from story_generator.generation.prompts.builder import CURRENT_PROMPT_VERSION
 from story_generator.generation.schemas import CreateGenerationRequestSchema
 from story_generator.generation.vocabulary_selection import (
@@ -58,12 +60,16 @@ class GenerationRequestService:
     def __init__(self, repository: GenerationRequestRepository):
         self.repository = repository
 
-    def create(self, db: Session, payload: CreateGenerationRequestSchema) -> StoryGenerationRequest:
+    def create(
+        self, db: Session, payload: CreateGenerationRequestSchema
+    ) -> StoryGenerationRequest:
         vocabulary_list = db.get(VocabularyList, payload.vocabulary_list_id)
         if vocabulary_list is None:
             raise VocabularyListNotFoundError(payload.vocabulary_list_id)
 
-        snapshot = select_vocabulary(db, vocabulary_list, payload.target_vocabulary_count)
+        snapshot = select_vocabulary(
+            db, vocabulary_list, payload.target_vocabulary_count
+        )
 
         request = StoryGenerationRequest(
             vocabulary_list_id=vocabulary_list.id,
@@ -88,27 +94,33 @@ class GenerationRequestService:
     def reclaim_stale(self, stale_after: timedelta) -> dict[str, list[int]]:
         """Requeue 'running' requests stuck past the staleness threshold,
         or mark them failed if they've already exhausted MAX_ATTEMPTS."""
-        return self.repository.reclaim_stale_running(stale_after, max_attempts=MAX_ATTEMPTS)
+        return self.repository.reclaim_stale_running(
+            stale_after, max_attempts=MAX_ATTEMPTS
+        )
 
     def start(self, request_id: int) -> StoryGenerationRequest:
         request = self._get(request_id)
         self._transition(request, "running")
-        request.started_at = datetime.now(timezone.utc)
+        request.started_at = datetime.now(UTC)
         request.attempt_count += 1
         return request
 
-    def succeed(self, request_id: int, usage: dict | None = None) -> StoryGenerationRequest:
+    def succeed(
+        self, request_id: int, usage: dict | None = None
+    ) -> StoryGenerationRequest:
         request = self._get(request_id)
         self._transition(request, "succeeded")
-        request.completed_at = datetime.now(timezone.utc)
+        request.completed_at = datetime.now(UTC)
         if usage is not None:
             request.usage = usage
         return request
 
-    def fail(self, request_id: int, error_code: str, error_message: str) -> StoryGenerationRequest:
+    def fail(
+        self, request_id: int, error_code: str, error_message: str
+    ) -> StoryGenerationRequest:
         request = self._get(request_id)
         self._transition(request, "failed")
-        request.completed_at = datetime.now(timezone.utc)
+        request.completed_at = datetime.now(UTC)
         request.error_code = error_code
         request.error_message = error_message
         return request

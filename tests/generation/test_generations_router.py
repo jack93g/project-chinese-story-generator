@@ -1,6 +1,5 @@
 import pytest
 
-from story_generator.generation.persistence.models import StoryGenerationRequest
 from story_generator.generation.providers.fake import FakeStoryGenerationProvider
 from story_generator.generation.schemas import MAX_TARGET_WORD_COUNT
 from story_generator.generation.worker import GenerationWorker
@@ -10,7 +9,9 @@ from story_generator.vocabulary.persistence.models import VocabularyItem, Vocabu
 pytestmark = pytest.mark.db
 
 
-def _make_list_with_items(db_session, *, skritter_list_id: str, n_items: int) -> VocabularyList:
+def _make_list_with_items(
+    db_session, *, skritter_list_id: str, n_items: int
+) -> VocabularyList:
     vocab_list = VocabularyList(skritter_list_id=skritter_list_id, name="Test list")
     db_session.add(vocab_list)
     db_session.flush()
@@ -31,7 +32,9 @@ def _make_list_with_items(db_session, *, skritter_list_id: str, n_items: int) ->
     return vocab_list
 
 
-def test_create_returns_202_with_id_and_queued_status_without_calling_provider(client, db_session):
+def test_create_returns_202_with_id_and_queued_status_without_calling_provider(
+    client, db_session
+):
     vocab_list = _make_list_with_items(db_session, skritter_list_id="post-1", n_items=3)
 
     response = client.post(
@@ -53,13 +56,19 @@ def test_create_returns_202_with_id_and_queued_status_without_calling_provider(c
 def test_create_missing_list_id_returns_422(client):
     response = client.post(
         "/story-generations",
-        json={"target_hsk_level": 2, "target_word_count": 150, "target_vocabulary_count": 3},
+        json={
+            "target_hsk_level": 2,
+            "target_word_count": 150,
+            "target_vocabulary_count": 3,
+        },
     )
     assert response.status_code == 422
 
 
 def test_create_word_count_above_max_returns_422(client, db_session):
-    vocab_list = _make_list_with_items(db_session, skritter_list_id="post-wordcount", n_items=3)
+    vocab_list = _make_list_with_items(
+        db_session, skritter_list_id="post-wordcount", n_items=3
+    )
 
     response = client.post(
         "/story-generations",
@@ -87,7 +96,9 @@ def test_create_nonexistent_list_returns_404(client):
 
 
 def test_create_empty_list_returns_422(client, db_session):
-    vocab_list = _make_list_with_items(db_session, skritter_list_id="post-empty", n_items=0)
+    vocab_list = _make_list_with_items(
+        db_session, skritter_list_id="post-empty", n_items=0
+    )
 
     response = client.post(
         "/story-generations",
@@ -107,7 +118,9 @@ def test_status_returns_404_for_unknown_id(client):
 
 
 def test_status_reveals_queued_state_before_processing(client, db_session):
-    vocab_list = _make_list_with_items(db_session, skritter_list_id="status-queued", n_items=2)
+    vocab_list = _make_list_with_items(
+        db_session, skritter_list_id="status-queued", n_items=2
+    )
     create_response = client.post(
         "/story-generations",
         json={
@@ -128,8 +141,12 @@ def test_status_reveals_queued_state_before_processing(client, db_session):
     assert body["error_code"] is None
 
 
-def test_status_reveals_succeeded_state_and_story_id_after_worker_processes_it(client, db_session):
-    vocab_list = _make_list_with_items(db_session, skritter_list_id="status-success", n_items=1)
+def test_status_reveals_succeeded_state_and_story_id_after_worker_processes_it(
+    client, db_session
+):
+    vocab_list = _make_list_with_items(
+        db_session, skritter_list_id="status-success", n_items=1
+    )
     create_response = client.post(
         "/story-generations",
         json={
@@ -163,7 +180,9 @@ def test_status_reveals_succeeded_state_and_story_id_after_worker_processes_it(c
 
 
 def test_status_reveals_safe_error_message_for_diagnostic_failure(client, db_session):
-    vocab_list = _make_list_with_items(db_session, skritter_list_id="status-coverage-fail", n_items=1)
+    vocab_list = _make_list_with_items(
+        db_session, skritter_list_id="status-coverage-fail", n_items=1
+    )
     create_response = client.post(
         "/story-generations",
         json={
@@ -194,7 +213,9 @@ def test_status_reveals_safe_error_message_for_diagnostic_failure(client, db_ses
 
 
 def test_status_collapses_provider_error_to_generic_safe_message(client, db_session):
-    vocab_list = _make_list_with_items(db_session, skritter_list_id="status-provider-fail", n_items=1)
+    vocab_list = _make_list_with_items(
+        db_session, skritter_list_id="status-provider-fail", n_items=1
+    )
     create_response = client.post(
         "/story-generations",
         json={
@@ -218,7 +239,9 @@ def test_status_collapses_provider_error_to_generic_safe_message(client, db_sess
     assert body["error_code"] == "ProviderAPIError"
     # the raw provider message is NOT echoed verbatim — collapsed to
     # a generic safe message instead
-    assert body["error_message"] == "Story generation failed. You may retry this request."
+    assert (
+        body["error_message"] == "Story generation failed. You may retry this request."
+    )
 
 
 def test_retry_returns_404_for_unknown_id(client):
@@ -227,7 +250,9 @@ def test_retry_returns_404_for_unknown_id(client):
 
 
 def test_retry_returns_409_when_request_is_not_in_a_failed_state(client, db_session):
-    vocab_list = _make_list_with_items(db_session, skritter_list_id="retry-not-failed", n_items=1)
+    vocab_list = _make_list_with_items(
+        db_session, skritter_list_id="retry-not-failed", n_items=1
+    )
     create_response = client.post(
         "/story-generations",
         json={
@@ -247,7 +272,9 @@ def test_retry_returns_409_when_request_is_not_in_a_failed_state(client, db_sess
 
 
 def test_retry_succeeds_for_an_eligible_failed_request(client, db_session):
-    vocab_list = _make_list_with_items(db_session, skritter_list_id="retry-eligible", n_items=1)
+    vocab_list = _make_list_with_items(
+        db_session, skritter_list_id="retry-eligible", n_items=1
+    )
     create_response = client.post(
         "/story-generations",
         json={
@@ -272,7 +299,9 @@ def test_retry_succeeds_for_an_eligible_failed_request(client, db_session):
 
 
 def test_retry_returns_409_once_max_attempts_exhausted(client, db_session):
-    vocab_list = _make_list_with_items(db_session, skritter_list_id="retry-exhausted", n_items=1)
+    vocab_list = _make_list_with_items(
+        db_session, skritter_list_id="retry-exhausted", n_items=1
+    )
     create_response = client.post(
         "/story-generations",
         json={

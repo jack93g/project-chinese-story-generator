@@ -1,8 +1,8 @@
 import logging
 
-from story_generator.vocabulary.parser import parse_vocab
 from story_generator.ingestion.persistence.repository import SyncRunRepository
 from story_generator.ingestion.schemas import SyncRunResponse, SyncStatusResponse
+from story_generator.vocabulary.parser import parse_vocab
 
 logger = logging.getLogger(__name__)
 
@@ -31,7 +31,6 @@ class IngestionService:
         self.sync_run_repository = sync_run_repository
         self.tracking_session = tracking_session
 
-
     def import_list(self, list_id: str) -> dict:
         list_data = self.client.get_list(list_id)
         imported = 0
@@ -42,7 +41,9 @@ class IngestionService:
                 list_data["name"],
             )
             total = len(list_data["vocab_ids"])
-            logger.info("Importing list '%s' (%d vocabulary items)", list_data["name"], total)
+            logger.info(
+                "Importing list '%s' (%d vocabulary items)", list_data["name"], total
+            )
             for i, vocab_id in enumerate(list_data["vocab_ids"], start=1):
                 if i % 25 == 0 or i == total:
                     logger.info("Import progress: %d/%d", i, total)
@@ -88,11 +89,21 @@ class IngestionService:
                 vocab_skipped += result["vocab_skipped"]
             except Exception as exc:
                 logger.exception(
-                    "Failed to import list '%s' (%s)", vocab_list["name"], vocab_list["id"]
+                    "Failed to import list '%s' (%s)",
+                    vocab_list["name"],
+                    vocab_list["id"],
                 )
-                failures.append({"id": vocab_list["id"], "name": vocab_list["name"], "error": str(exc)})
+                failures.append(
+                    {
+                        "id": vocab_list["id"],
+                        "name": vocab_list["name"],
+                        "error": str(exc),
+                    }
+                )
 
-        logger.info("Finished: %d/%d lists imported successfully", lists_processed, len(lists))
+        logger.info(
+            "Finished: %d/%d lists imported successfully", lists_processed, len(lists)
+        )
         if failures:
             logger.error("%d list(s) failed during import", len(failures))
 
@@ -144,6 +155,7 @@ class IngestionService:
                 sync_run_id, request_path, request_params, response_status, payload
             )
             self.tracking_session.commit()
+
         return record
 
     def _safe_error_message(self, exc: Exception) -> str:

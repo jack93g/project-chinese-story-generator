@@ -36,7 +36,11 @@ import time
 
 import httpx
 
-from story_generator.config import get_openai_api_key, get_openai_base_url, get_openai_model
+from story_generator.config import (
+    get_openai_api_key,
+    get_openai_base_url,
+    get_openai_model,
+)
 from story_generator.generation.prompts.builder import build_prompt
 from story_generator.generation.providers.base import RawExchangeCallback
 from story_generator.generation.providers.errors import (
@@ -47,7 +51,9 @@ from story_generator.generation.providers.errors import (
     ProviderTimeoutError,
 )
 from story_generator.generation.providers.parser import parse_structured_result
-from story_generator.generation.providers.provider_registry import assert_current_provider_approved
+from story_generator.generation.providers.provider_registry import (
+    assert_current_provider_approved,
+)
 from story_generator.generation.providers.types import (
     GenerationRequestInput,
     GenerationResult,
@@ -133,7 +139,9 @@ class OpenAIStoryGenerationProvider:
         usage = self._extract_usage(response_body, latency_ms)
         return parse_structured_result(raw_text, usage)
 
-    def _raise_for_status(self, response: httpx.Response, response_body: dict | None) -> None:
+    def _raise_for_status(
+        self, response: httpx.Response, response_body: dict | None
+    ) -> None:
         if response.status_code < 400:
             return
         message = self._error_message(response, response_body)

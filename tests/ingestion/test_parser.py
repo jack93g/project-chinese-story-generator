@@ -7,12 +7,10 @@ def test_parse_vocab():
         "Vocabs": [
             {
                 "id": "zh-刻板印象-0",
-                "language":"zh",
+                "language": "zh",
                 "writing": "刻板印象",
                 "reading": "ke4ban3yin4xiang4",
-                "definitions": {
-                    "en": "Stereotype"
-                },
+                "definitions": {"en": "Stereotype"},
             }
         ]
     }

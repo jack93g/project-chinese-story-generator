@@ -51,7 +51,13 @@ from pathlib import Path
 
 import httpx
 
-from story_generator.eval.comparison import ProviderSpec, load_outcomes, run_comparison, to_json, to_markdown
+from story_generator.eval.comparison import (
+    ProviderSpec,
+    load_outcomes,
+    run_comparison,
+    to_json,
+    to_markdown,
+)
 from story_generator.eval.fixtures import EVAL_FIXTURES
 from story_generator.generation.providers.openai import OpenAIStoryGenerationProvider
 
@@ -89,11 +95,13 @@ def _run(args: argparse.Namespace) -> None:
 
     provider_specs = [_build_provider_spec(spec_str) for spec_str in args.provider]
 
-    print(f"Running {len(EVAL_FIXTURES)} fixtures x {len(provider_specs)} providers "
-          f"= {len(EVAL_FIXTURES) * len(provider_specs)} generations...")
+    print(
+        f"Running {len(EVAL_FIXTURES)} fixtures x {len(provider_specs)} providers "
+        f"= {len(EVAL_FIXTURES) * len(provider_specs)} generations..."
+    )
     outcomes = run_comparison(EVAL_FIXTURES, provider_specs)
 
-    timestamp = dt.datetime.now(dt.timezone.utc).strftime("%Y-%m-%dT%H%M%SZ")
+    timestamp = dt.datetime.now(dt.UTC).strftime("%Y-%m-%dT%H%M%SZ")
     output_dir = Path(args.output_dir)
     output_dir.mkdir(parents=True, exist_ok=True)
 
@@ -105,7 +113,9 @@ def _run(args: argparse.Namespace) -> None:
     failures = [o for o in outcomes if not o.schema_valid]
     print(f"\nWrote {md_path}")
     print(f"Wrote {json_path}")
-    print(f"{len(outcomes) - len(failures)}/{len(outcomes)} generations returned a valid schema.")
+    print(
+        f"{len(outcomes) - len(failures)}/{len(outcomes)} generations returned a valid schema."
+    )
     print(
         "\nNOTE: schema validity / coverage / length / latency are recorded "
         "automatically. Manual quality notes are NOT. Read the transcripts in "
@@ -128,24 +138,44 @@ def _render(args: argparse.Namespace) -> None:
     output_path.write_text(to_markdown(outcomes), encoding="utf-8")
 
     with_notes = sum(1 for o in outcomes if o.manual_quality_notes)
-    print(f"Wrote {output_path} ({with_notes}/{len(outcomes)} outcomes have manual quality notes)")
+    print(
+        f"Wrote {output_path} ({with_notes}/{len(outcomes)} outcomes have manual quality notes)"
+    )
 
 
 def main() -> None:
-    parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
+    parser = argparse.ArgumentParser(
+        description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter
+    )
     subparsers = parser.add_subparsers(dest="command", required=True)
 
-    run_parser = subparsers.add_parser("run", help="Run the comparison against one or more providers")
-    run_parser.add_argument("--provider", action="append", default=[], metavar="SPEC", help=_PROVIDER_SPEC_HELP)
+    run_parser = subparsers.add_parser(
+        "run", help="Run the comparison against one or more providers"
+    )
+    run_parser.add_argument(
+        "--provider",
+        action="append",
+        default=[],
+        metavar="SPEC",
+        help=_PROVIDER_SPEC_HELP,
+    )
     run_parser.add_argument("--output-dir", default="reports/provider-comparisons")
     run_parser.set_defaults(func=_run)
 
     render_parser = subparsers.add_parser(
-        "render", help="Regenerate a markdown report from a (possibly hand-edited) JSON report"
+        "render",
+        help="Regenerate a markdown report from a (possibly hand-edited) JSON report",
     )
-    render_parser.add_argument("--input", required=True, metavar="JSON_PATH", help="Path to a report .json file")
     render_parser.add_argument(
-        "--output", metavar="MD_PATH", help="Path to write the .md to (default: same basename as --input)"
+        "--input",
+        required=True,
+        metavar="JSON_PATH",
+        help="Path to a report .json file",
+    )
+    render_parser.add_argument(
+        "--output",
+        metavar="MD_PATH",
+        help="Path to write the .md to (default: same basename as --input)",
     )
     render_parser.set_defaults(func=_render)
 

@@ -12,9 +12,11 @@ from sqlalchemy import (
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import relationship
 
-from story_generator.database.base import Base
 import story_generator.vocabulary.persistence.models  # noqa: F401
+from story_generator.database.base import Base
+
 MAX_TARGET_WORD_COUNT = 1000
+
 
 class StoryGenerationRequest(Base):
     """
@@ -37,7 +39,9 @@ class StoryGenerationRequest(Base):
     __tablename__ = "story_generation_requests"
 
     id = Column(BigInteger, primary_key=True)
-    vocabulary_list_id = Column(BigInteger, ForeignKey("vocabulary_lists.id"), nullable=False)
+    vocabulary_list_id = Column(
+        BigInteger, ForeignKey("vocabulary_lists.id"), nullable=False
+    )
     target_hsk_level = Column(SmallInteger, nullable=False)
     topic = Column(Text, nullable=True)
     target_word_count = Column(SmallInteger, nullable=False)
@@ -56,7 +60,9 @@ class StoryGenerationRequest(Base):
     error_message = Column(Text, nullable=True)
     started_at = Column(DateTime(timezone=True), nullable=True)
     completed_at = Column(DateTime(timezone=True), nullable=True)
-    created_at = Column(DateTime(timezone=True), nullable=False, server_default=func.now())
+    created_at = Column(
+        DateTime(timezone=True), nullable=False, server_default=func.now()
+    )
 
     raw_payloads = relationship(
         "RawGenerationPayload",
@@ -123,6 +129,10 @@ class RawGenerationPayload(Base):
     request_body = Column(JSONB, nullable=True)
     response_status = Column(Integer, nullable=True)
     payload = Column(JSONB, nullable=True)
-    fetched_at = Column(DateTime(timezone=True), nullable=False, server_default=func.now())
+    fetched_at = Column(
+        DateTime(timezone=True), nullable=False, server_default=func.now()
+    )
 
-    generation_request = relationship("StoryGenerationRequest", back_populates="raw_payloads")
+    generation_request = relationship(
+        "StoryGenerationRequest", back_populates="raw_payloads"
+    )

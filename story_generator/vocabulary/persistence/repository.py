@@ -1,8 +1,8 @@
 from __future__ import annotations
+
 from sqlalchemy import func
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.orm import Session
-
 
 from story_generator.vocabulary.persistence.models import (
     VocabularyItem,
@@ -48,9 +48,11 @@ class VocabularyRepository:
         return self.session.execute(stmt).scalar_one()
 
     def ensure_vocab(self, vocab: SkritterVocabularyRecord) -> tuple[int, bool]:
-        existing_id = self.session.query(VocabularyItem.id).filter_by(
-            skritter_vocab_id=vocab.skritter_vocab_id
-        ).scalar()
+        existing_id = (
+            self.session.query(VocabularyItem.id)
+            .filter_by(skritter_vocab_id=vocab.skritter_vocab_id)
+            .scalar()
+        )
         insert_stmt = pg_insert(VocabularyItem).values(
             skritter_vocab_id=vocab.skritter_vocab_id,
             language=vocab.language,
@@ -81,7 +83,9 @@ class VocabularyRepository:
 
     def list_lists(self, limit: int, offset: int) -> list[tuple[VocabularyList, int]]:
         return (
-            self.session.query(VocabularyList, func.count(list_vocabulary.c.vocabulary_id))
+            self.session.query(
+                VocabularyList, func.count(list_vocabulary.c.vocabulary_id)
+            )
             .outerjoin(list_vocabulary, list_vocabulary.c.list_id == VocabularyList.id)
             .group_by(VocabularyList.id)
             .order_by(VocabularyList.id.asc())

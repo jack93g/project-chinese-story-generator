@@ -20,15 +20,19 @@ def _make_result(title, body):
     return GenerationResult(
         title=title,
         body=body,
-        usage=UsageMetadata(prompt_tokens=1, completion_tokens=1, total_tokens=2, latency_ms=10),
+        usage=UsageMetadata(
+            prompt_tokens=1, completion_tokens=1, total_tokens=2, latency_ms=10
+        ),
     )
 
 
 def test_validate_story_marks_all_present_words_as_used():
-    request = _make_request([
-        {"id": 1, "writing": "你好", "reading": "", "definition_en": ""},
-        {"id": 2, "writing": "菜单", "reading": "", "definition_en": ""},
-    ])
+    request = _make_request(
+        [
+            {"id": 1, "writing": "你好", "reading": "", "definition_en": ""},
+            {"id": 2, "writing": "菜单", "reading": "", "definition_en": ""},
+        ]
+    )
     result = _make_result("故事", "你好，请给我菜单。")
 
     report, used_map = validate_story(request, result)
@@ -39,10 +43,12 @@ def test_validate_story_marks_all_present_words_as_used():
 
 
 def test_validate_story_flags_missing_words():
-    request = _make_request([
-        {"id": 1, "writing": "你好", "reading": "", "definition_en": ""},
-        {"id": 2, "writing": "菜单", "reading": "", "definition_en": ""},
-    ])
+    request = _make_request(
+        [
+            {"id": 1, "writing": "你好", "reading": "", "definition_en": ""},
+            {"id": 2, "writing": "菜单", "reading": "", "definition_en": ""},
+        ]
+    )
     result = _make_result("故事", "你好。")
 
     report, used_map = validate_story(request, result)
@@ -51,14 +57,17 @@ def test_validate_story_flags_missing_words():
     assert report["missing_vocabulary"] == [{"id": 2, "writing": "菜单"}]
     assert report["used_vocabulary_count"] == 1
 
+
 def test_validate_story_meets_threshold_with_one_missing_word_out_of_many():
-    request = _make_request([
-        {"id": 1, "writing": "你好", "reading": "", "definition_en": ""},
-        {"id": 2, "writing": "菜单", "reading": "", "definition_en": ""},
-        {"id": 3, "writing": "朋友", "reading": "", "definition_en": ""},
-        {"id": 4, "writing": "学校", "reading": "", "definition_en": ""},
-        {"id": 5, "writing": "天气", "reading": "", "definition_en": ""},
-    ])
+    request = _make_request(
+        [
+            {"id": 1, "writing": "你好", "reading": "", "definition_en": ""},
+            {"id": 2, "writing": "菜单", "reading": "", "definition_en": ""},
+            {"id": 3, "writing": "朋友", "reading": "", "definition_en": ""},
+            {"id": 4, "writing": "学校", "reading": "", "definition_en": ""},
+            {"id": 5, "writing": "天气", "reading": "", "definition_en": ""},
+        ]
+    )
     # 4/5 = 80% coverage — meets the default 0.8 threshold
     result = _make_result("故事", "你好，菜单，朋友，学校都在这里。")
 
@@ -69,13 +78,15 @@ def test_validate_story_meets_threshold_with_one_missing_word_out_of_many():
 
 
 def test_validate_story_fails_threshold_when_too_many_words_missing():
-    request = _make_request([
-        {"id": 1, "writing": "你好", "reading": "", "definition_en": ""},
-        {"id": 2, "writing": "菜单", "reading": "", "definition_en": ""},
-        {"id": 3, "writing": "朋友", "reading": "", "definition_en": ""},
-        {"id": 4, "writing": "学校", "reading": "", "definition_en": ""},
-        {"id": 5, "writing": "天气", "reading": "", "definition_en": ""},
-    ])
+    request = _make_request(
+        [
+            {"id": 1, "writing": "你好", "reading": "", "definition_en": ""},
+            {"id": 2, "writing": "菜单", "reading": "", "definition_en": ""},
+            {"id": 3, "writing": "朋友", "reading": "", "definition_en": ""},
+            {"id": 4, "writing": "学校", "reading": "", "definition_en": ""},
+            {"id": 5, "writing": "天气", "reading": "", "definition_en": ""},
+        ]
+    )
     # 3/5 = 60% coverage — below the default 0.8 threshold
     result = _make_result("故事", "你好，菜单，朋友都在这里。")
 

@@ -1,6 +1,10 @@
-from typing import Callable, Protocol, runtime_checkable
+from collections.abc import Callable
+from typing import Protocol, runtime_checkable
 
-from story_generator.generation.providers.types import GenerationRequestInput, GenerationResult
+from story_generator.generation.providers.types import (
+    GenerationRequestInput,
+    GenerationResult,
+)
 
 # Called by a provider with (request_body, response_status, response_body)
 # right before generate() returns or raises, so callers can persist the
@@ -32,5 +36,4 @@ class StoryGenerationProvider(Protocol):
         self,
         request: GenerationRequestInput,
         on_raw_exchange: RawExchangeCallback | None = None,
-    ) -> GenerationResult:
-        ...
+    ) -> GenerationResult: ...
