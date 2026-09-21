@@ -59,9 +59,9 @@ def reset_generation_rate_limit():
     """The limiter is module-level state; keep tests independent."""
     from story_generator.api import rate_limit
 
-    rate_limit._generation_limiter._hits.clear()
+    rate_limit._generation_limiter.reset()
     yield
-    rate_limit._generation_limiter._hits.clear()
+    rate_limit._generation_limiter.reset()
 
 
 @pytest.fixture(scope="session")

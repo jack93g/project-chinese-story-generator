@@ -35,6 +35,9 @@ def create_app() -> FastAPI:
     )
 
     app.include_router(health_router)
+    # Router-level dependencies run before route-level ones, so the key check
+    # comes before the generation rate limiter: an unauthenticated caller must
+    # never be able to use up the owner's rate-limit budget. Keep it that way.
     protected = [Depends(require_api_key)]
     app.include_router(vocabulary_router, dependencies=protected)
     app.include_router(sync_status_router, dependencies=protected)

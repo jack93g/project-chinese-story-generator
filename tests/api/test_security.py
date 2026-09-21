@@ -94,3 +94,27 @@ def test_generation_endpoints_return_429_when_rate_limited(monkeypatch):
 
     assert limited.status_code == 429
     assert "Retry-After" in limited.headers
+
+
+def test_unauthenticated_requests_do_not_consume_rate_limit_budget(monkeypatch):
+    limiter = SlidingWindowRateLimiter(1, 60)
+    monkeypatch.setattr(rate_limit, "_generation_limiter", limiter)
+    app = create_app()
+    app.dependency_overrides[get_db] = lambda: None
+
+    anonymous = TestClient(app)
+    for _ in range(3):
+        assert anonymous.post("/story-generations", json={}).status_code == 401
+
+    keyed = TestClient(app, headers={"X-API-Key": TEST_API_KEY})
+    assert keyed.post("/story-generations", json={}).status_code == 422
+
+
+def test_limiter_reset_clears_recorded_hits():
+    limiter = SlidingWindowRateLimiter(1, 60)
+    assert limiter.check() is None
+    assert limiter.check() is not None
+
+    limiter.reset()
+
+    assert limiter.check() is None

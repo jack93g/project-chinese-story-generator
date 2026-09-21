@@ -18,6 +18,10 @@ class SlidingWindowRateLimiter:
         self._hits: deque[float] = deque()
         self._lock = Lock()
 
+    def reset(self) -> None:
+        with self._lock:
+            self._hits.clear()
+
     def check(self) -> float | None:
         """Record a hit. Returns None if allowed, else seconds until retry."""
         now = time.monotonic()
