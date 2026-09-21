@@ -1,6 +1,10 @@
 import { fireEvent, render, screen } from "@testing-library/react";
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import { getAccessKey, reportAccessKeyRejected } from "@/lib/access-key";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import {
+  clearAccessKey,
+  getAccessKey,
+  reportAccessKeyRejected,
+} from "@/lib/access-key";
 import { AccessKeyGate } from "./access-key-gate";
 
 describe("AccessKeyGate", () => {
@@ -47,5 +51,31 @@ describe("AccessKeyGate", () => {
     ).toBeInTheDocument();
     expect(screen.queryByText("secret content")).not.toBeInTheDocument();
     expect(getAccessKey()).toBeNull();
+  });
+});
+
+describe("AccessKeyGate with storage blocked", () => {
+  afterEach(() => vi.restoreAllMocks());
+
+  it("still lets the user in for this page load", () => {
+    vi.spyOn(Storage.prototype, "getItem").mockImplementation(() => {
+      throw new Error("blocked");
+    });
+    vi.spyOn(Storage.prototype, "setItem").mockImplementation(() => {
+      throw new Error("blocked");
+    });
+    vi.spyOn(Storage.prototype, "removeItem").mockImplementation(() => {
+      throw new Error("blocked");
+    });
+    clearAccessKey();
+
+    render(<AccessKeyGate>secret content</AccessKeyGate>);
+    fireEvent.change(screen.getByLabelText("Access key"), {
+      target: { value: "k" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Continue" }));
+
+    expect(screen.getByText("secret content")).toBeInTheDocument();
+    clearAccessKey();
   });
 });

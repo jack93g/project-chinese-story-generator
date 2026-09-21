@@ -373,3 +373,68 @@ def test_oversized_topic_returns_422(client, db_session):
     )
 
     assert response.status_code == 422
+
+
+def test_unknown_list_returns_404_even_when_the_queue_is_full(client, db_session):
+    from story_generator.generation.persistence.service import MAX_ACTIVE_GENERATIONS
+
+    vocab_list = _make_list_with_items(
+        db_session, skritter_list_id="order-1", n_items=3
+    )
+    for _ in range(MAX_ACTIVE_GENERATIONS):
+        assert _create(client, vocab_list.id).status_code == 202
+
+    assert _create(client, vocab_list.id + 1000).status_code == 404
+
+
+def _request_with_status(vocab_list, status):
+    """A request row satisfying the status-aware lifecycle timestamp constraint."""
+    from datetime import UTC, datetime
+
+    from story_generator.generation.persistence.models import StoryGenerationRequest
+
+    now = datetime.now(UTC)
+    return StoryGenerationRequest(
+        vocabulary_list_id=vocab_list.id,
+        target_hsk_level=2,
+        target_word_count=100,
+        target_vocabulary_count=1,
+        selected_vocabulary_snapshot=[],
+        prompt_version="story-v1",
+        provider="openai",
+        model="gpt-test",
+        status=status,
+        attempt_count=0 if status == "queued" else 1,
+        started_at=None if status == "queued" else now,
+        completed_at=now if status in ("succeeded", "failed") else None,
+    )
+
+
+def test_retry_returns_429_when_the_queue_is_full(client, db_session):
+    from story_generator.generation.persistence.service import MAX_ACTIVE_GENERATIONS
+
+    vocab_list = _make_list_with_items(
+        db_session, skritter_list_id="retry-cap", n_items=3
+    )
+    failed = _request_with_status(vocab_list, "failed")
+    db_session.add(failed)
+    db_session.flush()
+    for _ in range(MAX_ACTIVE_GENERATIONS):
+        assert _create(client, vocab_list.id).status_code == 202
+
+    assert client.post(f"/story-generations/{failed.id}/retry").status_code == 429
+
+
+def test_only_queued_and_running_requests_count_toward_the_cap(db_session):
+    from story_generator.generation.persistence.repository import (
+        GenerationRequestRepository,
+    )
+
+    vocab_list = _make_list_with_items(
+        db_session, skritter_list_id="count-1", n_items=2
+    )
+    for status in ("queued", "running", "succeeded", "failed"):
+        db_session.add(_request_with_status(vocab_list, status))
+    db_session.flush()
+
+    assert GenerationRequestRepository(db_session).count_active() == 2

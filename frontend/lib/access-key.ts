@@ -4,6 +4,10 @@
 
 const STORAGE_KEY = "story-generator-access-key";
 
+// Used when localStorage is unavailable (e.g. blocked site data), so the key
+// still lasts until the next reload instead of the gate never letting you in.
+let memoryKey: string | null = null;
+
 export const ACCESS_KEY_REJECTED_EVENT = "access-key-rejected";
 const ACCESS_KEY_CHANGED_EVENT = "access-key-changed";
 
@@ -19,23 +23,24 @@ export function subscribeToAccessKey(onChange: () => void): () => void {
 
 export function getAccessKey(): string | null {
   try {
-    return window.localStorage.getItem(STORAGE_KEY);
+    return window.localStorage.getItem(STORAGE_KEY) ?? memoryKey;
   } catch {
-    return null;
+    return memoryKey;
   }
 }
 
 export function setAccessKey(key: string): void {
+  memoryKey = key;
   try {
     window.localStorage.setItem(STORAGE_KEY, key);
   } catch {
-    // Storage unavailable (e.g. blocked site data); the key only lasts
-    // until the next reload in that case.
+    // Storage unavailable; memoryKey above keeps the key for this page load.
   }
   window.dispatchEvent(new Event(ACCESS_KEY_CHANGED_EVENT));
 }
 
 export function clearAccessKey(): void {
+  memoryKey = null;
   try {
     window.localStorage.removeItem(STORAGE_KEY);
   } catch {

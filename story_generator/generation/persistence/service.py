@@ -74,7 +74,6 @@ class GenerationRequestService:
     def create(
         self, db: Session, payload: CreateGenerationRequestSchema
     ) -> StoryGenerationRequest:
-        self._ensure_capacity()
         vocabulary_list = db.get(VocabularyList, payload.vocabulary_list_id)
         if vocabulary_list is None:
             raise VocabularyListNotFoundError(payload.vocabulary_list_id)
@@ -82,6 +81,9 @@ class GenerationRequestService:
         snapshot = select_vocabulary(
             db, vocabulary_list, payload.target_vocabulary_count
         )
+        # After input validation, so a bad list id still gets 404/422 rather
+        # than 429 when the queue happens to be full.
+        self._ensure_capacity()
 
         request = StoryGenerationRequest(
             vocabulary_list_id=vocabulary_list.id,
@@ -150,6 +152,9 @@ class GenerationRequestService:
         return request
 
     def _ensure_capacity(self) -> None:
+        # Best-effort cost guard, not a strict invariant: count-then-insert is
+        # not locked, so two simultaneous requests could both pass and briefly
+        # exceed the cap. Acceptable for the single-user deployment.
         active = self.repository.count_active()
         if active >= MAX_ACTIVE_GENERATIONS:
             raise GenerationQueueFullError(active)
