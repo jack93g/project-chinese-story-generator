@@ -242,3 +242,17 @@ postgres-data/
 # Editor files
 .vscode/
 .idea/
+
+# Terraform: state can contain sensitive values and must never be committed.
+# .terraform.lock.hcl IS committed (it pins provider versions).
+**/.terraform/
+*.tfstate
+*.tfstate.*
+*.tfvars
+*.tfvars.json
+crash.log
+crash.*.log
+override.tf
+override.tf.json
+*_override.tf
+*_override.tf.json
