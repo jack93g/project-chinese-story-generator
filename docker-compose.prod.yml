@@ -12,8 +12,10 @@ services:
   api:
     ports: !reset []
 
+  # Pinned to the version proven on the Droplet. The Caddyfile's request_body
+  # limit needs a recent Caddy 2.x, so avoid a floating tag.
   caddy:
-    image: caddy:2
+    image: caddy:2.11.4
     restart: unless-stopped
     ports:
       - "80:80"
