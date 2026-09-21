@@ -61,7 +61,8 @@ Frontend (`cd frontend`): `npm run dev`, `npm run build`, `npm run lint`, `npm r
 Environment (`.env` in repo root, never commit it): `DATABASE_URL`,
 `TEST_DATABASE_URL` (must contain `test` and differ from `DATABASE_URL` — the
 test suite refuses to run otherwise), `SKRITTER_ACCESS_TOKEN`, `OPENAI_API_KEY`,
-`OPENAI_PROVIDER_LABEL`, `OPENAI_MODEL`, `OPENAI_BASE_URL`, plus
+`OPENAI_PROVIDER_LABEL`, `OPENAI_MODEL`, `OPENAI_BASE_URL`, `API_ACCESS_KEY` (required: the API won't start without it;
+clients send it as an `X-API-Key` header; only `GET /health` is open), plus
 `POSTGRES_USER`, `POSTGRES_PASSWORD`, `POSTGRES_DB` (used by Compose to
 create the database and build the containers' `DATABASE_URL`).
 

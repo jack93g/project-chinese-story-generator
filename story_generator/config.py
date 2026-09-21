@@ -58,3 +58,17 @@ def get_cors_allowed_origins() -> list[str]:
         "CORS_ALLOWED_ORIGINS", "http://localhost:3000,http://127.0.0.1:3000"
     )
     return [origin.strip() for origin in raw.split(",") if origin.strip()]
+
+
+def get_api_access_key() -> str:
+    """
+    Shared secret every API request (except /health) must present in the
+    X-API-Key header. Required: the API refuses to start without it so a
+    production box can never silently run unauthenticated.
+    """
+    key = os.getenv("API_ACCESS_KEY")
+    if not key:
+        raise RuntimeError(
+            "API_ACCESS_KEY environment variable is not set. Add it to your .env file."
+        )
+    return key

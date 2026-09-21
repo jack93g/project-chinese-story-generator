@@ -1,6 +1,6 @@
 from datetime import UTC, datetime, timedelta
 
-from sqlalchemy import select, update
+from sqlalchemy import func, select, update
 from sqlalchemy.orm import Session
 
 from story_generator.generation.persistence.models import (
@@ -27,6 +27,14 @@ class GenerationRequestRepository:
 
     def get_by_id(self, request_id: int) -> StoryGenerationRequest | None:
         return self.session.get(StoryGenerationRequest, request_id)
+
+    def count_active(self) -> int:
+        """Number of requests currently queued or running."""
+        return self.session.scalar(
+            select(func.count())
+            .select_from(StoryGenerationRequest)
+            .where(StoryGenerationRequest.status.in_(("queued", "running")))
+        )
 
     def claim_next_request(self) -> StoryGenerationRequest | None:
         """

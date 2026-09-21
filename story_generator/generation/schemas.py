@@ -5,6 +5,7 @@ from pydantic import BaseModel, Field, field_validator
 # word-count CHECK constraint (migration) — this is validated at both
 # layers deliberately; see StoryGenerationRequest docstring.
 MAX_TARGET_WORD_COUNT = 1000
+MAX_TOPIC_LENGTH = 200
 
 # Error codes we generate ourselves — their error_message is written
 # by us and safe to expose verbatim via the API. Anything else (e.g.
@@ -45,7 +46,7 @@ class CreateGenerationRequestSchema(BaseModel):
     target_hsk_level: int = Field(ge=1, le=6)
     target_word_count: int = Field(gt=0, le=MAX_TARGET_WORD_COUNT)
     target_vocabulary_count: int = Field(ge=1, le=15)
-    topic: str | None = None
+    topic: str | None = Field(default=None, max_length=MAX_TOPIC_LENGTH)
 
     @field_validator("topic")
     @classmethod

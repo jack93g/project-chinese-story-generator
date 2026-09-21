@@ -1,3 +1,5 @@
+import { getAccessKey, reportAccessKeyRejected } from "./access-key";
+
 const DEFAULT_API_BASE_URL = "http://127.0.0.1:8000";
 
 export const API_BASE_URL =
@@ -102,8 +104,29 @@ async function parseErrorMessage(response: Response): Promise<string> {
   return `Request failed with status ${response.status}`;
 }
 
+// Every API call goes through here so the access key header is added in one
+// place and a rejected key (401) is handled in one place.
+async function apiFetch(
+  path: string,
+  init?: RequestInit,
+): Promise<Response> {
+  const accessKey = getAccessKey();
+  let requestInit = init;
+  if (accessKey) {
+    const headers = new Headers(init?.headers);
+    headers.set("X-API-Key", accessKey);
+    requestInit = { ...init, headers };
+  }
+
+  const response = await fetch(apiUrl(path), requestInit);
+  if (response.status === 401) {
+    reportAccessKeyRejected();
+  }
+  return response;
+}
+
 async function requestJson<T>(path: string, init?: RequestInit): Promise<T> {
-  const response = await fetch(apiUrl(path), init);
+  const response = await apiFetch(path, init);
   if (!response.ok) {
     throw new ApiError(await parseErrorMessage(response), response.status);
   }
@@ -185,7 +208,7 @@ export function fetchStory(id: number | string): Promise<StoryDetail> {
 }
 
 export async function deleteStory(id: number | string): Promise<void> {
-  const response = await fetch(apiUrl(`/stories/${encodeURIComponent(id)}`), {
+  const response = await apiFetch(`/stories/${encodeURIComponent(id)}`, {
     method: "DELETE",
   });
   if (!response.ok) {

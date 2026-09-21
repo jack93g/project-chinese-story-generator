@@ -249,3 +249,66 @@ describe("deleteStory", () => {
     );
   });
 });
+
+describe("access key handling", () => {
+  afterEach(() => {
+    vi.unstubAllGlobals();
+    window.localStorage.clear();
+    vi.resetModules();
+  });
+
+  it("sends the stored key in an X-API-Key header and keeps other headers", async () => {
+    window.localStorage.setItem("story-generator-access-key", "secret");
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({ id: 1, status: "queued" }),
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    const { createStoryGeneration } = await import("./api");
+    await createStoryGeneration({
+      vocabulary_list_id: 1,
+      target_hsk_level: 2,
+      target_word_count: 100,
+      target_vocabulary_count: 2,
+    });
+
+    const init = fetchMock.mock.calls[0][1] as RequestInit;
+    const headers = new Headers(init.headers);
+    expect(headers.get("X-API-Key")).toBe("secret");
+    expect(headers.get("content-type")).toBe("application/json");
+  });
+
+  it("sends the key on DELETE requests too", async () => {
+    window.localStorage.setItem("story-generator-access-key", "secret");
+    const fetchMock = vi.fn().mockResolvedValue({ ok: true });
+    vi.stubGlobal("fetch", fetchMock);
+
+    const { deleteStory } = await import("./api");
+    await deleteStory(3);
+
+    const init = fetchMock.mock.calls[0][1] as RequestInit;
+    expect(new Headers(init.headers).get("X-API-Key")).toBe("secret");
+  });
+
+  it("clears the stored key and signals the gate when the API answers 401", async () => {
+    window.localStorage.setItem("story-generator-access-key", "wrong");
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue({
+        ok: false,
+        status: 401,
+        json: async () => ({ detail: "Invalid or missing API key" }),
+      }),
+    );
+    const onRejected = vi.fn();
+    window.addEventListener("access-key-rejected", onRejected);
+
+    const { fetchStories, ApiError } = await import("./api");
+    await expect(fetchStories()).rejects.toBeInstanceOf(ApiError);
+
+    window.removeEventListener("access-key-rejected", onRejected);
+    expect(onRejected).toHaveBeenCalledOnce();
+    expect(window.localStorage.getItem("story-generator-access-key")).toBeNull();
+  });
+});
