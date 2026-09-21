@@ -2,10 +2,12 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 
 from story_generator.api.dependencies import get_db
+from story_generator.api.rate_limit import generation_rate_limit
 from story_generator.generation.persistence.repository import (
     GenerationRequestRepository,
 )
 from story_generator.generation.persistence.service import (
+    GenerationQueueFullError,
     GenerationRequestNotFoundError,
     GenerationRequestService,
     InvalidTransitionError,
@@ -26,6 +28,7 @@ router = APIRouter(tags=["story-generations"])
     "/story-generations",
     response_model=GenerationCreatedResponse,
     status_code=202,
+    dependencies=[Depends(generation_rate_limit)],
 )
 def create_story_generation(
     payload: CreateGenerationRequestSchema,
@@ -46,6 +49,8 @@ def create_story_generation(
         raise HTTPException(status_code=404, detail=str(exc)) from exc
     except EmptyVocabularyListError as exc:
         raise HTTPException(status_code=422, detail=str(exc)) from exc
+    except GenerationQueueFullError as exc:
+        raise HTTPException(status_code=429, detail=str(exc)) from exc
 
     db.commit()
     return GenerationCreatedResponse(id=request.id, status=request.status)
@@ -75,6 +80,7 @@ def get_story_generation_status(
     "/story-generations/{generation_request_id}/retry",
     response_model=GenerationStatusResponse,
     status_code=202,
+    dependencies=[Depends(generation_rate_limit)],
 )
 def retry_story_generation(
     generation_request_id: int,
@@ -87,6 +93,8 @@ def retry_story_generation(
         request = service.retry(generation_request_id)
     except GenerationRequestNotFoundError as exc:
         raise HTTPException(status_code=404, detail=str(exc)) from exc
+    except GenerationQueueFullError as exc:
+        raise HTTPException(status_code=429, detail=str(exc)) from exc
     except RetryLimitExceededError as exc:
         raise HTTPException(status_code=409, detail=str(exc)) from exc
     except InvalidTransitionError as exc:

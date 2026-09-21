@@ -58,6 +58,8 @@ Application secrets live only in a `.env` file on the Droplet:
 - `OPENAI_MODEL`
 - `OPENAI_BASE_URL`
 - `SKRITTER_ACCESS_TOKEN`
+- `API_ACCESS_KEY` (shared secret for the single-user gate; every API route except `GET /health` requires it in an `X-API-Key` header, and the API refuses to start without it)
+- `CORS_ALLOWED_ORIGINS` (not secret, but production-specific: the `https://` frontend origins)
 
 `.env` is created and updated manually over SSH — not automated through
 CI. This is a deliberate trade-off: keeping CI from ever holding application

@@ -1,0 +1,17 @@
+api.huaben.app {
+	encode gzip
+
+	# Reject oversized request bodies at the edge, before they reach the API.
+	request_body {
+		max_size 64KB
+	}
+
+	header {
+		Strict-Transport-Security "max-age=31536000"
+		X-Content-Type-Options "nosniff"
+		Referrer-Policy "no-referrer"
+		-Server
+	}
+
+	reverse_proxy api:8000
+}

@@ -16,6 +16,8 @@ from story_generator.generation.vocabulary_selection import (
 from story_generator.vocabulary.persistence.models import VocabularyList
 
 MAX_ATTEMPTS = 3
+# Cap on queued + running requests, to bound paid LLM work.
+MAX_ACTIVE_GENERATIONS = 3
 
 VALID_TRANSITIONS: dict[str, set[str]] = {
     "queued": {"running"},
@@ -46,6 +48,15 @@ class VocabularyListNotFoundError(Exception):
         super().__init__(f"Vocabulary list {vocabulary_list_id} not found")
 
 
+class GenerationQueueFullError(Exception):
+    def __init__(self, active_count: int):
+        self.active_count = active_count
+        super().__init__(
+            f"{active_count} generation requests are already queued or running "
+            f"(max {MAX_ACTIVE_GENERATIONS}); try again once one finishes"
+        )
+
+
 class RetryLimitExceededError(Exception):
     def __init__(self, request_id: int, attempt_count: int):
         self.request_id = request_id
@@ -63,6 +74,7 @@ class GenerationRequestService:
     def create(
         self, db: Session, payload: CreateGenerationRequestSchema
     ) -> StoryGenerationRequest:
+        self._ensure_capacity()
         vocabulary_list = db.get(VocabularyList, payload.vocabulary_list_id)
         if vocabulary_list is None:
             raise VocabularyListNotFoundError(payload.vocabulary_list_id)
@@ -129,12 +141,18 @@ class GenerationRequestService:
         request = self._get(request_id)
         if request.attempt_count >= MAX_ATTEMPTS:
             raise RetryLimitExceededError(request_id, request.attempt_count)
+        self._ensure_capacity()
         self._transition(request, "queued")
         request.started_at = None
         request.completed_at = None
         request.error_code = None
         request.error_message = None
         return request
+
+    def _ensure_capacity(self) -> None:
+        active = self.repository.count_active()
+        if active >= MAX_ACTIVE_GENERATIONS:
+            raise GenerationQueueFullError(active)
 
     def _transition(self, request: StoryGenerationRequest, new_status: str) -> None:
         allowed = VALID_TRANSITIONS.get(request.status, set())

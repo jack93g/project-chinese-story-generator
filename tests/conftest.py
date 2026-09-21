@@ -44,6 +44,26 @@ def _get_test_database_url() -> str:
     return test_url
 
 
+TEST_API_KEY = "test-access-key"
+
+
+@pytest.fixture(autouse=True)
+def api_access_key(monkeypatch):
+    """The app refuses to start without API_ACCESS_KEY; set a known one."""
+    monkeypatch.setenv("API_ACCESS_KEY", TEST_API_KEY)
+    return TEST_API_KEY
+
+
+@pytest.fixture(autouse=True)
+def reset_generation_rate_limit():
+    """The limiter is module-level state; keep tests independent."""
+    from story_generator.api import rate_limit
+
+    rate_limit._generation_limiter._hits.clear()
+    yield
+    rate_limit._generation_limiter._hits.clear()
+
+
 @pytest.fixture(scope="session")
 def test_database_url():
     return _get_test_database_url()
@@ -129,7 +149,7 @@ def client(db_session):
 
     app.dependency_overrides[get_db] = lambda: db_session
 
-    with TestClient(app) as client:
+    with TestClient(app, headers={"X-API-Key": TEST_API_KEY}) as client:
         yield client
 
     app.dependency_overrides.clear()

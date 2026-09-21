@@ -331,3 +331,45 @@ def test_retry_returns_409_once_max_attempts_exhausted(client, db_session):
     response = client.post(f"/story-generations/{request_id}/retry")
 
     assert response.status_code == 409
+
+
+def _create(client, list_id):
+    return client.post(
+        "/story-generations",
+        json={
+            "vocabulary_list_id": list_id,
+            "target_hsk_level": 2,
+            "target_word_count": 150,
+            "target_vocabulary_count": 2,
+        },
+    )
+
+
+def test_create_returns_429_once_active_requests_hit_the_cap(client, db_session):
+    from story_generator.generation.persistence.service import MAX_ACTIVE_GENERATIONS
+
+    vocab_list = _make_list_with_items(db_session, skritter_list_id="cap-1", n_items=3)
+
+    for _ in range(MAX_ACTIVE_GENERATIONS):
+        assert _create(client, vocab_list.id).status_code == 202
+
+    assert _create(client, vocab_list.id).status_code == 429
+
+
+def test_oversized_topic_returns_422(client, db_session):
+    vocab_list = _make_list_with_items(
+        db_session, skritter_list_id="topic-1", n_items=3
+    )
+
+    response = client.post(
+        "/story-generations",
+        json={
+            "vocabulary_list_id": vocab_list.id,
+            "target_hsk_level": 2,
+            "target_word_count": 150,
+            "target_vocabulary_count": 2,
+            "topic": "x" * 201,
+        },
+    )
+
+    assert response.status_code == 422

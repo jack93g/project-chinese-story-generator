@@ -3,6 +3,7 @@ from pydantic import ValidationError
 
 from story_generator.generation.schemas import (
     MAX_TARGET_WORD_COUNT,
+    MAX_TOPIC_LENGTH,
     CreateGenerationRequestSchema,
 )
 
@@ -95,3 +96,15 @@ def test_provider_and_model_are_not_accepted_as_input():
 
     assert not hasattr(schema, "provider")
     assert not hasattr(schema, "model")
+
+
+def test_topic_over_max_length_is_rejected():
+    base = dict(
+        vocabulary_list_id=1,
+        target_hsk_level=2,
+        target_word_count=100,
+        target_vocabulary_count=2,
+    )
+    CreateGenerationRequestSchema(**base, topic="x" * MAX_TOPIC_LENGTH)
+    with pytest.raises(ValidationError):
+        CreateGenerationRequestSchema(**base, topic="x" * (MAX_TOPIC_LENGTH + 1))
