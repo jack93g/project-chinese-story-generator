@@ -3,6 +3,7 @@ from fastapi.testclient import TestClient
 
 from story_generator.api import rate_limit
 from story_generator.api.app import create_app
+from story_generator.api.dependencies import get_db
 from story_generator.api.rate_limit import SlidingWindowRateLimiter
 from tests.conftest import TEST_API_KEY
 
@@ -81,7 +82,11 @@ def test_generation_endpoints_return_429_when_rate_limited(monkeypatch):
     monkeypatch.setattr(
         rate_limit, "_generation_limiter", SlidingWindowRateLimiter(1, 60)
     )
-    client = TestClient(create_app(), headers={"X-API-Key": TEST_API_KEY})
+    app = create_app()
+    # FastAPI resolves every dependency (including get_db) before it reports a
+    # body-validation error, so stub the session: this test needs no database.
+    app.dependency_overrides[get_db] = lambda: None
+    client = TestClient(app, headers={"X-API-Key": TEST_API_KEY})
 
     # Invalid body: fails validation (422) but still consumes rate-limit budget.
     assert client.post("/story-generations", json={}).status_code == 422
