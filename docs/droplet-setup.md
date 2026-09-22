@@ -93,18 +93,80 @@ checks when the API is unreachable: `nc -z <ip> 443`, then the firewall's
 inbound rules, then `docker compose ... ps` and the Caddy logs on the box.
 Terraform (below) should define all three inbound rules explicitly.
 
+## Infrastructure as code (Terraform)
+
+`infra/terraform/` (Droplet, firewall, SSH key, DNS record) reproduces this
+setup from code, provider auth (`DIGITALOCEAN_TOKEN`, `CLOUDFLARE_API_TOKEN`)
+and the admin public key (`TF_VAR_admin_ssh_public_key`) supplied only as
+shell env vars, never committed. First-boot provisioning (`deploy` user,
+Docker, SSH hardening) is replayed by `cloud-init.yaml`, passed as the
+Droplet's `user_data`.
+
+The real Droplet, firewall, SSH key and DNS record were each `terraform
+import`ed rather than recreated, so Terraform adopted the hand-built
+resources without touching them. `user_data` and `ssh_keys` are in the
+Droplet's `lifecycle.ignore_changes`: DigitalOcean doesn't report back which
+SSH keys or `user_data` an existing Droplet was created with, so declaring
+them in config after import otherwise reads as "these differ" and Terraform
+plans to destroy and recreate the Droplet (`ssh_keys` is a force-replacement
+field) — which would take the real database with it, since Postgres's data
+lives only in a Docker volume on the Droplet's own disk, nothing separate.
+Always read `terraform plan` in full before `apply` on this resource, and
+stop on any `forces replacement`/`destroy` line.
+
+**State**: local `terraform.tfstate`, gitignored (state can hold sensitive
+values and must never be committed). Since it's local-only, it's the single
+source of truth for what Terraform manages — back it up (e.g. to the
+password manager) after a real `apply`, since losing it means Terraform no
+longer recognizes the existing infrastructure and would try to create a
+duplicate of everything on the next `apply`. `.terraform.lock.hcl` (pins
+provider versions) is committed; `.terraform.tfvars`/`.terraform/` are not.
+
+**Proof that `apply` builds this from a clean state**, not just imports it:
+run the same config in an isolated scratch directory (own state, own
+throwaway resource names, e.g. `story-droplet-test`/`api-test.huaben.app`),
+apply for real, verify SSH/Docker/sudo/hardening exactly as below, then
+`terraform destroy` it. Never run this against the real Droplet's state.
+
+### Gotcha: cloud-init failures are silent unless you go looking
+
+The `user_data` script errored twice before working, and neither failure was
+visible from the outside — `apply` succeeds either way, since DigitalOcean
+just accepts the boot script and cloud-init runs it after `apply` returns:
+
+1. `groups: [docker, sudo]` on the `deploy` user tried to add it to the
+   `docker` group at user-creation time, before the `docker-ce` package
+   (which creates that group) was installed by `runcmd` — `useradd` failed
+   outright, so `deploy` never got created at all. Fix: grant `sudo` via the
+   user's own `sudo:` directive instead of group membership, and only
+   `usermod -aG docker deploy` after Docker is actually installed.
+2. A single em dash in a `runcmd` comment corrupted into an invalid
+   character somewhere in the Terraform → DigitalOcean → cloud-init
+   hand-off, which made cloud-init treat the *entire* `user_data` as invalid
+   YAML and silently apply none of it (logged as "empty cloud config").
+   Fix: keep `cloud-init.yaml` plain ASCII.
+
+Diagnosis, since SSH failures alone don't distinguish these: DigitalOcean's
+web console ("Launch Droplet Console") gives root access independent of
+SSH/cloud-init succeeding at all. From there,
+`grep -iE "error|fail|warn" /var/log/cloud-init.log` finds the actual cause,
+and `curl http://169.254.169.254/metadata/v1/user-data` (from inside the
+Droplet) shows the exact raw script DigitalOcean received, for comparing
+against what's on disk.
+
 ## Known trade-offs
 
 - Membership of the `docker` group is effectively root-equivalent (a user
   who can start containers can mount the host filesystem). `deploy` limits
   accidents and scope but is not a hard boundary against a stolen key, so
   the deploy key must be protected as carefully as a root credential.
-- `deploy` has no `sudo`. OS-level changes go through the DigitalOcean web
-  console until a better answer is needed.
+- `deploy` has passwordless `sudo` (added via cloud-init). Given `docker`
+  group membership is already root-equivalent, this doesn't meaningfully
+  widen what a stolen key can do — it just avoids going through the
+  DigitalOcean console for OS-level changes.
 
 ## Still to do
 
-- Terraform for the Droplet, firewall and DNS, with state handling documented.
 - Deploy pipeline (GHCR image tagged by git SHA, restart API and worker).
 - Deploy hardening: dedicated deploy key in a GitHub Environment restricted
   to `main`.

@@ -1,0 +1,46 @@
+#cloud-config
+# Replays the manual setup from docs/droplet-setup.md (session 2026-09-20/21)
+# so a Terraform-created Droplet reaches the same state as the hand-built one.
+
+package_update: true
+package_upgrade: true
+
+users:
+  - name: deploy
+    lock_passwd: true
+    shell: /bin/bash
+    sudo: "ALL=(ALL) NOPASSWD:ALL"
+    ssh_authorized_keys:
+      - ${ssh_public_key}   # interpolated by Terraform's templatefile()
+
+write_files:
+  - path: /etc/ssh/sshd_config.d/00-hardening.conf
+    content: |
+      PermitRootLogin no
+      PasswordAuthentication no
+
+  - path: /etc/apt/sources.list.d/docker.sources
+    content: |
+      Types: deb
+      URIs: https://download.docker.com/linux/ubuntu
+      Suites: noble
+      Components: stable
+      Signed-By: /etc/apt/keyrings/docker.asc
+
+runcmd:
+  # Docker's official apt repo (not Ubuntu's docker.io), matching the manual setup.
+  - install -m 0755 -d /etc/apt/keyrings
+  - curl -fsSL https://download.docker.com/linux/ubuntu/gpg -o /etc/apt/keyrings/docker.asc
+  - chmod a+r /etc/apt/keyrings/docker.asc
+  - apt-get update
+  - apt-get install -y docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
+  # docker group is created by the docker-ce package above, so this has to
+  # run now, not in the users: block above. Doing it there fails useradd
+  # outright, since the docker group doesn't exist yet at that point.
+  - usermod -aG docker deploy
+  - sshd -t && systemctl reload ssh
+
+power_state:
+  mode: reboot
+  message: "Rebooting after first-boot provisioning"
+  condition: true
