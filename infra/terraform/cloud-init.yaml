@@ -1,0 +1,61 @@
+#cloud-config
+# Replays the manual setup from docs/droplet-setup.md (session 2026-09-20/21)
+# so a Terraform-created Droplet reaches the same state as the hand-built one.
+#
+# No top-level package_update/package_upgrade here on purpose: those trigger
+# an apt-get update during cloud-init's early config stage, which runs after
+# write_files has already created docker.sources (below) but before runcmd
+# has fetched the signing key that file points at, so that update would hit
+# the Docker repo with no key yet. The update/upgrade instead happens
+# explicitly in runcmd, after the key exists.
+
+users:
+  - name: deploy
+    lock_passwd: true
+    shell: /bin/bash
+    sudo: "ALL=(ALL) NOPASSWD:ALL"
+    ssh_authorized_keys:
+      - ${ssh_public_key}   # interpolated by Terraform's templatefile()
+
+write_files:
+  - path: /etc/ssh/sshd_config.d/00-hardening.conf
+    content: |
+      PermitRootLogin no
+      PasswordAuthentication no
+
+  - path: /etc/apt/sources.list.d/docker.sources
+    content: |
+      Types: deb
+      URIs: https://download.docker.com/linux/ubuntu
+      Suites: noble
+      Components: stable
+      Signed-By: /etc/apt/keyrings/docker.asc
+
+runcmd:
+  # Docker's official apt repo (not Ubuntu's docker.io), matching the manual setup.
+  - install -m 0755 -d /etc/apt/keyrings
+  - curl -fsSL https://download.docker.com/linux/ubuntu/gpg -o /etc/apt/keyrings/docker.asc
+  - chmod a+r /etc/apt/keyrings/docker.asc
+  - apt-get update
+  # DEBIAN_FRONTEND=noninteractive plus the two dpkg options below make
+  # "keep the currently-installed config file" automatic for any package
+  # with a locally-modified conffile - the same choice made by hand for
+  # sshd_config in step 1 - since there's no terminal here to answer that
+  # prompt; without this, upgrade/install can hang forever waiting for
+  # input that will never come, and provisioning silently stalls.
+  - DEBIAN_FRONTEND=noninteractive apt-get -y -o Dpkg::Options::="--force-confdef" -o Dpkg::Options::="--force-confold" upgrade
+  - DEBIAN_FRONTEND=noninteractive apt-get -y -o Dpkg::Options::="--force-confdef" -o Dpkg::Options::="--force-confold" install docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
+  # docker group is created by the docker-ce package above, so this has to
+  # run now, not in the users: block above. Doing it there fails useradd
+  # outright, since the docker group doesn't exist yet at that point.
+  - usermod -aG docker deploy
+  - sshd -t && systemctl reload ssh
+
+# cloud-init runs user_data once per instance ID, not on every boot, so this
+# only fires on first boot (to pick up the kernel/package updates above) -
+# an ordinary `reboot` afterward doesn't change the instance ID and won't
+# re-trigger it.
+power_state:
+  mode: reboot
+  message: "Rebooting after first-boot provisioning"
+  condition: true

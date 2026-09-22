@@ -32,9 +32,13 @@ durable background workflow.
 Start the application and open the interactive documentation at
 <http://127.0.0.1:8000/docs>.
 
+Every endpoint except `/health` requires an `X-API-Key` header matching
+`API_ACCESS_KEY` from your `.env`; the API refuses to start if that variable
+is unset.
+
 | Method | Path | Description |
 | --- | --- | --- |
-| `GET` | `/health` | Returns `{"status": "ok"}` without requiring database configuration. |
+| `GET` | `/health` | Returns `{"status": "ok"}` without requiring database configuration or an API key. |
 | `GET` | `/vocabulary` | Returns paginated vocabulary items. |
 | `GET` | `/vocabulary-lists` | Returns paginated vocabulary-list summaries, including item counts. |
 | `GET` | `/vocabulary-lists/{list_id}` | Returns a vocabulary list and its items. |
@@ -106,6 +110,10 @@ nothing else installed. (The frontend dev server runs separately; see
    OPENAI_PROVIDER_LABEL=groq
    OPENAI_MODEL=openai/gpt-oss-120b
    OPENAI_BASE_URL=https://api.groq.com/openai/v1/chat/completions
+
+   # Required: clients must send this as the X-API-Key header; the API
+   # refuses to start without it.
+   API_ACCESS_KEY=choose-a-random-key
    ```
 
    The password is embedded in database URLs, so use only letters and digits
@@ -168,6 +176,7 @@ OPENAI_API_KEY=your-provider-key
 OPENAI_PROVIDER_LABEL=groq
 OPENAI_MODEL=openai/gpt-oss-120b
 OPENAI_BASE_URL=https://api.groq.com/openai/v1/chat/completions
+API_ACCESS_KEY=choose-a-random-key
 ```
 
 Use the `postgresql+psycopg://` scheme (plain `postgresql://` selects a
@@ -180,7 +189,8 @@ the importer. `SKRITTER_ACCESS_TOKEN` is required only for a Skritter import.
 `TEST_DATABASE_URL` must refer to a separate database whose name includes
 `test`; the test suite refuses to use the development database.
 `OPENAI_API_KEY` and the three `OPENAI_*` provider settings are required only
-by the generation worker and live-provider smoke test.
+by the generation worker and live-provider smoke test. `API_ACCESS_KEY` is
+required by the API itself — it refuses to start without it.
 
 ## Run the API
 
@@ -218,6 +228,7 @@ generation request ID.
 ```bash
 curl -X POST http://127.0.0.1:8000/story-generations \
   -H 'content-type: application/json' \
+  -H "X-API-Key: $API_ACCESS_KEY" \
   -d '{
     "vocabulary_list_id": 1,
     "target_hsk_level": 2,
@@ -226,7 +237,7 @@ curl -X POST http://127.0.0.1:8000/story-generations \
     "topic": "a trip to the market"
   }'
 
-curl http://127.0.0.1:8000/story-generations/1
+curl http://127.0.0.1:8000/story-generations/1 -H "X-API-Key: $API_ACCESS_KEY"
 ```
 
 On success, the status response includes `story_id`; retrieve the completed
@@ -234,7 +245,7 @@ story at `GET /stories/{story_id}`. A failed request may be requeued while it
 has fewer than three attempts:
 
 ```bash
-curl -X POST http://127.0.0.1:8000/story-generations/1/retry
+curl -X POST http://127.0.0.1:8000/story-generations/1/retry -H "X-API-Key: $API_ACCESS_KEY"
 ```
 
 ### Configure a generation provider
