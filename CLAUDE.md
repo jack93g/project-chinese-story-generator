@@ -95,8 +95,9 @@ router (story_generator/api/routers/*) → service → repository → SQLAlchemy
   Never touches HTTP or writes SQL directly.
 - **Repository**: the only layer that speaks SQL/ORM. No business rules.
 
-`docs/process.md` traces a full request end-to-end through these layers and
-is the reference for how a new endpoint should be structured.
+[docs/architecture.md](docs/architecture.md) traces a full request
+end-to-end through these layers and is the reference for how a new endpoint
+should be structured.
 
 **Modules** (`story_generator/`):
 
