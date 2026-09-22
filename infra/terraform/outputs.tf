@@ -5,5 +5,9 @@ output "droplet_ipv4" {
 
 output "api_url" {
   description = "Live API URL"
-  value       = "https://${cloudflare_dns_record.api.name}"
+  # Built from the input variables rather than cloudflare_dns_record.api.name:
+  # that attribute is provider-computed, and in practice already returns the
+  # full FQDN even though "name" is configured as just the subdomain (a
+  # v5-provider quirk we don't want this output silently depending on).
+  value = "https://${var.api_subdomain}.${var.domain}"
 }

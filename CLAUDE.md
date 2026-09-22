@@ -62,9 +62,11 @@ Environment (`.env` in repo root, never commit it): `DATABASE_URL`,
 `TEST_DATABASE_URL` (must contain `test` and differ from `DATABASE_URL` — the
 test suite refuses to run otherwise), `SKRITTER_ACCESS_TOKEN`, `OPENAI_API_KEY`,
 `OPENAI_PROVIDER_LABEL`, `OPENAI_MODEL`, `OPENAI_BASE_URL`, `API_ACCESS_KEY` (required: the API won't start without it;
-clients send it as an `X-API-Key` header; only `GET /health` is open), plus
-`POSTGRES_USER`, `POSTGRES_PASSWORD`, `POSTGRES_DB` (used by Compose to
-create the database and build the containers' `DATABASE_URL`).
+clients send it as an `X-API-Key` header; only `GET /health` is open),
+`CORS_ALLOWED_ORIGINS` (comma-separated browser origins; defaults to the
+local Next.js dev server), plus `POSTGRES_USER`, `POSTGRES_PASSWORD`,
+`POSTGRES_DB` (used by Compose to create the database and build the
+containers' `DATABASE_URL`).
 
 - Database URLs must use the `postgresql+psycopg://` scheme (psycopg 3 is the
   only declared driver; plain `postgresql://` selects psycopg2, which isn't

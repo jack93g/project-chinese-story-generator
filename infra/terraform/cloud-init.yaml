@@ -45,6 +45,10 @@ runcmd:
   - usermod -aG docker deploy
   - sshd -t && systemctl reload ssh
 
+# cloud-init runs user_data once per instance ID, not on every boot, so this
+# only fires on first boot (to pick up the kernel/package updates above) -
+# an ordinary `reboot` afterward doesn't change the instance ID and won't
+# re-trigger it.
 power_state:
   mode: reboot
   message: "Rebooting after first-boot provisioning"
