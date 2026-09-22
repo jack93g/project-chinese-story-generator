@@ -37,8 +37,14 @@ runcmd:
   - curl -fsSL https://download.docker.com/linux/ubuntu/gpg -o /etc/apt/keyrings/docker.asc
   - chmod a+r /etc/apt/keyrings/docker.asc
   - apt-get update
-  - apt-get upgrade -y
-  - apt-get install -y docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
+  # DEBIAN_FRONTEND=noninteractive plus the two dpkg options below make
+  # "keep the currently-installed config file" automatic for any package
+  # with a locally-modified conffile - the same choice made by hand for
+  # sshd_config in step 1 - since there's no terminal here to answer that
+  # prompt; without this, upgrade/install can hang forever waiting for
+  # input that will never come, and provisioning silently stalls.
+  - DEBIAN_FRONTEND=noninteractive apt-get -y -o Dpkg::Options::="--force-confdef" -o Dpkg::Options::="--force-confold" upgrade
+  - DEBIAN_FRONTEND=noninteractive apt-get -y -o Dpkg::Options::="--force-confdef" -o Dpkg::Options::="--force-confold" install docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
   # docker group is created by the docker-ce package above, so this has to
   # run now, not in the users: block above. Doing it there fails useradd
   # outright, since the docker group doesn't exist yet at that point.

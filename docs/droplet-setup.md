@@ -96,9 +96,10 @@ Terraform (below) should define all three inbound rules explicitly.
 ## Infrastructure as code (Terraform)
 
 `infra/terraform/` (Droplet, firewall, SSH key, DNS record) reproduces this
-setup from code, provider auth (`DIGITALOCEAN_TOKEN`, `CLOUDFLARE_API_TOKEN`)
-and the admin public key (`TF_VAR_admin_ssh_public_key`) supplied only as
-shell env vars, never committed. First-boot provisioning (`deploy` user,
+setup from code, provider auth (`DIGITALOCEAN_TOKEN`, `CLOUDFLARE_API_TOKEN`),
+the admin public key (`TF_VAR_admin_ssh_public_key`) and the Cloudflare zone
+ID (`TF_VAR_cloudflare_zone_id`, from the domain's Overview page) supplied
+only as shell env vars, never committed. First-boot provisioning (`deploy` user,
 Docker, SSH hardening) is replayed by `cloud-init.yaml`, passed as the
 Droplet's `user_data`.
 

@@ -32,6 +32,11 @@ variable "api_subdomain" {
   description = "Subdomain the API is served on, e.g. \"api\" for api.<domain>"
   type        = string
   default     = "api"
+
+  validation {
+    condition     = length(trimspace(var.api_subdomain)) > 0
+    error_message = "api_subdomain must not be empty (api_url would become \"https://.<domain>\")."
+  }
 }
 
 variable "admin_ssh_public_key" {
