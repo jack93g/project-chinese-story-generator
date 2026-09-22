@@ -1,9 +1,13 @@
 #cloud-config
 # Replays the manual setup from docs/droplet-setup.md (session 2026-09-20/21)
 # so a Terraform-created Droplet reaches the same state as the hand-built one.
-
-package_update: true
-package_upgrade: true
+#
+# No top-level package_update/package_upgrade here on purpose: those trigger
+# an apt-get update during cloud-init's early config stage, which runs after
+# write_files has already created docker.sources (below) but before runcmd
+# has fetched the signing key that file points at, so that update would hit
+# the Docker repo with no key yet. The update/upgrade instead happens
+# explicitly in runcmd, after the key exists.
 
 users:
   - name: deploy
@@ -33,6 +37,7 @@ runcmd:
   - curl -fsSL https://download.docker.com/linux/ubuntu/gpg -o /etc/apt/keyrings/docker.asc
   - chmod a+r /etc/apt/keyrings/docker.asc
   - apt-get update
+  - apt-get upgrade -y
   - apt-get install -y docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
   # docker group is created by the docker-ce package above, so this has to
   # run now, not in the users: block above. Doing it there fails useradd
