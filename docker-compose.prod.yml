@@ -7,7 +7,9 @@
 #
 # The migrate/api/worker image comes from GHCR, tagged by git SHA, so a deploy
 # and a rollback are the same operation with a different tag. IMAGE_TAG is
-# required: there is deliberately no `latest`.
+# required: there is deliberately no `latest`. The repository path here must
+# match the one deploy-backend.yml pushes to (ghcr.io/<owner>/<repo>); update
+# both if the repo is ever renamed or transferred.
 x-app-image: &app-image
   image: ghcr.io/jack93g/project-chinese-story-generator:${IMAGE_TAG:?IMAGE_TAG must be set to a git SHA}
   build: !reset null

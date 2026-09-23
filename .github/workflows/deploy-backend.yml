@@ -32,7 +32,7 @@ jobs:
   build:
     name: Build and push image
     # A rollback redeploys an existing image, so there is nothing to build.
-    if: ${{ inputs.sha == '' }}
+    if: ${{ github.event_name != 'workflow_dispatch' || inputs.sha == '' }}
     runs-on: ubuntu-latest
     timeout-minutes: 20
 

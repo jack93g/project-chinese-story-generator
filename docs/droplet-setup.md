@@ -198,15 +198,25 @@ variable so CI can't be steered to an impostor host.
    - secret `DEPLOY_SSH_KEY` = contents of `~/.ssh/story_ci_deploy` (private)
    - variable `DROPLET_HOST` = the Droplet's IP or `api.huaben.app`
    - variable `DROPLET_HOST_KEY` = the output of
-     `ssh-keyscan -t ed25519 <host>` (one `host ssh-ed25519 AAAA...` line;
-     compare its fingerprint against the one your first SSH login showed)
+     `ssh-keyscan -t ed25519 <host>`, run with **exactly the same host string**
+     as `DROPLET_HOST` (a `known_hosts` line is keyed by host, so an IP in one
+     and the domain in the other fails every deploy under strict host-key
+     checking). Compare its fingerprint against the one your first SSH login
+     showed.
 4. **GHCR visibility**: after the first push, GitHub -> your profile ->
    Packages -> the image -> Package settings -> change visibility to public
    (the image holds only code, no secrets), so `docker compose pull` on the
    Droplet needs no registry credential.
 
 Nothing else is needed on the Droplet: the script fetches and checks out each
-SHA itself. Because `docker-compose.prod.yml` requires `IMAGE_TAG`, compose
+SHA itself, over HTTPS with no credential (the repo is public; if it ever goes
+private, the Droplet needs a read-only deploy key or token).
+
+The installed `~deploy/deploy.sh` is a hand-made copy, so it does not update
+itself: after changing `scripts/droplet-deploy.sh`, copy it over again (and
+compare with `diff`) before relying on the change. Only `api` and `worker` are
+recreated by a deploy; changes to `db` or `caddy` (including the Caddyfile)
+are applied by hand with `docker compose ... up -d caddy`. Because `docker-compose.prod.yml` requires `IMAGE_TAG`, compose
 commands you run by hand there need it too; the checked-out commit is the
 deployed one, so `export IMAGE_TAG=$(git rev-parse HEAD)` first.
 

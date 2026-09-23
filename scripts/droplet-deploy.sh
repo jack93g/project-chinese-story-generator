@@ -39,8 +39,10 @@ echo "==> running migrations"
 "${compose[@]}" run --rm migrate
 
 # Recreate both the API and the worker, never just one, on the new image.
+# Named explicitly so db and caddy are left alone: changes to them (e.g. the
+# Caddyfile) are deliberate manual steps, not something a code deploy bounces.
 echo "==> restarting api and worker"
-"${compose[@]}" up -d --remove-orphans
+"${compose[@]}" up -d --remove-orphans api worker
 
 echo "==> waiting for /health"
 for _ in $(seq 1 30); do
