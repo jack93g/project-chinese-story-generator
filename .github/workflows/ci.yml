@@ -52,7 +52,11 @@ jobs:
           POSTGRES_USER: ci
           POSTGRES_PASSWORD: ci
           POSTGRES_DB: ci
-        run: docker compose -f docker-compose.yml -f docker-compose.prod.yml config --quiet
+        run: |
+          # The base file's env_file needs a .env to exist; an empty one is
+          # enough to render (gitignored, exists only on this runner).
+          touch .env
+          docker compose -f docker-compose.yml -f docker-compose.prod.yml config --quiet
 
   python-db:
     name: Python DB tests
