@@ -176,6 +176,13 @@ unintended.
 -> paste an older full SHA into `sha`. The build is skipped (the image is
 already in GHCR) and the script redeploys that tag. Migrations are not
 reversed; they stay additive so an older image works against a newer schema.
+A red deploy run does **not** mean the previous release is still live: the
+script has already replaced the api and worker containers by the time the
+health checks run. On failure it prints the previous SHA; redeploy that via
+the workflow's `sha` input. The script also refuses any SHA that is not on
+`origin/main`. It relies on Docker Compose 2.24+ (for `!reset` in the prod
+override), which the Droplet's Docker apt repo provides.
+
 The earliest SHA you can roll back to is the commit that first ran this
 workflow: only SHAs built by it have an image in GHCR, and older commits' compose
 files have no `image:`/`IMAGE_TAG` support at all.

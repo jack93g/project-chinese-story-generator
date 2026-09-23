@@ -27,7 +27,14 @@ export IMAGE_TAG="$sha"
 compose=(docker compose -f docker-compose.yml -f docker-compose.prod.yml)
 
 echo "==> checking out $sha (compose files and Caddyfile must match the image)"
+previous="$(git rev-parse HEAD)"
 git fetch --quiet origin
+# Only ever deploy what has been merged to main: a rollback target must be
+# something main once contained, never a commit pushed from a side branch.
+if ! git merge-base --is-ancestor "$sha" origin/main; then
+  echo "refusing: $sha is not on origin/main" >&2
+  exit 1
+fi
 git checkout --quiet --detach "$sha"
 
 echo "==> pulling images"
@@ -57,6 +64,7 @@ for _ in $(seq 1 30); do
       exit 0
     fi
     echo "worker is not running after deploying $sha" >&2
+    echo "previous release was $previous (redeploy it via the workflow's sha input)" >&2
     "${compose[@]}" logs --tail=40 worker >&2
     exit 1
   fi
@@ -64,5 +72,6 @@ for _ in $(seq 1 30); do
 done
 
 echo "health check failed after deploying $sha" >&2
+echo "previous release was $previous (redeploy it via the workflow's sha input)" >&2
 "${compose[@]}" logs --tail=40 api worker >&2
 exit 1
