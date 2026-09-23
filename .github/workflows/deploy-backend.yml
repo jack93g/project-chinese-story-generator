@@ -103,9 +103,9 @@ jobs:
           DEPLOY_SSH_KEY: ${{ secrets.DEPLOY_SSH_KEY }}
           DROPLET_HOST_KEY: ${{ vars.DROPLET_HOST_KEY }}
         run: |
+          umask 077
           install -m 700 -d ~/.ssh
           printf '%s\n' "$DEPLOY_SSH_KEY" > ~/.ssh/deploy_key
-          chmod 600 ~/.ssh/deploy_key
           # The Droplet's host key is pinned, so a deploy can never be sent
           # to (or leak the key to) an impostor host.
           printf '%s\n' "$DROPLET_HOST_KEY" > ~/.ssh/known_hosts
@@ -121,4 +121,6 @@ jobs:
           ssh -i ~/.ssh/deploy_key \
             -o IdentitiesOnly=yes \
             -o StrictHostKeyChecking=yes \
+            -o BatchMode=yes \
+            -o ConnectTimeout=15 \
             "deploy@${DROPLET_HOST}" "$SHA"

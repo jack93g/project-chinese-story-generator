@@ -38,7 +38,13 @@ fi
 git checkout --quiet --detach "$sha"
 
 echo "==> pulling images"
-"${compose[@]}" pull --quiet migrate api worker
+# If the image can't be pulled (e.g. a rollback SHA that was never built), put
+# the checkout back so ~/app still matches what is actually running.
+if ! "${compose[@]}" pull --quiet migrate api worker; then
+  git checkout --quiet --detach "$previous"
+  echo "pull failed for $sha; checkout restored to $previous" >&2
+  exit 1
+fi
 
 # Migrate first, while the old API/worker keep serving: new code never starts
 # against an old schema, and additive migrations keep the old code working.
