@@ -49,8 +49,16 @@ for _ in $(seq 1 30); do
   if "${compose[@]}" exec -T api python -c \
     "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health', timeout=3)" \
     >/dev/null 2>&1; then
-    echo "==> deployed $sha"
-    exit 0
+    # The API answering says nothing about the worker, which has no port to
+    # probe: after a short settle, make sure it is running and not restarting.
+    sleep 5
+    if "${compose[@]}" ps --status running --services | grep -qx worker; then
+      echo "==> deployed $sha"
+      exit 0
+    fi
+    echo "worker is not running after deploying $sha" >&2
+    "${compose[@]}" logs --tail=40 worker >&2
+    exit 1
   fi
   sleep 2
 done

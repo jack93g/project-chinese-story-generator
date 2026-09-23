@@ -176,6 +176,9 @@ unintended.
 -> paste an older full SHA into `sha`. The build is skipped (the image is
 already in GHCR) and the script redeploys that tag. Migrations are not
 reversed; they stay additive so an older image works against a newer schema.
+The earliest SHA you can roll back to is the commit that first ran this
+workflow: only SHAs built by it have an image in GHCR, and older commits' compose
+files have no `image:`/`IMAGE_TAG` support at all.
 
 **What CI can do if its key leaks.** The CI key is a dedicated, passphrase-less
 key whose `authorized_keys` line forces the deploy script, so it cannot open a
