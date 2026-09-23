@@ -155,6 +155,81 @@ and `curl http://169.254.169.254/metadata/v1/user-data` (from inside the
 Droplet) shows the exact raw script DigitalOcean received, for comparing
 against what's on disk.
 
+## Deploy pipeline
+
+`.github/workflows/deploy-backend.yml` runs on every push to `main`: it builds
+the image, pushes it to `ghcr.io/jack93g/project-chinese-story-generator`
+tagged with the full git SHA (never `latest`), then SSHes to the Droplet to
+deploy that SHA. The Droplet never builds images. All actions are pinned to
+commit SHAs.
+
+On the Droplet, `scripts/droplet-deploy.sh` (installed by hand as
+`~deploy/deploy.sh`, outside the repo checkout so a deploy can't rewrite the
+script that runs it) does, in order: check out the SHA (so the compose files
+and Caddyfile match the image), `pull`, run migrations while the old
+containers still serve, `up -d` for **both** `api` and `worker`, then wait for
+`/health`. `docker-compose.prod.yml` reads the tag from `IMAGE_TAG`, which has
+no default: a missing tag fails loudly rather than deploying something
+unintended.
+
+**Rollback** is the same pipeline: Actions -> "Deploy backend" -> Run workflow
+-> paste an older full SHA into `sha`. The build is skipped (the image is
+already in GHCR) and the script redeploys that tag. Migrations are not
+reversed; they stay additive so an older image works against a newer schema.
+A red deploy run does **not** mean the previous release is still live: the
+script has already replaced the api and worker containers by the time the
+health checks run. On failure it prints the previous SHA; redeploy that via
+the workflow's `sha` input. The script also refuses any SHA that is not on
+`origin/main`. It relies on Docker Compose 2.24+ (for `!reset` in the prod
+override), which the Droplet's Docker apt repo provides.
+
+The earliest SHA you can roll back to is the commit that first ran this
+workflow: only SHAs built by it have an image in GHCR, and older commits' compose
+files have no `image:`/`IMAGE_TAG` support at all.
+
+**What CI can do if its key leaks.** The CI key is a dedicated, passphrase-less
+key whose `authorized_keys` line forces the deploy script, so it cannot open a
+shell or run anything else; the script accepts only a 40-character SHA. That is
+tighter than the `deploy` user's own access (which is root-equivalent through
+the `docker` group). The key lives only in the `production` GitHub Environment,
+restricted to `main`; the Droplet's host key is pinned in an Environment
+variable so CI can't be steered to an impostor host.
+
+### One-time setup (by hand)
+
+1. **CI key**, on your laptop (no passphrase, CI can't type one):
+   `ssh-keygen -t ed25519 -f ~/.ssh/story_ci_deploy -N "" -C ci-deploy`
+2. **Droplet**: copy `scripts/droplet-deploy.sh` to `~deploy/deploy.sh`
+   (`chmod 755`), then append this one line to `~deploy/.ssh/authorized_keys`,
+   with the contents of `story_ci_deploy.pub` in place of `AAAA...`:
+   `command="/home/deploy/deploy.sh",restrict ssh-ed25519 AAAA... ci-deploy`
+3. **GitHub** -> Settings -> Environments -> New environment `production`;
+   under "Deployment branches" choose "Selected branches" -> `main`. Add:
+   - secret `DEPLOY_SSH_KEY` = contents of `~/.ssh/story_ci_deploy` (private)
+   - variable `DROPLET_HOST` = the Droplet's IP or `api.huaben.app`
+   - variable `DROPLET_HOST_KEY` = the output of
+     `ssh-keyscan -t ed25519 <host>`, run with **exactly the same host string**
+     as `DROPLET_HOST` (a `known_hosts` line is keyed by host, so an IP in one
+     and the domain in the other fails every deploy under strict host-key
+     checking). Compare its fingerprint against the one your first SSH login
+     showed.
+4. **GHCR visibility**: after the first push, GitHub -> your profile ->
+   Packages -> the image -> Package settings -> change visibility to public
+   (the image holds only code, no secrets), so `docker compose pull` on the
+   Droplet needs no registry credential.
+
+Nothing else is needed on the Droplet: the script fetches and checks out each
+SHA itself, over HTTPS with no credential (the repo is public; if it ever goes
+private, the Droplet needs a read-only deploy key or token).
+
+The installed `~deploy/deploy.sh` is a hand-made copy, so it does not update
+itself: after changing `scripts/droplet-deploy.sh`, copy it over again (and
+compare with `diff`) before relying on the change. Only `api` and `worker` are
+recreated by a deploy; changes to `db` or `caddy` (including the Caddyfile)
+are applied by hand with `docker compose ... up -d caddy`. Because `docker-compose.prod.yml` requires `IMAGE_TAG`, compose
+commands you run by hand there need it too; the checked-out commit is the
+deployed one, so `export IMAGE_TAG=$(git rev-parse HEAD)` first.
+
 ## Known trade-offs
 
 - Membership of the `docker` group is effectively root-equivalent (a user
@@ -168,6 +243,5 @@ against what's on disk.
 
 ## Still to do
 
-- Deploy pipeline (GHCR image tagged by git SHA, restart API and worker).
-- Deploy hardening: dedicated deploy key in a GitHub Environment restricted
-  to `main`.
+- First real run of the deploy pipeline after the one-time setup above, and
+  a rehearsed rollback (M5-5).

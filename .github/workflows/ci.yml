@@ -43,6 +43,21 @@ jobs:
       - name: Run unit tests
         run: pytest -m "not db" -ra
 
+      # The prod override (GHCR image by IMAGE_TAG, build removed) is only
+      # otherwise exercised mid-deploy on the Droplet; render it here so a
+      # mistake fails in CI. Dummy values: nothing is started.
+      - name: Validate prod compose
+        env:
+          IMAGE_TAG: ci
+          POSTGRES_USER: ci
+          POSTGRES_PASSWORD: ci
+          POSTGRES_DB: ci
+        run: |
+          # The base file's env_file needs a .env to exist; an empty one is
+          # enough to render (gitignored, exists only on this runner).
+          touch .env
+          docker compose -f docker-compose.yml -f docker-compose.prod.yml config --quiet
+
   python-db:
     name: Python DB tests
     runs-on: ubuntu-latest
