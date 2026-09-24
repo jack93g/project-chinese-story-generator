@@ -12,7 +12,7 @@ durable background workflow.
   vocabulary or list memberships.
 - Serve a FastAPI for vocabulary, vocabulary lists, saved stories, sync
   status, and asynchronous story-generation requests.
-- Queue generation requests, select a deterministic vocabulary sample,
+- Queue generation requests, select a random vocabulary sample,
   generate a structured story through an OpenAI-compatible provider, validate
   vocabulary coverage, and persist the completed story and its vocabulary
   usage.

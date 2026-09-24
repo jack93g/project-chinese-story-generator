@@ -1,10 +1,13 @@
 """
-Deterministic vocabulary selection for a story-generation request.
+Vocabulary selection for a story-generation request.
 
 Custom words (user-entered) always come first, in the order given. The
-list then fills the remaining slots up to target_vocabulary_count,
-ordered by VocabularyItem.id ascending and skipping words already
-chosen as custom — no randomness, fully reproducible:
+list then fills the remaining slots up to target_vocabulary_count with a
+random sample of its words, skipping words already chosen as custom.
+Random so that a large list (hundreds of words) is practised across
+stories, not just its first few words every time. The chosen words are
+frozen in the request's selected_vocabulary_snapshot, so a retry reuses
+them:
 
 - Neither custom words nor list items   -> EmptyVocabularyListError.
 - Fewer items than target_vocabulary_count -> silently capped to
@@ -13,7 +16,7 @@ chosen as custom — no randomness, fully reproducible:
   target_vocabulary_count ("oversized list").
 """
 
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from story_generator.vocabulary.persistence.models import (
@@ -60,7 +63,7 @@ def select_vocabulary(
             .join(list_vocabulary, list_vocabulary.c.vocabulary_id == VocabularyItem.id)
             .where(list_vocabulary.c.list_id == vocabulary_list.id)
             .where(VocabularyItem.writing.not_in([e["writing"] for e in selected]))
-            .order_by(VocabularyItem.id.asc())
+            .order_by(func.random())
             .limit(remaining)
         )
         selected.extend(

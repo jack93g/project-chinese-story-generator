@@ -184,9 +184,14 @@ def test_select_puts_custom_first_and_fills_from_list_without_duplicates(db_sess
     )
     custom = VocabularyRepository(db_session).get_or_create_custom_items(["丙", "新词"])
 
-    result = select_vocabulary(db_session, vocab_list, 4, custom)
+    result = [
+        e["writing"] for e in select_vocabulary(db_session, vocab_list, 4, custom)
+    ]
 
-    assert [e["writing"] for e in result] == ["丙", "新词", "甲", "乙"]
+    assert result[:2] == ["丙", "新词"]
+    # two of the list's other words, in random order; 丙 isn't repeated
+    assert len(set(result[2:])) == 2
+    assert set(result[2:]) <= {"甲", "乙", "丁"}
 
 
 @pytest.mark.db
@@ -257,11 +262,10 @@ def test_post_list_plus_custom_words(client, db_session):
 
     assert response.status_code == 202
     request = db_session.get(StoryGenerationRequest, response.json()["id"])
-    assert [e["writing"] for e in request.selected_vocabulary_snapshot] == [
-        "新词",
-        "甲",
-        "乙",
-    ]
+    writings = [e["writing"] for e in request.selected_vocabulary_snapshot]
+    assert writings[0] == "新词"
+    assert len(set(writings[1:])) == 2
+    assert set(writings[1:]) <= {"甲", "乙", "丙"}
 
 
 @pytest.mark.db

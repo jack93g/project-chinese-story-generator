@@ -130,8 +130,8 @@ should be structured.
     unreviewed combination, including the code-level OpenAI default. New
     providers/models must be evaluated with
     `story_generator.cli.provider_comparison` and added here deliberately.
-  - `vocabulary_selection.py` — deterministic sampling of known vocabulary
-    for a request.
+  - `vocabulary_selection.py` — random sampling of known vocabulary for a
+    request (custom words first); frozen in the request's snapshot.
   - `worker.py` / `cli/generation_worker.py` — durable worker loop. Multiple
     workers can run safely: claiming a queued request is done at the database
     level so two workers never process the same one, and stale `running`
