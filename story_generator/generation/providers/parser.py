@@ -53,7 +53,39 @@ def parse_structured_result(raw_text: str, usage: UsageMetadata) -> GenerationRe
     title = _require_chinese_text(data["title"], field_name="title")
     body = _require_chinese_text(data["body"], field_name="body")
 
-    return GenerationResult(title=title, body=body, usage=usage)
+    return GenerationResult(
+        title=title,
+        body=body,
+        usage=usage,
+        glossary=_parse_glossary(data.get("glossary")),
+    )
+
+
+def _parse_glossary(value) -> list[dict]:
+    """Best-effort: malformed glossary data is dropped, never an error."""
+    if not isinstance(value, list):
+        return []
+    entries = []
+    for entry in value:
+        if not isinstance(entry, dict):
+            continue
+        writing = entry.get("writing")
+        if not isinstance(writing, str) or not writing.strip():
+            continue
+        reading = entry.get("reading")
+        definition = entry.get("definition_en")
+        entries.append(
+            {
+                "writing": writing.strip(),
+                "reading": reading.strip()[:100]
+                if isinstance(reading, str) and reading.strip()
+                else None,
+                "definition_en": definition.strip()[:300]
+                if isinstance(definition, str) and definition.strip()
+                else None,
+            }
+        )
+    return entries
 
 
 def _parse_json(raw_text: str):

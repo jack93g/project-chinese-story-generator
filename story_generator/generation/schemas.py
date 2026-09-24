@@ -1,4 +1,6 @@
-from pydantic import BaseModel, Field, field_validator
+import re
+
+from pydantic import BaseModel, Field, field_validator, model_validator
 
 # TODO: placeholder cap until product specifies the real maximum story
 # length. Mirror any change here in the story_generation_requests
@@ -6,6 +8,10 @@ from pydantic import BaseModel, Field, field_validator
 # layers deliberately; see StoryGenerationRequest docstring.
 MAX_TARGET_WORD_COUNT = 1000
 MAX_TOPIC_LENGTH = 200
+MAX_CUSTOM_WORD_LENGTH = 20
+# CJK-only: custom words are interpolated into the LLM prompt, so anything
+# else (latin text, punctuation) is rejected rather than sanitised.
+_CUSTOM_WORD_PATTERN = re.compile(r"^[\u3400-\u4dbf\u4e00-\u9fff]+$")
 
 # Error codes we generate ourselves — their error_message is written
 # by us and safe to expose verbatim via the API. Anything else (e.g.
@@ -42,11 +48,43 @@ class CreateGenerationRequestSchema(BaseModel):
     GenerationRequestService.create(), not chosen by the caller.
     """
 
-    vocabulary_list_id: int
+    vocabulary_list_id: int | None = None
     target_hsk_level: int = Field(ge=1, le=6)
     target_word_count: int = Field(gt=0, le=MAX_TARGET_WORD_COUNT)
     target_vocabulary_count: int = Field(ge=1, le=15)
     topic: str | None = Field(default=None, max_length=MAX_TOPIC_LENGTH)
+    # Raw cap only bounds work; the real limit is checked after dedupe (via
+    # target_vocabulary_count, which is itself at most 15).
+    custom_words: list[str] = Field(default_factory=list, max_length=100)
+
+    @field_validator("custom_words")
+    @classmethod
+    def normalize_custom_words(cls, words: list[str]) -> list[str]:
+        cleaned: list[str] = []
+        for word in words:
+            word = word.strip()
+            if not word or word in cleaned:
+                continue
+            if len(word) > MAX_CUSTOM_WORD_LENGTH or not _CUSTOM_WORD_PATTERN.match(
+                word
+            ):
+                raise ValueError(
+                    f"Custom words must be Chinese characters only, at most "
+                    f"{MAX_CUSTOM_WORD_LENGTH} long: {word[:30]!r}"
+                )
+            cleaned.append(word)
+        return cleaned
+
+    @model_validator(mode="after")
+    def require_a_vocabulary_source(self) -> "CreateGenerationRequestSchema":
+        if self.vocabulary_list_id is None and not self.custom_words:
+            raise ValueError("Provide a vocabulary list, custom words, or both")
+        if len(self.custom_words) > self.target_vocabulary_count:
+            raise ValueError(
+                f"{len(self.custom_words)} custom words exceed "
+                f"target_vocabulary_count ({self.target_vocabulary_count})"
+            )
+        return self
 
     @field_validator("topic")
     @classmethod

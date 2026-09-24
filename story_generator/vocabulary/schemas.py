@@ -5,7 +5,7 @@ from pydantic import BaseModel
 
 class VocabularyResponse(BaseModel):
     id: int
-    skritter_vocab_id: str
+    skritter_vocab_id: str | None
     language: str
     writing: str
     reading: str | None

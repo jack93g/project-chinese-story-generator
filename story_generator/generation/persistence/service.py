@@ -14,6 +14,7 @@ from story_generator.generation.vocabulary_selection import (
     select_vocabulary,
 )
 from story_generator.vocabulary.persistence.models import VocabularyList
+from story_generator.vocabulary.persistence.repository import VocabularyRepository
 
 MAX_ATTEMPTS = 3
 # Cap on queued + running requests, to bound paid LLM work.
@@ -74,19 +75,24 @@ class GenerationRequestService:
     def create(
         self, db: Session, payload: CreateGenerationRequestSchema
     ) -> StoryGenerationRequest:
-        vocabulary_list = db.get(VocabularyList, payload.vocabulary_list_id)
-        if vocabulary_list is None:
-            raise VocabularyListNotFoundError(payload.vocabulary_list_id)
+        vocabulary_list = None
+        if payload.vocabulary_list_id is not None:
+            vocabulary_list = db.get(VocabularyList, payload.vocabulary_list_id)
+            if vocabulary_list is None:
+                raise VocabularyListNotFoundError(payload.vocabulary_list_id)
 
+        custom_items = VocabularyRepository(db).get_or_create_custom_items(
+            payload.custom_words
+        )
         snapshot = select_vocabulary(
-            db, vocabulary_list, payload.target_vocabulary_count
+            db, vocabulary_list, payload.target_vocabulary_count, custom_items
         )
         # After input validation, so a bad list id still gets 404/422 rather
         # than 429 when the queue happens to be full.
         self._ensure_capacity()
 
         request = StoryGenerationRequest(
-            vocabulary_list_id=vocabulary_list.id,
+            vocabulary_list_id=vocabulary_list.id if vocabulary_list else None,
             target_hsk_level=payload.target_hsk_level,
             topic=payload.topic,
             target_word_count=payload.target_word_count,

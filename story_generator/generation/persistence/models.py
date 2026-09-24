@@ -22,6 +22,8 @@ class StoryGenerationRequest(Base):
     """
     Durable job/audit record for one story-generation attempt lifecycle.
 
+    vocabulary_list_id is NULL when the request used custom words only.
+
     selected_vocabulary_snapshot is an immutable copy of the exact words,
     readings, and definitions selected at request time (e.g.
     [{"id": 10, "writing": "菜单", "reading": "càidān", "definition_en":
@@ -40,7 +42,7 @@ class StoryGenerationRequest(Base):
 
     id = Column(BigInteger, primary_key=True)
     vocabulary_list_id = Column(
-        BigInteger, ForeignKey("vocabulary_lists.id"), nullable=False
+        BigInteger, ForeignKey("vocabulary_lists.id"), nullable=True
     )
     target_hsk_level = Column(SmallInteger, nullable=False)
     topic = Column(Text, nullable=True)

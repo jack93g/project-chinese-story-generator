@@ -218,7 +218,8 @@ h2 {
 }
 
 .form-field select,
-.form-field input {
+.form-field input,
+.form-field textarea {
   padding: 0.55rem 0.7rem;
   border: 1px solid var(--border-strong);
   border-radius: var(--radius);
@@ -231,12 +232,14 @@ h2 {
 }
 
 .form-field select:hover,
-.form-field input:hover {
+.form-field input:hover,
+.form-field textarea:hover {
   border-color: var(--muted-foreground);
 }
 
 .form-field select:focus-visible,
-.form-field input:focus-visible {
+.form-field input:focus-visible,
+.form-field textarea:focus-visible {
   outline: none;
   border-color: var(--accent);
   box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 25%, transparent);
@@ -284,6 +287,11 @@ h2 {
 
 .field-error {
   color: var(--danger);
+  font-size: 0.9rem;
+}
+
+.field-hint {
+  color: var(--muted-foreground);
   font-size: 0.9rem;
 }
 
