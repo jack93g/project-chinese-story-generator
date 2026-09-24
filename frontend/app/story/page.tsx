@@ -4,6 +4,7 @@ import { Suspense, useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { annotateVocabulary } from "@/lib/annotate";
 import { ApiError, fetchStory, type StoryDetail } from "@/lib/api";
+import { describeModel } from "@/lib/model-label";
 import { toToneMarks } from "@/lib/pinyin";
 import { Seal } from "../components/seal";
 
@@ -152,6 +153,7 @@ function StoryReader({ story }: { story: StoryDetail }) {
   const [vertical, setVertical] = useState(() =>
     readPreference(VERTICAL_KEY, false),
   );
+  const writtenBy = describeModel(story.provider, story.model);
   const segments = useMemo(
     () => annotateVocabulary(story.content, story.selected_vocabulary),
     [story],
@@ -184,6 +186,7 @@ function StoryReader({ story }: { story: StoryDetail }) {
         <p className="story-meta">
           {story.target_hsk !== null && <>HSK {story.target_hsk} &middot; </>}
           {formatDate(story.created_at)}
+          {writtenBy && <> &middot; Written by {writtenBy}</>}
         </p>
         <div role="group" aria-label="Reading options" className="story-options">
           <button

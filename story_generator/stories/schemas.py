@@ -28,5 +28,15 @@ class PaginatedStoryResponse(BaseModel):
 
 
 class StoryDetail(StorySummary):
+    """
+    A saved story for reading.
+
+    provider and model name what wrote the story, so the reader can show
+    it; they are the only generation-request fields exposed, and are None
+    for a story with no linked request.
+    """
+
     content: str
     selected_vocabulary: list[VocabularyResponse]
+    provider: str | None
+    model: str | None

@@ -154,6 +154,32 @@ describe("StoryPage", () => {
     );
   });
 
+  it("credits the model that wrote the story", async () => {
+    useSearchParams.mockReturnValue(new URLSearchParams("id=5"));
+    fetchStory.mockResolvedValueOnce({
+      ...STORY,
+      provider: "groq",
+      model: "openai/gpt-oss-120b",
+    });
+    render(<StoryPage />);
+
+    await screen.findByRole("heading", { name: "天气小记" });
+
+    expect(
+      screen.getByText(/Written by gpt-oss-120b via Groq/),
+    ).toBeInTheDocument();
+  });
+
+  it("omits the model credit when the API doesn't say", async () => {
+    useSearchParams.mockReturnValue(new URLSearchParams("id=5"));
+    fetchStory.mockResolvedValueOnce(STORY);
+    render(<StoryPage />);
+
+    await screen.findByRole("heading", { name: "天气小记" });
+
+    expect(screen.queryByText(/Written by/)).not.toBeInTheDocument();
+  });
+
   it("omits the HSK badge when target_hsk is null but still shows the date", async () => {
     useSearchParams.mockReturnValue(new URLSearchParams("id=5"));
     fetchStory.mockResolvedValueOnce({ ...STORY, target_hsk: null });
