@@ -34,6 +34,14 @@ describe("annotateVocabulary", () => {
     ).toEqual([{ kind: "text", text: "从今天开始下雨" }]);
   });
 
+  it("matches a word Skritter stores with spaces between its parts", () => {
+    expect(
+      annotateVocabulary("口语能力", [
+        { writing: "口语 能力", reading: "kou3yu3 neng2li4" },
+      ]),
+    ).toEqual([{ kind: "word", text: "口语能力", reading: "kǒuyǔ nénglì" }]);
+  });
+
   it("keeps line breaks in the surrounding text", () => {
     expect(
       annotateVocabulary("第一行。\n天气", [

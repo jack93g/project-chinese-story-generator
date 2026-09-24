@@ -7,7 +7,9 @@ export type TextSegment =
 type Annotatable = { writing: string; reading: string | null };
 
 // Only plain runs of Chinese characters can be found verbatim in a story;
-// grammar patterns like "从...开始" or "先 ... 再..." are skipped.
+// grammar patterns like "从...开始" or "先 ... 再..." are skipped. Skritter
+// sometimes puts spaces between the parts of a word ("口语 能力"), which a
+// story won't, so spaces are removed before matching.
 const HAN_ONLY = /^\p{Script=Han}+$/u;
 
 /**
@@ -21,8 +23,9 @@ export function annotateVocabulary(
 ): TextSegment[] {
   const readings = new Map<string, string>();
   for (const item of vocabulary) {
-    if (item.reading && HAN_ONLY.test(item.writing) && !readings.has(item.writing)) {
-      readings.set(item.writing, toToneMarks(item.reading));
+    const writing = item.writing.replace(/\s+/g, "");
+    if (item.reading && HAN_ONLY.test(writing) && !readings.has(writing)) {
+      readings.set(writing, toToneMarks(item.reading));
     }
   }
   const words = [...readings.keys()].sort((a, b) => b.length - a.length);

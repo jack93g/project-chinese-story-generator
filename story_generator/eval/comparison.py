@@ -36,6 +36,7 @@ from story_generator.generation.validation import (
     MIN_LENGTH_RATIO,
     VOCABULARY_COVERAGE_THRESHOLD,
     length_ratio,
+    word_appears,
 )
 
 
@@ -86,17 +87,16 @@ class EvalOutcome:
 
 def compute_coverage(vocabulary_snapshot: list[dict], result: GenerationResult) -> dict:
     """
-    Deliberately duplicates the coverage math in
-    story_generator.generation.validation.validate_story(). That
-    function takes a StoryGenerationRequest ORM instance, which this
-    harness intentionally avoids depending on (no DB needed to run an
-    eval). If validate_story()'s algorithm changes, update this too —
-    worth extracting a shared pure function if the two drift further.
+    Mirrors the coverage math in
+    story_generator.generation.validation.validate_story(), sharing its
+    word_appears() matcher. validate_story() itself takes a
+    StoryGenerationRequest ORM instance, which this harness
+    intentionally avoids depending on (no DB needed to run an eval).
     """
-    combined_text = f"{result.title}{result.body}"
+    combined_text = f"{result.title}\n{result.body}"
     missing = []
     for item in vocabulary_snapshot:
-        if item["writing"] not in combined_text:
+        if not word_appears(item["writing"], combined_text):
             missing.append({"id": item["id"], "writing": item["writing"]})
 
     requested = len(vocabulary_snapshot)

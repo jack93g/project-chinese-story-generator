@@ -3,11 +3,20 @@ Post-generation validation: checks whether the generated story
 actually used the vocabulary it was asked to use, and records a
 summary for StoryGenerationRequest.validation_report.
 
-Deliberately simple — substring containment on the raw Chinese text,
-not real word-segmentation/tokenization. Good enough to flag gross
-mismatches (a requested word never appearing at all) and cheap to
-compute; swap in real segmentation later if false negatives (e.g.
-compound-word boundary issues) turn out to matter in practice.
+Deliberately simple — matching on the raw Chinese text, not real
+word-segmentation/tokenization. Good enough to flag gross mismatches (a
+requested word never appearing at all) and cheap to compute; swap in
+real segmentation later if false negatives (e.g. compound-word boundary
+issues) turn out to matter in practice.
+
+Skritter entries aren't always plain words. Some have spaces, either as
+word breaks ("口语 能力", written 口语能力 in a story) or as gaps ("一旦
+就", as in 一旦下雨就); some are grammar patterns ("虽然 ... 但是...");
+some end in punctuation ("你在吗？"). So word_appears() splits an entry
+on spaces and ellipses, drops trailing punctuation, and looks for the
+parts in order within one sentence. That can accept a stray match for
+a spaced entry, which is the cheaper mistake: a false miss can fail a
+good story on coverage.
 
 Coverage is NOT required to be 100% — models occasionally drop one
 requested word from an otherwise good story, and treating that as a
@@ -25,6 +34,8 @@ meets_length_threshold is there so shortfalls stay visible in
 validation_report and in the provider-comparison report.
 """
 
+import re
+
 from story_generator.generation.persistence.models import StoryGenerationRequest
 from story_generator.generation.providers.types import GenerationResult
 
@@ -36,6 +47,20 @@ VOCABULARY_COVERAGE_THRESHOLD = 0.8
 # Recorded, not enforced (see module docstring): a body shorter than this
 # fraction of target_word_count is flagged meets_length_threshold=False.
 MIN_LENGTH_RATIO = 0.8
+
+
+# Spaces and ellipses (..., …, 。。。) separate the parts of an entry.
+_PART_SEPARATOR = re.compile(r"\s+|\.{2,}|…+|。{2,}")
+_TRAILING_PUNCTUATION = "。！？!?，,"
+# Parts may be separated by anything short of the end of a sentence.
+_GAP = "[^。！？!?\n]*?"
+
+
+def word_appears(writing: str, text: str) -> bool:
+    """Whether a vocabulary entry appears in text (see module docstring)."""
+    parts = _PART_SEPARATOR.split(writing.strip().rstrip(_TRAILING_PUNCTUATION))
+    pattern = _GAP.join(re.escape(part) for part in parts if part)
+    return re.search(pattern, text) is not None
 
 
 def length_ratio(body: str, target_word_count: int) -> float:
@@ -55,12 +80,13 @@ def validate_story(
     whether this result is acceptable to persist as a successful
     story, or should be treated as a failed generation instead.
     """
-    combined_text = f"{result.title}{result.body}"
+    # Newline-separated so a pattern can't match across title and body.
+    combined_text = f"{result.title}\n{result.body}"
 
     used_map: dict[int, bool] = {}
     missing_vocabulary = []
     for item in request.selected_vocabulary_snapshot:
-        is_used = item["writing"] in combined_text
+        is_used = word_appears(item["writing"], combined_text)
         used_map[item["id"]] = is_used
         if not is_used:
             missing_vocabulary.append({"id": item["id"], "writing": item["writing"]})
