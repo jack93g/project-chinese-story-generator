@@ -574,12 +574,17 @@ always full.
    BEGIN;
    UPDATE story_generation_requests
    SET status = 'failed', started_at = now(), completed_at = now(),
+       -- Retry only accepts attempt_count < 3, so this makes the
+       -- cancellation final rather than one click from being requeued.
+       attempt_count = 3,
        error_code = 'OperatorCancelled',
        error_message = 'Cancelled by operator during abuse response'
    WHERE status = 'queued'
    RETURNING id, topic, created_at;
    COMMIT;   -- or ROLLBACK if the list looks wrong
    ```
+   These rows then show as failed with no attempts actually made; the
+   `OperatorCancelled` error code is what tells them apart.
    To remove the rows entirely instead, use `DELETE FROM
    story_generation_requests WHERE status = 'queued' RETURNING id;` in the
    same `BEGIN`/`COMMIT` wrapper. Queued rows have no stories or payloads
