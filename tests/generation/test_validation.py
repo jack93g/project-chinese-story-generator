@@ -94,3 +94,30 @@ def test_validate_story_fails_threshold_when_too_many_words_missing():
 
     assert report["coverage"] == 0.6
     assert report["meets_coverage_threshold"] is False
+
+
+def test_validate_story_records_length_against_target():
+    request = _make_request(
+        [{"id": 1, "writing": "你好", "reading": "", "definition_en": ""}]
+    )
+    result = _make_result("故事", "你好" * 45)  # 90 characters, target 100
+
+    report, _ = validate_story(request, result)
+
+    assert report["actual_character_count"] == 90
+    assert report["length_ratio"] == 0.9
+    assert report["meets_length_threshold"] is True
+
+
+def test_validate_story_flags_short_story_without_failing_coverage():
+    request = _make_request(
+        [{"id": 1, "writing": "你好", "reading": "", "definition_en": ""}]
+    )
+    result = _make_result("故事", "你好" * 25)  # 50 characters, target 100
+
+    report, _ = validate_story(request, result)
+
+    assert report["length_ratio"] == 0.5
+    assert report["meets_length_threshold"] is False
+    # length is recorded, not enforced: the story is still acceptable
+    assert report["meets_coverage_threshold"] is True

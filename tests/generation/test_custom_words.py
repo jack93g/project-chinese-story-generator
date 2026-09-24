@@ -78,18 +78,26 @@ def test_schema_dedupes_before_applying_the_count_limit():
 # ---- prompt v2 (no database) ----
 
 
-def _prompt_request(snapshot):
+def _prompt_request(snapshot, prompt_version="story-v2"):
     return GenerationRequestInput(
         target_hsk_level=2,
         target_word_count=150,
         target_vocabulary_count=len(snapshot),
         vocabulary_snapshot=snapshot,
-        prompt_version="story-v2",
+        prompt_version=prompt_version,
     )
 
 
-def test_current_prompt_version_is_v2():
-    assert CURRENT_PROMPT_VERSION == "story-v2"
+def test_current_prompt_version_asks_for_a_glossary_of_custom_words():
+    prompt = build_prompt(
+        _prompt_request(
+            [{"id": 2, "writing": "饭馆", "reading": None, "definition_en": None}],
+            prompt_version=CURRENT_PROMPT_VERSION,
+        )
+    )
+
+    assert '"glossary"' in prompt
+    assert "glossary entry for each of these words: 饭馆" in prompt
 
 
 def test_v2_prompt_omits_missing_reading_and_definition():
@@ -213,7 +221,7 @@ def test_post_custom_words_only_end_to_end(client, db_session):
 
     request = db_session.get(StoryGenerationRequest, request_id)
     assert request.vocabulary_list_id is None
-    assert request.prompt_version == "story-v2"
+    assert request.prompt_version == CURRENT_PROMPT_VERSION
     assert [e["writing"] for e in request.selected_vocabulary_snapshot] == [
         "菜单",
         "饭馆",

@@ -323,6 +323,12 @@ the report again, and then add the reviewed report to the allowlist:
   --input reports/provider-comparisons/TIMESTAMP.json
 ```
 
+The harness sends the prompt version production currently uses. When changing
+the prompt, add `--prompt-version story-v2` (or whichever version it replaces)
+to measure a baseline on the same day. The summary flags any story shorter
+than 80% of its target length; if a model is routinely short, fix the prompt
+before approving it.
+
 The comparison command does not write to the application database. For local
 OpenAI-compatible servers that do not require a key, the final part of the
 provider specification may name an unset environment variable.

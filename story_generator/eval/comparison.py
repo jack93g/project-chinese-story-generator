@@ -15,9 +15,9 @@ by hand does not persist anything and will be overwritten on the next
 render.
 
 Deliberately standalone: no database, no persistence.* imports beyond
-the one constant reused from generation.validation. This harness is
-meant to be run offline/locally before a provider or model is ever
-wired into the live pipeline.
+the thresholds and length_ratio() reused from generation.validation.
+This harness is meant to be run offline/locally before a provider or
+model is ever wired into the live pipeline.
 """
 
 import dataclasses
@@ -32,7 +32,11 @@ from story_generator.generation.providers.types import (
     GenerationRequestInput,
     GenerationResult,
 )
-from story_generator.generation.validation import VOCABULARY_COVERAGE_THRESHOLD
+from story_generator.generation.validation import (
+    MIN_LENGTH_RATIO,
+    VOCABULARY_COVERAGE_THRESHOLD,
+    length_ratio,
+)
 
 
 @dataclasses.dataclass(frozen=True)
@@ -75,6 +79,9 @@ class EvalOutcome:
     title: str | None
     body: str | None
     manual_quality_notes: str = ""
+    # Defaulted so reports written before these fields existed still load.
+    prompt_version: str | None = None
+    meets_length_threshold: bool | None = None
 
 
 def compute_coverage(vocabulary_snapshot: list[dict], result: GenerationResult) -> dict:
@@ -137,10 +144,11 @@ def run_single(fixture: EvalFixture, provider_spec: ProviderSpec) -> EvalOutcome
             latency_ms=None,
             title=None,
             body=None,
+            prompt_version=fixture.prompt_version,
         )
 
     coverage_info = compute_coverage(fixture.vocabulary_snapshot, result)
-    actual_chars = len(result.body)
+    ratio = length_ratio(result.body, fixture.target_word_count)
 
     return EvalOutcome(
         fixture_name=fixture.name,
@@ -158,13 +166,13 @@ def run_single(fixture: EvalFixture, provider_spec: ProviderSpec) -> EvalOutcome
         >= VOCABULARY_COVERAGE_THRESHOLD,
         missing_vocabulary=coverage_info["missing_vocabulary"],
         target_word_count=fixture.target_word_count,
-        actual_character_count=actual_chars,
-        length_ratio=(actual_chars / fixture.target_word_count)
-        if fixture.target_word_count
-        else None,
+        actual_character_count=len(result.body),
+        length_ratio=ratio,
         latency_ms=result.usage.latency_ms,
         title=result.title,
         body=result.body,
+        prompt_version=fixture.prompt_version,
+        meets_length_threshold=ratio >= MIN_LENGTH_RATIO,
     )
 
 
@@ -218,8 +226,12 @@ def to_markdown(outcomes: list[EvalOutcome]) -> str:
         "",
         "## Summary",
         "",
-        "| Fixture | Category | Provider | Model | Base URL | Schema valid | Coverage | Meets threshold | Chars (actual/target) | Latency (ms) | Error | Manual quality notes |",
-        "|---|---|---|---|---|---|---|---|---|---|---|---|",
+        f"Length is flagged when the body is under {MIN_LENGTH_RATIO:.0%} of the "
+        "target. It doesn't fail a generation in production, but a model that is "
+        "routinely short needs a prompt fix before it's approved.",
+        "",
+        "| Fixture | Category | Provider | Model | Base URL | Prompt | Schema valid | Coverage | Meets threshold | Chars (actual/target) | Meets length | Latency (ms) | Error | Manual quality notes |",
+        "|---|---|---|---|---|---|---|---|---|---|---|---|---|---|",
     ]
 
     for o in outcomes:
@@ -230,9 +242,14 @@ def to_markdown(outcomes: list[EvalOutcome]) -> str:
             else ("❌" if o.meets_coverage_threshold is not None else "—")
         )
         chars_str = (
-            f"{o.actual_character_count}/{o.target_word_count}"
+            f"{o.actual_character_count}/{o.target_word_count} ({o.length_ratio:.0%})"
             if o.actual_character_count is not None
             else f"—/{o.target_word_count}"
+        )
+        length_str = (
+            "—"
+            if o.meets_length_threshold is None
+            else ("✅" if o.meets_length_threshold else "❌")
         )
         latency_str = str(o.latency_ms) if o.latency_ms is not None else "—"
         error_str = o.error_code or "—"
@@ -243,8 +260,9 @@ def to_markdown(outcomes: list[EvalOutcome]) -> str:
         )
         lines.append(
             f"| {o.fixture_name} | {o.category} | {o.provider_label} | {o.model} | `{o.base_url}` | "
+            f"{o.prompt_version or '—'} | "
             f"{'✅' if o.schema_valid else '❌'} | {coverage_str} | {meets_str} | "
-            f"{chars_str} | {latency_str} | {error_str} | {notes_str} |"
+            f"{chars_str} | {length_str} | {latency_str} | {error_str} | {notes_str} |"
         )
 
     lines += [

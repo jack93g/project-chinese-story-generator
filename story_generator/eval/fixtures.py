@@ -33,6 +33,8 @@ Categories (per M3-7 acceptance criteria):
 
 from dataclasses import dataclass
 
+from story_generator.generation.prompts.builder import CURRENT_PROMPT_VERSION
+
 
 @dataclass(frozen=True)
 class EvalFixture:
@@ -44,7 +46,8 @@ class EvalFixture:
     target_vocabulary_count: int
     vocabulary_snapshot: list[dict]
     topic: str | None = None
-    prompt_version: str = "story-v1"
+    # The prompt production sends, so a report measures what users get.
+    prompt_version: str = CURRENT_PROMPT_VERSION
 
 
 EVAL_FIXTURES: list[EvalFixture] = [

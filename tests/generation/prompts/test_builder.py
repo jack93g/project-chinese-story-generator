@@ -2,6 +2,7 @@ from story_generator.generation.prompts.builder import (
     CURRENT_PROMPT_VERSION,
     build_prompt,
     build_story_v1_prompt,
+    build_story_v3_prompt,
 )
 from story_generator.generation.providers.types import GenerationRequestInput
 
@@ -93,3 +94,49 @@ def test_prompt_requests_structured_json_output():
 
     assert '"title"' in prompt
     assert '"body"' in prompt
+
+
+def test_current_prompt_version_is_v3():
+    assert CURRENT_PROMPT_VERSION == "story-v3"
+
+
+def test_v3_prompt_states_a_length_band_and_paragraph_plan():
+    request = _make_request(prompt_version="story-v3", target_word_count=300)
+
+    prompt = build_story_v3_prompt(request)
+
+    assert "at least 270 Chinese characters long and at most 360" in prompt
+    assert "aim for about 300" in prompt
+    assert "3 paragraphs of about 100 characters each" in prompt
+    # repeated in the JSON shape
+    assert '"body": "<Chinese story body, 270-360 characters>"' in prompt
+
+
+def test_v3_prompt_plans_one_paragraph_for_a_short_target():
+    request = _make_request(prompt_version="story-v3", target_word_count=60)
+
+    prompt = build_story_v3_prompt(request)
+
+    assert "one paragraph of about 60 characters" in prompt
+
+
+def test_v3_prompt_keeps_vocabulary_and_glossary_request():
+    request = _make_request(
+        prompt_version="story-v3",
+        vocabulary_snapshot=[
+            {
+                "id": 1,
+                "writing": "你好",
+                "reading": "ni3 hao3",
+                "definition_en": "hello",
+            },
+            {"id": 2, "writing": "饭馆", "reading": None, "definition_en": None},
+        ],
+    )
+
+    prompt = build_prompt(request)
+
+    assert "- 你好 (ni3 hao3): hello" in prompt
+    assert "- 饭馆\n" in prompt
+    assert "glossary entry for each of these words: 饭馆" in prompt
+    assert '"glossary"' in prompt

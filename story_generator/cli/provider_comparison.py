@@ -45,6 +45,7 @@ Examples:
 """
 
 import argparse
+import dataclasses
 import datetime as dt
 import os
 from pathlib import Path
@@ -59,6 +60,10 @@ from story_generator.eval.comparison import (
     to_markdown,
 )
 from story_generator.eval.fixtures import EVAL_FIXTURES
+from story_generator.generation.prompts.builder import (
+    CURRENT_PROMPT_VERSION,
+    PROMPT_BUILDERS,
+)
 from story_generator.generation.providers.openai import OpenAIStoryGenerationProvider
 
 _PROVIDER_SPEC_HELP = (
@@ -93,13 +98,24 @@ def _run(args: argparse.Namespace) -> None:
     if not args.provider:
         raise SystemExit("--provider is required for `run`. See --help for the format.")
 
+    if args.prompt_version not in PROMPT_BUILDERS:
+        raise SystemExit(
+            f"Unknown --prompt-version {args.prompt_version!r}. "
+            f"Known: {', '.join(PROMPT_BUILDERS)}."
+        )
+
     provider_specs = [_build_provider_spec(spec_str) for spec_str in args.provider]
+    fixtures = [
+        dataclasses.replace(fixture, prompt_version=args.prompt_version)
+        for fixture in EVAL_FIXTURES
+    ]
 
     print(
-        f"Running {len(EVAL_FIXTURES)} fixtures x {len(provider_specs)} providers "
-        f"= {len(EVAL_FIXTURES) * len(provider_specs)} generations..."
+        f"Running {len(fixtures)} fixtures x {len(provider_specs)} providers "
+        f"= {len(fixtures) * len(provider_specs)} generations "
+        f"(prompt {args.prompt_version})..."
     )
-    outcomes = run_comparison(EVAL_FIXTURES, provider_specs)
+    outcomes = run_comparison(fixtures, provider_specs)
 
     timestamp = dt.datetime.now(dt.UTC).strftime("%Y-%m-%dT%H%M%SZ")
     output_dir = Path(args.output_dir)
@@ -158,6 +174,15 @@ def main() -> None:
         default=[],
         metavar="SPEC",
         help=_PROVIDER_SPEC_HELP,
+    )
+    run_parser.add_argument(
+        "--prompt-version",
+        default=CURRENT_PROMPT_VERSION,
+        help=(
+            "Prompt version to send (default: the one production uses, "
+            f"{CURRENT_PROMPT_VERSION}). Pass an older one to measure a "
+            "baseline for a prompt change."
+        ),
     )
     run_parser.add_argument("--output-dir", default="reports/provider-comparisons")
     run_parser.set_defaults(func=_run)

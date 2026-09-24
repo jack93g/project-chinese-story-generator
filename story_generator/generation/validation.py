@@ -14,6 +14,15 @@ requested word from an otherwise good story, and treating that as a
 hard failure would waste a generation that's still usable. Instead,
 a story is only rejected as insufficient when fewer than
 VOCABULARY_COVERAGE_THRESHOLD of the requested words actually appear.
+
+Length is recorded but NOT enforced. Retries are manual (the Retry
+button, at most MAX_ATTEMPTS per request), so rejecting a short story
+throws away a readable one and costs the learner a click and another
+paid call — and a short story usually comes back short again, because
+the shortfall is systematic to the prompt/model pairing rather than
+random. The fix for short stories is the prompt (see story-v3);
+meets_length_threshold is there so shortfalls stay visible in
+validation_report and in the provider-comparison report.
 """
 
 from story_generator.generation.persistence.models import StoryGenerationRequest
@@ -23,6 +32,15 @@ from story_generator.generation.providers.types import GenerationResult
 # 0.8 means: at least 80% of requested vocabulary must appear in the
 # generated text for the story to be considered acceptable.
 VOCABULARY_COVERAGE_THRESHOLD = 0.8
+
+# Recorded, not enforced (see module docstring): a body shorter than this
+# fraction of target_word_count is flagged meets_length_threshold=False.
+MIN_LENGTH_RATIO = 0.8
+
+
+def length_ratio(body: str, target_word_count: int) -> float:
+    """Body length (characters, punctuation included) over the target."""
+    return len(body) / target_word_count
 
 
 def validate_story(
@@ -51,12 +69,17 @@ def validate_story(
     used_count = requested_count - len(missing_vocabulary)
     coverage = used_count / requested_count if requested_count else 1.0
 
+    ratio = length_ratio(result.body, request.target_word_count)
+
     report = {
         "requested_vocabulary_count": requested_count,
         "used_vocabulary_count": used_count,
         "missing_vocabulary": missing_vocabulary,
         "target_word_count": request.target_word_count,
         "actual_character_count": len(result.body),
+        "length_ratio": ratio,
+        "length_threshold": MIN_LENGTH_RATIO,
+        "meets_length_threshold": ratio >= MIN_LENGTH_RATIO,
         "coverage": coverage,
         "coverage_threshold": VOCABULARY_COVERAGE_THRESHOLD,
         "meets_coverage_threshold": coverage >= VOCABULARY_COVERAGE_THRESHOLD,
