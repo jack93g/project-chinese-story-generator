@@ -69,6 +69,10 @@ Review the diff for:
 
 Do not comment on formatting or style a linter would catch.
 
+If the diff ends with a note listing files that were omitted because the \
+diff was too large, you have not seen those files: do not guess at their \
+contents, and say in "findings_markdown" that they were not reviewed.
+
 The user message may also include a second diff showing what changed since \
 a previous review of this same PR. If it does, use it to fill in \
 "changes_since_last_review_markdown" below, focused on whether it addresses \
@@ -108,6 +112,112 @@ def truncate(text: str, max_chars: int) -> str:
     return text[:cutoff] + "\n\n... [truncated, too large to review in full]"
 
 
+SOURCE_PREFIXES = (
+    "story_generator/",
+    "alembic/versions/",
+    "scripts/",
+    "frontend/app/",
+    "frontend/lib/",
+)
+# Source files outside those folders, e.g. the uvicorn entrypoint.
+SOURCE_FILES = {"main.py"}
+TEST_FILE_PATTERN = re.compile(
+    r"(^|/)(tests?/|__tests__/)|(^|/)test_[^/]*\.py$|\.(test|spec)\.[jt]sx?$"
+)
+LOW_PRIORITY_NAMES = {
+    "package-lock.json",
+    "yarn.lock",
+    "pnpm-lock.yaml",
+    "poetry.lock",
+    "uv.lock",
+}
+
+
+def file_priority(path: str) -> int:
+    """Rank a changed file for review: 0 source, 1 other, 2 tests, 3 docs/lockfiles.
+
+    "Other" (Dockerfile, Caddyfile, compose files, workflows, pyproject.toml)
+    ranks above tests: it is usually small and often security-relevant.
+    Tests are checked before source because frontend tests sit next to the
+    code they test (e.g. frontend/app/page.test.tsx).
+    """
+    name = path.rsplit("/", 1)[-1]
+    if (
+        path.startswith("docs/")
+        or name.lower().endswith(".md")
+        or name in LOW_PRIORITY_NAMES
+    ):
+        return 3
+    if TEST_FILE_PATTERN.search(path):
+        return 2
+    if path in SOURCE_FILES or path.startswith(SOURCE_PREFIXES):
+        return 0
+    return 1
+
+
+def diff_file_path(section: str) -> str:
+    """Return the post-change path from a section's `diff --git a/X b/Y` header."""
+    header = section.split("\n", 1)[0].removeprefix("diff --git ")
+
+    def unprefix(path: str) -> str:
+        # Git quotes paths containing unusual characters: "b/some path".
+        return path.strip('"')[2:]
+
+    # Unrenamed files repeat the same path twice, which stays unambiguous
+    # even when the path itself contains " b/".
+    half = (len(header) - 1) // 2
+    old_path, sep, new_path = header[:half], header[half : half + 1], header[half + 1 :]
+    if sep == " " and unprefix(old_path) == unprefix(new_path):
+        return unprefix(new_path)
+    start = max(header.rfind(" b/"), header.rfind(' "b/'))
+    return unprefix(header[start + 1 :]) if start != -1 else header
+
+
+def split_diff_by_file(diff: str) -> list[str]:
+    """Split a unified diff into one section per `diff --git` header."""
+    return [section for section in re.split(r"(?m)^(?=diff --git )", diff) if section]
+
+
+def fit_diff_to_budget(diff: str, max_chars: int) -> tuple[str, list[str]]:
+    """Fit a diff into max_chars by dropping whole files, lowest priority first.
+
+    Diffs arrive in alphabetical file order, so a plain cut would keep docs
+    and drop backend code. Instead, whole files are kept in priority order
+    (source, other, tests, docs/lockfiles; ties keep diff order) until the
+    budget is used, skipping any file that doesn't fit in what's left. The
+    kept files are returned with a note listing the omitted paths appended
+    (the note itself isn't counted against the budget), plus that list.
+    """
+    if len(diff) <= max_chars:
+        return diff, []
+    sections = split_diff_by_file(diff)
+    if len(sections) <= 1 or not sections[0].startswith("diff --git "):
+        # Not a multi-file git diff; fall back to a plain line-boundary cut.
+        return truncate(diff, max_chars), []
+
+    kept: list[str] = []
+    omitted: list[str] = []
+    remaining = max_chars
+    for section in sorted(sections, key=lambda s: file_priority(diff_file_path(s))):
+        if len(section) <= remaining:
+            kept.append(section)
+            remaining -= len(section)
+        else:
+            omitted.append(diff_file_path(section))
+
+    text = "".join(kept)
+    if omitted:
+        if text and not text.endswith("\n"):
+            text += "\n"
+        text += (
+            f"\n... [{len(omitted)} file(s) omitted, too large to review in full. "
+            "These files were NOT reviewed:\n"
+            + "\n".join(f"- {path}" for path in omitted)
+            + "\n]"
+        )
+    return text, omitted
+
+
 def github_request(url: str, token: str, accept: str) -> bytes:
     request = urllib.request.Request(
         url,
@@ -121,18 +231,19 @@ def github_request(url: str, token: str, accept: str) -> bytes:
         return response.read()
 
 
-def fetch_pr_diff(repo: str, pr_number: str, token: str) -> str:
+def fetch_pr_diff(repo: str, pr_number: str, token: str) -> tuple[str, list[str]]:
+    """Return the PR diff fitted to MAX_DIFF_CHARS and the paths left out of it."""
     if not pr_number.isdigit():
         raise ValueError(f"PR_NUMBER must be numeric, got: {pr_number!r}")
     url = f"{GITHUB_API}/repos/{repo}/pulls/{pr_number}"
     diff = github_request(url, token, "application/vnd.github.v3.diff").decode("utf-8")
-    return truncate(diff, MAX_DIFF_CHARS)
+    return fit_diff_to_budget(diff, MAX_DIFF_CHARS)
 
 
 def fetch_diff_since(repo: str, prev_sha: str, head_sha: str, token: str) -> str:
     url = f"{GITHUB_API}/repos/{repo}/compare/{prev_sha}...{head_sha}"
     diff = github_request(url, token, "application/vnd.github.v3.diff").decode("utf-8")
-    return truncate(diff, MAX_DIFF_CHARS)
+    return fit_diff_to_budget(diff, MAX_DIFF_CHARS)[0]
 
 
 def load_claude_md(repo: str, token: str, base_ref: str) -> str:
@@ -285,7 +396,9 @@ def parse_review(content: str) -> dict:
         raise RuntimeError(f"Unexpected review JSON shape: {content}") from error
 
 
-def render_comment(review: dict, model: str, head_sha: str) -> str:
+def render_comment(
+    review: dict, model: str, head_sha: str, omitted_files: list[str] | None = None
+) -> str:
     emoji = VERDICT_EMOJI[review["verdict"]]
     lines = [
         f"### {emoji} DeepSeek review",
@@ -296,6 +409,17 @@ def render_comment(review: dict, model: str, head_sha: str) -> str:
         "",
         review["findings_markdown"],
     ]
+
+    if omitted_files:
+        # Stated here as well as in the prompt so the comment reliably says
+        # what wasn't reviewed, whatever the model wrote. Backticks are
+        # stripped so a crafted filename can't break out of the code span.
+        paths = ", ".join(f"`{path.replace('`', '')}`" for path in omitted_files)
+        lines += [
+            "",
+            f"**Not reviewed** (omitted to fit the {MAX_DIFF_CHARS:,}-character "
+            f"diff limit): {paths}",
+        ]
 
     since = review["changes_since_last_review_markdown"]
     if since:
@@ -345,7 +469,7 @@ def main() -> None:
     head_sha = env("PR_HEAD_SHA")
     base_ref = os.environ.get("GITHUB_BASE_REF") or "main"
 
-    diff = fetch_pr_diff(repo, pr_number, github_token)
+    diff, omitted_files = fetch_pr_diff(repo, pr_number, github_token)
     if not diff.strip():
         print("Empty diff, nothing to review.")
         return
@@ -367,7 +491,7 @@ def main() -> None:
 
     content = call_openrouter(openrouter_api_key, diff, claude_md, since_diff)
     review = parse_review(content)
-    comment = render_comment(review, OPENROUTER_MODEL, head_sha)
+    comment = render_comment(review, OPENROUTER_MODEL, head_sha, omitted_files)
     post_comment(repo, pr_number, github_token, comment)
     print("Posted DeepSeek review comment.")
 

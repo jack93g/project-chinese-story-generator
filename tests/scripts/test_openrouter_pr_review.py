@@ -7,16 +7,20 @@ import pytest
 import scripts.openrouter_pr_review as pr_review
 from scripts.openrouter_pr_review import (
     call_openrouter,
+    diff_file_path,
     env,
     extract_json_object,
     fetch_diff_since,
     fetch_last_reviewed_sha,
     fetch_pr_diff,
+    file_priority,
+    fit_diff_to_budget,
     load_claude_md,
     main,
     parse_review,
     post_comment,
     render_comment,
+    split_diff_by_file,
     truncate,
 )
 
@@ -36,6 +40,143 @@ def test_truncate_cuts_on_line_boundary():
 def test_truncate_falls_back_to_hard_cutoff_with_no_newline():
     result = truncate("a" * 20, max_chars=5)
     assert result == "aaaaa\n\n... [truncated, too large to review in full]"
+
+
+def _file_diff(path: str, body_chars: int) -> str:
+    return (
+        f"diff --git a/{path} b/{path}\n"
+        f"--- a/{path}\n"
+        f"+++ b/{path}\n"
+        f"@@ -0,0 +1 @@\n"
+        f"+{'x' * body_chars}\n"
+    )
+
+
+def test_split_diff_by_file_splits_on_git_headers():
+    first = _file_diff("a.py", 5)
+    second = _file_diff("b.py", 5)
+    assert split_diff_by_file(first + second) == [first, second]
+
+
+def test_split_diff_by_file_ignores_diff_git_text_mid_line():
+    section = _file_diff("a.py", 0).replace("+\n", "+see diff --git usage\n")
+    assert split_diff_by_file(section) == [section]
+
+
+@pytest.mark.parametrize(
+    ("header", "expected"),
+    [
+        (
+            "diff --git a/story_generator/x.py b/story_generator/x.py",
+            "story_generator/x.py",
+        ),
+        ("diff --git a/old.py b/new.py", "new.py"),
+        ("diff --git a/dir b/file.py b/dir b/file.py", "dir b/file.py"),
+        ('diff --git "a/docs/some file.md" "b/docs/some file.md"', "docs/some file.md"),
+    ],
+)
+def test_diff_file_path_reads_post_change_path(header, expected):
+    assert diff_file_path(header + "\nindex 1..2\n") == expected
+
+
+@pytest.mark.parametrize(
+    ("path", "expected"),
+    [
+        ("main.py", 0),
+        ("story_generator/api/routers/auth.py", 0),
+        ("alembic/versions/0007_add_users.py", 0),
+        ("scripts/openrouter_pr_review.py", 0),
+        ("frontend/app/login/page.tsx", 0),
+        ("frontend/lib/api.ts", 0),
+        ("pyproject.toml", 1),
+        ("Dockerfile", 1),
+        (".github/workflows/deploy-backend.yml", 1),
+        ("tests/api/test_auth.py", 2),
+        ("tests/conftest.py", 2),
+        ("frontend/app/page.test.tsx", 2),
+        ("frontend/lib/api.test.ts", 2),
+        ("CLAUDE.md", 3),
+        ("frontend/README.md", 3),
+        ("docs/runbook.md", 3),
+        ("docs/diagram.png", 3),
+        ("frontend/package-lock.json", 3),
+    ],
+)
+def test_file_priority_ranks_source_then_other_then_tests_then_docs(path, expected):
+    assert file_priority(path) == expected
+
+
+def test_fit_diff_to_budget_leaves_diff_under_cap_untouched():
+    diff = _file_diff("README.md", 10) + _file_diff("story_generator/x.py", 10)
+    assert fit_diff_to_budget(diff, len(diff)) == (diff, [])
+
+
+def test_fit_diff_to_budget_keeps_source_over_alphabetically_earlier_docs():
+    docs = _file_diff("CLAUDE.md", 100) + _file_diff("docs/runbook.md", 100)
+    source = _file_diff("story_generator/api/routers/auth.py", 100)
+    test = _file_diff("tests/api/test_auth.py", 100)
+    diff = docs + source + test
+
+    result, omitted = fit_diff_to_budget(diff, len(source) + len(test))
+
+    assert result.startswith(source + test)
+    assert omitted == ["CLAUDE.md", "docs/runbook.md"]
+    assert "2 file(s) omitted" in result
+    assert "- CLAUDE.md\n- docs/runbook.md\n]" in result
+    assert "x" * 100 not in result.split(test, 1)[1]
+
+
+def test_fit_diff_to_budget_drops_tests_before_config():
+    config = _file_diff("Dockerfile", 100)
+    test = _file_diff("tests/test_x.py", 100)
+
+    result, omitted = fit_diff_to_budget(config + test, len(config) + 10)
+
+    assert result.startswith(config)
+    assert omitted == ["tests/test_x.py"]
+
+
+def test_fit_diff_to_budget_drops_tests_before_source():
+    source = _file_diff("story_generator/x.py", 100)
+    test = _file_diff("tests/test_x.py", 100)
+
+    result, omitted = fit_diff_to_budget(test + source, len(source) + 10)
+
+    assert result.startswith(source)
+    assert omitted == ["tests/test_x.py"]
+
+
+def test_fit_diff_to_budget_skips_file_that_does_not_fit_but_keeps_smaller_later_ones():
+    big = _file_diff("story_generator/big.py", 500)
+    small = _file_diff("story_generator/small.py", 10)
+    readme = _file_diff("README.md", 10)
+    budget = len(small) + len(readme) + 50
+
+    result, omitted = fit_diff_to_budget(big + small + readme, budget)
+
+    assert result.startswith(small + readme)
+    assert omitted == ["story_generator/big.py"]
+
+
+def test_fit_diff_to_budget_kept_files_stay_within_budget():
+    sections = [_file_diff(f"story_generator/m{i}.py", 100) for i in range(10)]
+    budget = len(sections[0]) * 3 + 5
+
+    result, omitted = fit_diff_to_budget("".join(sections), budget)
+
+    kept = result.split("\n... [", 1)[0]
+    assert len(kept) <= budget
+    assert len(omitted) == 7
+    assert omitted == [f"story_generator/m{i}.py" for i in range(3, 10)]
+
+
+def test_fit_diff_to_budget_falls_back_to_line_cut_for_a_single_file():
+    diff = _file_diff("story_generator/huge.py", 500)
+
+    result, omitted = fit_diff_to_budget(diff, 100)
+
+    assert result.endswith("[truncated, too large to review in full]")
+    assert omitted == []
 
 
 def _http_error(code: int, body: bytes) -> urllib.error.HTTPError:
@@ -209,11 +350,12 @@ def test_fetch_pr_diff_builds_url_and_truncates(monkeypatch):
     monkeypatch.setattr(pr_review, "github_request", fake_github_request)
     monkeypatch.setattr(pr_review, "MAX_DIFF_CHARS", 10)
 
-    result = fetch_pr_diff("owner/repo", "43", "token")
+    result, omitted = fetch_pr_diff("owner/repo", "43", "token")
 
     assert captured["url"] == "https://api.github.com/repos/owner/repo/pulls/43"
     assert captured["accept"] == "application/vnd.github.v3.diff"
     assert result.endswith("[truncated, too large to review in full]")
+    assert omitted == []
 
 
 def test_fetch_diff_since_builds_compare_url(monkeypatch):
@@ -435,6 +577,30 @@ def test_render_comment_includes_model_and_sha_marker():
     assert f"{pr_review.REVIEW_MARKER_PREFIX}abc123 -->" in comment
 
 
+def test_render_comment_lists_omitted_files():
+    review = {
+        "verdict": "green",
+        "pr_summary": "summary",
+        "findings_markdown": "findings",
+        "changes_since_last_review_markdown": None,
+    }
+    comment = render_comment(
+        review, "some/model", "abc123", ["docs/runbook.md", "evil`name.md"]
+    )
+    assert "**Not reviewed**" in comment
+    assert "`docs/runbook.md`, `evilname.md`" in comment
+
+
+def test_render_comment_has_no_not_reviewed_line_when_nothing_omitted():
+    review = {
+        "verdict": "green",
+        "pr_summary": "summary",
+        "findings_markdown": "findings",
+        "changes_since_last_review_markdown": None,
+    }
+    assert "Not reviewed" not in render_comment(review, "some/model", "abc123", [])
+
+
 def test_post_comment_sends_expected_request(monkeypatch):
     captured = {}
 
@@ -472,7 +638,7 @@ def _set_required_env(monkeypatch):
 def test_main_returns_early_on_empty_diff(monkeypatch):
     _set_required_env(monkeypatch)
 
-    monkeypatch.setattr(pr_review, "fetch_pr_diff", lambda *a, **k: "   ")
+    monkeypatch.setattr(pr_review, "fetch_pr_diff", lambda *a, **k: ("   ", []))
 
     def fail_if_called(*args, **kwargs):
         raise AssertionError("should not be called for an empty diff")
@@ -488,7 +654,7 @@ def test_main_returns_early_on_empty_diff(monkeypatch):
 def test_main_first_review_posts_rendered_comment_without_since_section(monkeypatch):
     _set_required_env(monkeypatch)
 
-    monkeypatch.setattr(pr_review, "fetch_pr_diff", lambda *a, **k: "some diff")
+    monkeypatch.setattr(pr_review, "fetch_pr_diff", lambda *a, **k: ("some diff", []))
     monkeypatch.setattr(pr_review, "load_claude_md", lambda *a, **k: "claude.md")
     monkeypatch.setattr(pr_review, "fetch_last_reviewed_sha", lambda *a, **k: None)
 
@@ -520,12 +686,13 @@ def test_main_first_review_posts_rendered_comment_without_since_section(monkeypa
 
     assert "does a thing" in posted["body"]
     assert "What changed since the last review" not in posted["body"]
+    assert "Not reviewed" not in posted["body"]
 
 
 def test_main_second_review_fetches_since_diff_and_includes_section(monkeypatch):
     _set_required_env(monkeypatch)
 
-    monkeypatch.setattr(pr_review, "fetch_pr_diff", lambda *a, **k: "some diff")
+    monkeypatch.setattr(pr_review, "fetch_pr_diff", lambda *a, **k: ("some diff", []))
     monkeypatch.setattr(pr_review, "load_claude_md", lambda *a, **k: "claude.md")
     monkeypatch.setattr(pr_review, "fetch_last_reviewed_sha", lambda *a, **k: "old-sha")
 
@@ -562,3 +729,39 @@ def test_main_second_review_fetches_since_diff_and_includes_section(monkeypatch)
 
     assert since_calls == [("old-sha", "head-sha")]
     assert "fixed the earlier bug" in posted["body"]
+
+
+def test_main_lists_omitted_files_in_posted_comment(monkeypatch):
+    _set_required_env(monkeypatch)
+
+    monkeypatch.setattr(
+        pr_review,
+        "fetch_pr_diff",
+        lambda *a, **k: ("some diff", ["docs/runbook.md"]),
+    )
+    monkeypatch.setattr(pr_review, "load_claude_md", lambda *a, **k: "claude.md")
+    monkeypatch.setattr(pr_review, "fetch_last_reviewed_sha", lambda *a, **k: None)
+    monkeypatch.setattr(
+        pr_review,
+        "call_openrouter",
+        lambda api_key, diff, claude_md, since_diff=None: json.dumps(
+            {
+                "verdict": "green",
+                "pr_summary": "does a thing",
+                "findings_markdown": "none",
+                "changes_since_last_review_markdown": None,
+            }
+        ),
+    )
+
+    posted = {}
+    monkeypatch.setattr(
+        pr_review,
+        "post_comment",
+        lambda repo, pr_number, token, body: posted.update(body=body),
+    )
+
+    main()
+
+    assert "**Not reviewed**" in posted["body"]
+    assert "`docs/runbook.md`" in posted["body"]
