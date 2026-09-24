@@ -152,8 +152,12 @@ just accepts the boot script and cloud-init runs it after `apply` returns:
    Fix: keep `cloud-init.yaml` plain ASCII.
 
 Diagnosis, since SSH failures alone don't distinguish these: DigitalOcean's
-web console ("Launch Droplet Console") gives root access independent of
-SSH/cloud-init succeeding at all. From there,
+web console ("Launch Droplet Console") logs in as root over SSH, so it works
+only while root login is still allowed, which was the case here because the
+hardening step never ran. On a correctly provisioned Droplet
+(`PermitRootLogin no`) it fails with "All configured authentication methods
+failed"; use `sudo` as `deploy` instead (see the runbook's Conventions). From
+there,
 `grep -iE "error|fail|warn" /var/log/cloud-init.log` finds the actual cause,
 and `curl http://169.254.169.254/metadata/v1/user-data` (from inside the
 Droplet) shows the exact raw script DigitalOcean received, for comparing
@@ -242,10 +246,13 @@ deployed one, so `export IMAGE_TAG=$(git rev-parse HEAD)` first.
   who can start containers can mount the host filesystem). `deploy` limits
   accidents and scope but is not a hard boundary against a stolen key, so
   the deploy key must be protected as carefully as a root credential.
-- `deploy` has passwordless `sudo` (added via cloud-init). Given `docker`
+- `deploy` has passwordless `sudo`: cloud-init adds it on Terraform-built
+  Droplets, and the hand-built Droplet got the same rule afterwards in
+  `/etc/sudoers.d/90-deploy` (`deploy ALL=(ALL) NOPASSWD:ALL`). Given `docker`
   group membership is already root-equivalent, this doesn't meaningfully
-  widen what a stolen key can do — it just avoids going through the
-  DigitalOcean console for OS-level changes.
+  widen what a stolen key can do. It does matter in practice: with root SSH
+  login disabled, DigitalOcean's web console can't log in either, so `sudo`
+  is the normal route to root.
 
 ## Operating it
 

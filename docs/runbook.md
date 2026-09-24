@@ -28,10 +28,30 @@ guess.
 ## Conventions
 
 Everything "on the Droplet" means an SSH session as `deploy` with your admin
-key (not the CI key, which can only run the deploy script):
+key (not the CI key, which can only run the deploy script). The commands in
+this runbook use `deploy@api.huaben.app`, so tell SSH which key that host
+uses, in `~/.ssh/config` on your laptop:
+
+```
+Host story api.huaben.app
+    HostName api.huaben.app
+    User deploy
+    IdentityFile ~/.ssh/story_droplet
+    IdentitiesOnly yes
+```
+
+Then `ssh deploy@api.huaben.app` (or `ssh story`) logs in. Without it, SSH
+offers only your default keys and the Droplet answers "Permission denied
+(publickey)".
+
+**Root access** is `sudo` as `deploy` (passwordless). DigitalOcean's web
+console doesn't work: it logs in as root over SSH, which is disabled. If
+`sudo` ever stops working, the break-glass route is the `docker` group, which
+`deploy` is in and which is root-equivalent. This starts a root shell on the
+host itself; `exit` leaves it:
 
 ```bash
-ssh deploy@api.huaben.app
+docker run --rm -it --entrypoint chroot -v /:/host postgres:17 /host /bin/bash
 ```
 
 Production compose commands always need both files and `IMAGE_TAG`. The rest
