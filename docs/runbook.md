@@ -542,7 +542,7 @@ value once the new one is proven working.
 
 | Secret | Where to get a new one | Also do |
 | --- | --- | --- |
-| `API_ACCESS_KEY` | `openssl rand -hex 32` | Re-enter it in the frontend (it's in your browser's `localStorage`). Old key stops working immediately. |
+| `API_ACCESS_KEY` | `openssl rand -hex 32` | Check `grep '^API_ACCESS_KEY=' ~/app/.env` shows the new key (nano saves with `Ctrl+O`, Enter). Then enter the new key in the frontend when it asks (it's kept in your browser's `localStorage`); stories loading is the proof. The old key stops working immediately. |
 | `OPENAI_API_KEY` (OpenRouter) | Provider dashboard → new key | Queue one story to prove it, then delete the old key in the dashboard. |
 | `SKRITTER_ACCESS_TOKEN` | Skritter account settings | Only `sync-skritter` uses it; prove with `dc run --rm api sync-skritter --list-id <id>`. |
 | DB password (`POSTGRES_PASSWORD`) | `openssl rand -hex 24` (letters and digits only) | See below: `.env` alone doesn't change it. |
@@ -700,4 +700,4 @@ most: they prove code and data can both be recovered.
 | 2026-09-24 | Backup setup, first backup, laptop pull and decrypt check (production) | `==> wrote`, then `pg_restore --list` OK on the laptop | `deploy` had no sudo and the web console can't log in as root; gave `deploy` passwordless sudo via the docker break-glass route. Runbook host needed an `~/.ssh/config` entry; both documented |
 | 2026-09-24 | Restore rehearsal from a laptop backup into `restore_check` (production) | Row counts and Alembic version matched live; `restore_check` dropped | |
 | 2026-09-24 | Rollback `8d919dc` → `56637e0` and roll forward (production) | [rollback](https://github.com/jack93g/project-chinese-story-generator/actions/runs/35981613467) (build skipped), [roll forward](https://github.com/jack93g/project-chinese-story-generator/actions/runs/35981959976); `git rev-parse` and `dc ps` image tags checked each way | `gh run watch` hides the script's `==>` lines; runbook now shows `gh run view --log` |
-| | Secret rotation: at least one (production) | | |
+| 2026-09-24 | Rotate `API_ACCESS_KEY` (production) | `.env` holds the new key, the running `api` has the same value (hash compare), the site works with the new key | A two-key curl test was easy to paste in the wrong order and looked like a failure; runbook now checks `.env` and the site instead |
