@@ -695,7 +695,9 @@ most: they prove code and data can both be recovered.
 | Date | Procedure | Evidence | Notes |
 | --- | --- | --- | --- |
 | 2026-09-23 | Backup + both restore modes, on a local copy of the prod compose stack (not the Droplet) | Scripts run end to end: encrypted dump, pruning, scratch restore, `--replace-live` swap with health check, and the manual undo | Stand-in for `age` was used; not a substitute for the production rehearsal below |
-| | Rollback to previous SHA and roll forward (production) | Actions run URLs | |
-| | Restore rehearsal from a laptop backup (production, `restore_check`) | Row counts vs live | |
-| | Worker restart independent of the API (production) | `dc ps` / logs | |
+| 2026-09-24 | Deploy by merge (PR #65), then update the Droplet's `deploy.sh` copy and redeploy the live SHA to prove it (production) | [merge deploy](https://github.com/jack93g/project-chinese-story-generator/actions/runs/35977036214), [redeploy with new script](https://github.com/jack93g/project-chinese-story-generator/actions/runs/35977642641): `api`/`worker` left `Running`, `migrate` not re-run | Runbook's copy steps didn't cover a first install of `db-backup.sh` or say the check runs from the laptop; fixed |
+| 2026-09-24 | Worker restart independent of the API (production) | `Received SIGTERM ... Worker stopped.` in 0.8s, `dc ps` Up | No startup log line, and output was buffered until exit; fixed with `PYTHONUNBUFFERED` and a startup message |
+| 2026-09-24 | Backup setup, first backup, laptop pull and decrypt check (production) | `==> wrote`, then `pg_restore --list` OK on the laptop | `deploy` had no sudo and the web console can't log in as root; gave `deploy` passwordless sudo via the docker break-glass route. Runbook host needed an `~/.ssh/config` entry; both documented |
+| 2026-09-24 | Restore rehearsal from a laptop backup into `restore_check` (production) | Row counts and Alembic version matched live; `restore_check` dropped | |
+| 2026-09-24 | Rollback `8d919dc` → `56637e0` and roll forward (production) | [rollback](https://github.com/jack93g/project-chinese-story-generator/actions/runs/35981613467) (build skipped), [roll forward](https://github.com/jack93g/project-chinese-story-generator/actions/runs/35981959976); `git rev-parse` and `dc ps` image tags checked each way | `gh run watch` hides the script's `==>` lines; runbook now shows `gh run view --log` |
 | | Secret rotation: at least one (production) | | |
