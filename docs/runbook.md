@@ -34,8 +34,11 @@ key (not the CI key, which can only run the deploy script):
 ssh deploy@api.huaben.app
 ```
 
-Production compose commands always need both files and `IMAGE_TAG`. Add these
-two helpers to `~deploy/.bashrc` once, and the rest of this runbook uses them:
+Production compose commands always need both files and `IMAGE_TAG`. The rest
+of this runbook uses these two helpers from `~deploy/.bashrc`. A Droplet built
+by Terraform gets them from `infra/terraform/cloud-init.yaml`; on one built by
+hand, add them once, then `source ~/.bashrc`. If you change them, change both
+places.
 
 ```bash
 # Production compose, pinned to the image of the checked-out (deployed) commit.

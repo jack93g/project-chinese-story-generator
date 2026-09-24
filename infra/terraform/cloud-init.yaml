@@ -31,6 +31,22 @@ write_files:
       Components: stable
       Signed-By: /etc/apt/keyrings/docker.asc
 
+  # Shell helpers from docs/runbook.md ("Conventions"); keep the two in sync.
+  # defer: write_files normally runs before users are created, and writing
+  # into /home/deploy that early would create it root-owned. Deferred, it runs
+  # after the deploy user exists and appends to its default .bashrc.
+  # No dollar-brace sequences here: templatefile() would try to interpolate them.
+  - path: /home/deploy/.bashrc
+    owner: deploy:deploy
+    append: true
+    defer: true
+    content: |
+
+      # Production compose, pinned to the image of the checked-out (deployed) commit.
+      dc() { (cd ~/app && IMAGE_TAG="$(git rev-parse HEAD)" docker compose -f docker-compose.yml -f docker-compose.prod.yml "$@"); }
+      # psql on the production database; credentials come from the db container.
+      dbsql() { dc exec db sh -c 'psql -U "$POSTGRES_USER" -d "$POSTGRES_DB"' "$@"; }
+
 runcmd:
   # Docker's official apt repo (not Ubuntu's docker.io), matching the manual setup.
   - install -m 0755 -d /etc/apt/keyrings
