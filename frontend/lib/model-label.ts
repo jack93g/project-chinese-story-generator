@@ -5,6 +5,7 @@ const PROVIDER_NAMES: Record<string, string> = {
   deepseek: "DeepSeek",
   groq: "Groq",
   openai: "OpenAI",
+  openrouter: "OpenRouter",
 };
 
 /**

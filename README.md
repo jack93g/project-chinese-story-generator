@@ -127,9 +127,9 @@ nothing else installed. (The frontend dev server runs separately; see
 
    SKRITTER_ACCESS_TOKEN=your-token
    OPENAI_API_KEY=your-provider-key
-   OPENAI_PROVIDER_LABEL=groq
-   OPENAI_MODEL=openai/gpt-oss-120b
-   OPENAI_BASE_URL=https://api.groq.com/openai/v1/chat/completions
+   OPENAI_PROVIDER_LABEL=openrouter
+   OPENAI_MODEL=moonshotai/kimi-k2-0905
+   OPENAI_BASE_URL=https://openrouter.ai/api/v1/chat/completions
 
    # Required: scripts and curl send this as the X-API-Key header (the
    # browser logs in instead); the API refuses to start without it.
@@ -199,9 +199,9 @@ TEST_DATABASE_URL=postgresql+psycopg://USER:PASSWORD@localhost:5432/chinese_stor
 SKRITTER_ACCESS_TOKEN=your-token
 OPENAI_API_KEY=your-provider-key
 # Required for the worker; see “Configure a generation provider”.
-OPENAI_PROVIDER_LABEL=groq
-OPENAI_MODEL=openai/gpt-oss-120b
-OPENAI_BASE_URL=https://api.groq.com/openai/v1/chat/completions
+OPENAI_PROVIDER_LABEL=openrouter
+OPENAI_MODEL=moonshotai/kimi-k2-0905
+OPENAI_BASE_URL=https://openrouter.ai/api/v1/chat/completions
 API_ACCESS_KEY=choose-a-random-key
 ```
 
@@ -304,7 +304,8 @@ combination appears in the reviewed allowlist in
 `story_generator/generation/providers/provider_registry.py`. This prevents an
 unreviewed model or endpoint from being used by accident.
 
-The repository currently approves the Groq example shown in `.env` above.
+The repository currently approves the OpenRouter example shown in `.env`
+above (and the earlier Groq `openai/gpt-oss-120b` setup, kept for rollback).
 Although the code defaults to OpenAI's `gpt-4o` endpoint when these settings
 are absent, that default is not currently approved and the worker will reject
 it until it is evaluated and added to the allowlist.

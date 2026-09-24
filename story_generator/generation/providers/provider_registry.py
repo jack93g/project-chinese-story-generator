@@ -93,6 +93,21 @@ APPROVED_PROVIDERS: dict[tuple[str, str, str], ProviderApproval] = {
         reviewed_at="2026-08-23",
         notes=("3/7 look good, ran into rate limits with the others"),
     ),
+    (
+        "openrouter",
+        "moonshotai/kimi-k2-0905",
+        "https://openrouter.ai/api/v1/chat/completions",
+    ): ProviderApproval(
+        report_path="reports/provider-comparisons/2026-09-24T135827Z.json",
+        reviewed_by="Jack",
+        reviewed_at="2026-09-24",
+        notes=(
+            "7/7 valid with full coverage, 2-13s latency. Better than Groq; "
+            "stories often run short (50-84% of target). Kimi K2.6 wrote "
+            "better stories but took 40-197s with reasoning on "
+            "(2026-09-24T135423Z)."
+        ),
+    ),
 }
 
 
