@@ -1,8 +1,11 @@
 "use client";
 
-import { Suspense, useEffect, useState } from "react";
+import { Suspense, useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "next/navigation";
+import { annotateVocabulary } from "@/lib/annotate";
 import { ApiError, fetchStory, type StoryDetail } from "@/lib/api";
+import { toToneMarks } from "@/lib/pinyin";
+import { Seal } from "../components/seal";
 
 type StoryState =
   | { status: "loading" }
@@ -16,6 +19,28 @@ function formatDate(isoDate: string): string {
     month: "long",
     day: "numeric",
   });
+}
+
+const PINYIN_KEY = "story-reader:show-pinyin";
+const VERTICAL_KEY = "story-reader:vertical";
+
+// Reading options are a per-browser convenience; if storage is unavailable
+// (private window, blocked site data) the reader just uses the defaults.
+function readPreference(key: string, fallback: boolean): boolean {
+  try {
+    const value = localStorage.getItem(key);
+    return value === null ? fallback : value === "true";
+  } catch {
+    return fallback;
+  }
+}
+
+function writePreference(key: string, value: boolean) {
+  try {
+    localStorage.setItem(key, String(value));
+  } catch {
+    // Not remembered, but the toggle still works for this visit.
+  }
 }
 
 // A static export can't pre-render one page per story ID (IDs are created at
@@ -115,7 +140,40 @@ function StoryContent() {
     );
   }
 
-  const { story } = state;
+  return <StoryReader story={state.story} />;
+}
+
+// Rendered only once the story has loaded in the browser, so reading
+// localStorage while initialising state can't cause a hydration mismatch.
+function StoryReader({ story }: { story: StoryDetail }) {
+  const [showPinyin, setShowPinyin] = useState(() =>
+    readPreference(PINYIN_KEY, true),
+  );
+  const [vertical, setVertical] = useState(() =>
+    readPreference(VERTICAL_KEY, false),
+  );
+  const segments = useMemo(
+    () => annotateVocabulary(story.content, story.selected_vocabulary),
+    [story],
+  );
+
+  function togglePinyin() {
+    setShowPinyin(!showPinyin);
+    writePreference(PINYIN_KEY, !showPinyin);
+  }
+
+  function toggleVertical() {
+    setVertical(!vertical);
+    writePreference(VERTICAL_KEY, !vertical);
+  }
+
+  const bodyClasses = ["story-body"];
+  if (!showPinyin) {
+    bodyClasses.push("hide-pinyin");
+  }
+  if (vertical) {
+    bodyClasses.push("story-body-vertical");
+  }
 
   return (
     <article className="page-content story">
@@ -127,11 +185,46 @@ function StoryContent() {
           {story.target_hsk !== null && <>HSK {story.target_hsk} &middot; </>}
           {formatDate(story.created_at)}
         </p>
+        <div role="group" aria-label="Reading options" className="story-options">
+          <button
+            type="button"
+            className="toggle"
+            aria-pressed={showPinyin}
+            onClick={togglePinyin}
+          >
+            <span lang="zh">拼音</span> Pinyin
+          </button>
+          <button
+            type="button"
+            className="toggle"
+            aria-pressed={vertical}
+            onClick={toggleVertical}
+          >
+            <span lang="zh">竖排</span> Vertical
+          </button>
+        </div>
       </header>
 
-      <p lang="zh" className="story-body">
-        {story.content}
+      {/* In vertical mode the body scrolls sideways, so it takes focus to let
+          keyboard users scroll it. */}
+      <p
+        lang="zh"
+        className={bodyClasses.join(" ")}
+        tabIndex={vertical ? 0 : undefined}
+      >
+        {segments.map((segment, index) =>
+          segment.kind === "word" ? (
+            <ruby key={index}>
+              {segment.text}
+              <rt>{segment.reading}</rt>
+            </ruby>
+          ) : (
+            segment.text
+          ),
+        )}
       </p>
+
+      <Seal decorative className="seal-stamp" />
 
       <section aria-labelledby="glossary-heading" className="story-glossary">
         <h2 id="glossary-heading">Glossary</h2>
@@ -141,7 +234,9 @@ function StoryContent() {
               <dt lang="zh">
                 {item.writing}
                 {item.reading && (
-                  <span className="glossary-reading"> ({item.reading})</span>
+                  <span className="glossary-reading">
+                    {` (${toToneMarks(item.reading)})`}
+                  </span>
                 )}
               </dt>
               <dd>

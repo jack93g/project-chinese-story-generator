@@ -1,4 +1,4 @@
-import { render, screen } from "@testing-library/react";
+import { fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { ApiError } from "@/lib/api";
 import StoryPage from "./page";
@@ -46,6 +46,7 @@ const STORY = {
 describe("StoryPage", () => {
   afterEach(() => {
     vi.clearAllMocks();
+    localStorage.clear();
   });
 
   it("shows a loading state while the story is fetched", () => {
@@ -107,10 +108,50 @@ describe("StoryPage", () => {
     expect(body.textContent).toBe("第一行。\n第二行。");
 
     expect(screen.getByText("天气")).toBeInTheDocument();
-    expect(screen.getByText("(tian1qi4)")).toBeInTheDocument();
+    expect(screen.getByText("(tiānqì)")).toBeInTheDocument();
     expect(screen.getByText("weather")).toBeInTheDocument();
     expect(screen.getByText("下雨")).toBeInTheDocument();
     expect(screen.getByText("to rain")).toBeInTheDocument();
+  });
+
+  it("shows tone-marked pinyin above vocabulary words in the story", async () => {
+    useSearchParams.mockReturnValue(new URLSearchParams("id=5"));
+    fetchStory.mockResolvedValueOnce({ ...STORY, content: "今天天气好。" });
+    const { container } = render(<StoryPage />);
+
+    await screen.findByRole("heading", { name: "天气小记" });
+
+    const rubies = container.querySelectorAll(".story-body ruby");
+    expect(rubies).toHaveLength(1);
+    expect(rubies[0].firstChild?.textContent).toBe("天气");
+    expect(rubies[0].querySelector("rt")?.textContent).toBe("tiānqì");
+  });
+
+  it("toggles pinyin and vertical layout, and remembers the choice", async () => {
+    useSearchParams.mockReturnValue(new URLSearchParams("id=5"));
+    fetchStory.mockResolvedValue(STORY);
+    const { container, unmount } = render(<StoryPage />);
+
+    const pinyin = await screen.findByRole("button", { name: "拼音 Pinyin" });
+    const vertical = screen.getByRole("button", { name: "竖排 Vertical" });
+    const body = container.querySelector(".story-body")!;
+    expect(pinyin).toHaveAttribute("aria-pressed", "true");
+    expect(vertical).toHaveAttribute("aria-pressed", "false");
+
+    fireEvent.click(pinyin);
+    fireEvent.click(vertical);
+    expect(pinyin).toHaveAttribute("aria-pressed", "false");
+    expect(body).toHaveClass("hide-pinyin", "story-body-vertical");
+
+    unmount();
+    render(<StoryPage />);
+    expect(
+      await screen.findByRole("button", { name: "竖排 Vertical" }),
+    ).toHaveAttribute("aria-pressed", "true");
+    expect(screen.getByRole("button", { name: "拼音 Pinyin" })).toHaveAttribute(
+      "aria-pressed",
+      "false",
+    );
   });
 
   it("omits the HSK badge when target_hsk is null but still shows the date", async () => {

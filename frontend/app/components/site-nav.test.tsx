@@ -3,6 +3,15 @@ import { describe, expect, it } from "vitest";
 import { SiteNav } from "./site-nav";
 
 describe("SiteNav", () => {
+  it("links the 话本 seal and name to the home page", () => {
+    render(<SiteNav />);
+
+    expect(screen.getByRole("link", { name: "话本 Huaben" })).toHaveAttribute(
+      "href",
+      "/",
+    );
+  });
+
   it("links to the Generate and Saved stories pages", () => {
     render(<SiteNav />);
 

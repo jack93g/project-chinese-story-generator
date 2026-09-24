@@ -6,13 +6,15 @@
   --muted-foreground: #776f5e;
   --border: #ddd2b6;
   --border-strong: #c7b997;
-  --accent: #3454d1;
-  --accent-hover: #2842ad;
+  --accent: #b0301f;
+  --accent-hover: #8f2416;
   --accent-foreground: #ffffff;
   --danger: #c22c22;
   --danger-bg: #fbeae8;
   --danger-border: #f0c4bf;
-  --focus-ring: #3454d1;
+  --focus-ring: #b0301f;
+  --seal: #b8322a;
+  --seal-foreground: #fdf8ec;
 
   --font-sans: var(--font-geist-sans), Arial, Helvetica, sans-serif;
   --font-mono: var(--font-geist-mono), "SFMono-Regular", Consolas, monospace;
@@ -21,6 +23,7 @@
   --font-zh-sans:
     "PingFang SC", "Microsoft YaHei", "Noto Sans SC", "Noto Sans CJK SC",
     "Heiti SC", sans-serif;
+  --font-zh-kai: "Kaiti SC", STKaiti, KaiTi, "AR PL UKai CN", var(--font-zh-serif);
 
   --space-1: 0.25rem;
   --space-2: 0.5rem;
@@ -34,20 +37,20 @@
 
 @media (prefers-color-scheme: dark) {
   :root {
-    --background: #0a0a0a;
-    --surface: #18181b;
-    --surface-hover: #212124;
-    --foreground: #ededed;
-    --muted-foreground: #9a9aa0;
-    --border: #303034;
-    --border-strong: #45454a;
-    --accent: #7b93ff;
-    --accent-hover: #93a7ff;
-    --accent-foreground: #0a0a12;
+    --background: #12100e;
+    --surface: #1c1916;
+    --surface-hover: #25211d;
+    --foreground: #ebe4d6;
+    --muted-foreground: #a69c8a;
+    --border: #332d27;
+    --border-strong: #4a4239;
+    --accent: #e8735a;
+    --accent-hover: #f08a73;
+    --accent-foreground: #1a0c08;
     --danger: #ff6b60;
     --danger-bg: #2c1614;
     --danger-border: #4a2420;
-    --focus-ring: #7b93ff;
+    --focus-ring: #e8735a;
   }
 }
 
@@ -122,6 +125,9 @@ h2 {
 }
 
 .site-title {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.6rem;
   font-weight: 700;
   font-size: 1.05rem;
   letter-spacing: -0.01em;
@@ -214,6 +220,38 @@ h2 {
 .page-content .home-actions a:hover {
   color: var(--foreground);
   text-decoration: underline;
+}
+
+/* Seal (印章): the 话本 brand mark, stacked vertically like a name seal,
+   white characters on red with a thin inner border. */
+
+.seal {
+  display: inline-block;
+  writing-mode: vertical-rl;
+  padding: 0.4em 0.32em;
+  border-radius: 0.2em;
+  background: var(--seal);
+  color: var(--seal-foreground);
+  box-shadow:
+    inset 0 0 0 0.13em var(--seal),
+    inset 0 0 0 0.2em var(--seal-foreground);
+  font-family: var(--font-zh-kai);
+  font-size: 0.8rem;
+  font-weight: 700;
+  line-height: 1;
+  letter-spacing: 0.08em;
+}
+
+.site-title .seal {
+  font-size: 0.95rem;
+}
+
+/* Stamped at the end of a story, slightly askew like a hand-pressed seal. */
+.seal-stamp {
+  align-self: flex-end;
+  font-size: 1.1rem;
+  opacity: 0.9;
+  transform: rotate(-6deg);
 }
 
 /* Forms */
@@ -358,9 +396,70 @@ h2 {
 .story-body {
   white-space: pre-wrap;
   font-family: var(--font-zh-serif);
-  font-size: 1.2rem;
-  line-height: 2;
-  letter-spacing: 0.02em;
+  font-size: 1.25rem;
+  line-height: 2.2;
+  letter-spacing: 0.04em;
+}
+
+.story-body rt {
+  font-family: var(--font-sans);
+  font-size: 0.55em;
+  letter-spacing: 0;
+  color: var(--muted-foreground);
+}
+
+/* Hidden rather than removed so the text doesn't reflow when toggled. */
+.story-body.hide-pinyin rt {
+  visibility: hidden;
+}
+
+/* Traditional layout: columns top to bottom, read right to left. The body
+   scrolls sideways and starts at the right-hand edge. */
+.story-body-vertical {
+  writing-mode: vertical-rl;
+  height: min(70vh, 32rem);
+  overflow-x: auto;
+  overflow-y: hidden;
+  padding: var(--space-2) 0;
+}
+
+.story-options {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  margin-top: var(--space-1);
+}
+
+.toggle {
+  padding: 0.35rem 0.85rem;
+  border: 1px solid var(--border-strong);
+  border-radius: 999px;
+  background: transparent;
+  color: var(--muted-foreground);
+  font: inherit;
+  font-size: 0.875rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition:
+    color 0.15s ease,
+    border-color 0.15s ease,
+    background-color 0.15s ease;
+}
+
+.toggle:hover {
+  color: var(--foreground);
+  border-color: var(--foreground);
+}
+
+.toggle[aria-pressed="true"] {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: var(--accent-foreground);
+}
+
+.toggle[aria-pressed="true"]:hover {
+  background: var(--accent-hover);
+  border-color: var(--accent-hover);
 }
 
 .story-glossary dl {
