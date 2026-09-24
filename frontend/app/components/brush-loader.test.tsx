@@ -24,6 +24,18 @@ describe("BrushLoader", () => {
     expect(container.querySelector("svg")).toBeNull();
   });
 
+  it("shows the characters without animating when one has no stroke data", () => {
+    vi.stubGlobal(
+      "matchMedia",
+      vi.fn().mockReturnValue({ matches: false }),
+    );
+    const { container } = render(<BrushLoader text="正龙" pinyin="" />);
+
+    expect(container.querySelector(".brush-loader-squares")).toHaveTextContent(
+      "正龙",
+    );
+  });
+
   it("is hidden from screen readers", () => {
     const { container } = render(
       <BrushLoader text="排队中" pinyin="páiduì zhōng" />,

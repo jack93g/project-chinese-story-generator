@@ -14,7 +14,7 @@ import 队 from "@/lib/stroke-data/队.json";
 // Public License, see lib/stroke-data/ARPHICPL.TXT). Only the characters the
 // loader writes are vendored, rather than the whole 47 MB data package; add
 // a file here before using a new character.
-const STROKE_DATA: Record<string, typeof 中> = {
+const STROKE_DATA: Partial<Record<string, typeof 中>> = {
   中,
   事,
   写,
@@ -44,9 +44,11 @@ export function BrushLoader({ text, pinyin }: { text: string; pinyin: string }) 
   const [animating, setAnimating] = useState(false);
 
   useEffect(() => {
+    // Fall back to the plain characters if any has no vendored stroke data.
     if (
       typeof window.matchMedia !== "function" ||
-      window.matchMedia("(prefers-reduced-motion: reduce)").matches
+      window.matchMedia("(prefers-reduced-motion: reduce)").matches ||
+      [...text].some((char) => !STROKE_DATA[char])
     ) {
       return;
     }
@@ -70,7 +72,7 @@ export function BrushLoader({ text, pinyin }: { text: string; pinyin: string }) 
           outlineColor: cssColor("--border"),
           strokeAnimationSpeed: 2,
           delayBetweenStrokes: 80,
-          charDataLoader: () => STROKE_DATA[char],
+          charDataLoader: () => STROKE_DATA[char]!,
         }),
       );
       setAnimating(true);
@@ -90,6 +92,8 @@ export function BrushLoader({ text, pinyin }: { text: string; pinyin: string }) 
         }
       }
       void writeAll();
+    }).catch(() => {
+      // The library couldn't load (e.g. offline); the plain characters stay.
     });
 
     return () => {

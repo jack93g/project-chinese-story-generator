@@ -142,6 +142,9 @@ describe("StoryPage", () => {
     fireEvent.click(vertical);
     expect(pinyin).toHaveAttribute("aria-pressed", "false");
     expect(body).toHaveClass("hide-pinyin", "story-body-vertical");
+    expect(
+      screen.getByRole("region", { name: "Story text" }),
+    ).toHaveAttribute("tabindex", "0");
 
     unmount();
     render(<StoryPage />);

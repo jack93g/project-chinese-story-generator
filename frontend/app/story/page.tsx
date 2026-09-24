@@ -257,12 +257,16 @@ function StoryReader({
         </div>
       </header>
 
-      {/* In vertical mode the body scrolls sideways, so it takes focus to let
-          keyboard users scroll it. */}
+      {/* In vertical mode the body scrolls sideways, so it becomes a named,
+          focusable region to let keyboard users scroll it. */}
       <p
         lang="zh"
         className={bodyClasses.join(" ")}
-        tabIndex={vertical ? 0 : undefined}
+        {...(vertical && {
+          tabIndex: 0,
+          role: "region",
+          "aria-label": "Story text",
+        })}
       >
         {sentences.map((sentence, sentenceIndex) => (
           <span
