@@ -1,10 +1,14 @@
-# Droplet Setup (M5-4, manual)
+# Droplet Setup
 
-Record of the manual provisioning done for M5-4, written so the Terraform
-that follows can be checked against it and M5-5 can build the runbook from
-it. Decisions behind these choices are in
-[deployment-decisions.md](deployment-decisions.md). No secrets or IP
-addresses are recorded here.
+How the production server is built: a single DigitalOcean Droplet running
+the API, the background worker and PostgreSQL with Docker Compose, behind
+Caddy for HTTPS. It was first set up by hand, and that setup is recorded
+below step by step. The same setup is now reproduced by Terraform (see
+[Infrastructure as code](#infrastructure-as-code-terraform)), and this
+document is the reference to check it against.
+
+Day-to-day operating procedures are in [runbook.md](runbook.md). No secrets
+or IP addresses are recorded here.
 
 ## What was created by hand
 
@@ -15,7 +19,7 @@ addresses are recorded here.
 | Size | Regular SSD, 2GB RAM / 1 vCPU / 50GB (~$12/mo) |
 | Hostname | `story-droplet` |
 | IPv6 | Off (extra public address to firewall and DNS for no benefit) |
-| Backups / monitoring | Off (backup and restore is M5-5) |
+| Backups / monitoring | DigitalOcean backups off; encrypted weekly `pg_dump` instead (see [runbook.md](runbook.md#backups)) |
 | Authentication | SSH key only; a dedicated ed25519 key, passphrase-protected |
 | Cloud firewall | Inbound TCP 22, 80, 443 from anywhere; outbound default (allow all) |
 
@@ -176,6 +180,8 @@ unintended.
 -> paste an older full SHA into `sha`. The build is skipped (the image is
 already in GHCR) and the script redeploys that tag. Migrations are not
 reversed; they stay additive so an older image works against a newer schema.
+If the rollback crosses a migration, the script skips `alembic upgrade head`
+(the older image doesn't know the database's revision and would fail on it).
 A red deploy run does **not** mean the previous release is still live: the
 script has already replaced the api and worker containers by the time the
 health checks run. On failure it prints the previous SHA; redeploy that via
@@ -241,7 +247,8 @@ deployed one, so `export IMAGE_TAG=$(git rev-parse HEAD)` first.
   widen what a stolen key can do — it just avoids going through the
   DigitalOcean console for OS-level changes.
 
-## Still to do
+## Operating it
 
-- First real run of the deploy pipeline after the one-time setup above, and
-  a rehearsed rollback (M5-5).
+Day-to-day procedures (deploy, rollback, worker restarts, failed requests,
+backup/restore, secret rotation, abuse response, patching) and the log of
+rehearsals are in [runbook.md](runbook.md).

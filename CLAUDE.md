@@ -38,7 +38,9 @@ RUN_SMOKE_TESTS=1 .venv/bin/python -m pytest -m smoke   # live provider calls, r
 .venv/bin/python -m pytest tests/generation/test_worker.py::test_name -v   # single test
 ```
 
-Migrations, after changing an ORM model:
+Migrations, after changing an ORM model (they must stay additive/backward-
+compatible so a rollback can run older code on the newer schema; see the
+migration policy in [docs/runbook.md](docs/runbook.md)):
 
 ```bash
 .venv/bin/alembic revision --autogenerate -m "describe the change"
@@ -76,8 +78,8 @@ containers' `DATABASE_URL`).
   don't change `.env` for that.
 - The password is embedded in the URLs, so keep it URL-safe (letters and
   digits; no `/`, `+`, `=`, `@`).
-- The image must never contain secrets (it is planned to be published to a
-  public GHCR package — see `docs/deployment-decisions.md`): `.env` is
+- The image must never contain secrets (it is published as a public GHCR
+  package, so the Droplet can pull it without credentials): `.env` is
   excluded by `.dockerignore` and injected only at runtime via `env_file`.
 
 ## Architecture
@@ -122,7 +124,8 @@ should be structured.
   - `worker.py` / `cli/generation_worker.py` — durable worker loop. Multiple
     workers can run safely: claiming a queued request is done at the database
     level so two workers never process the same one, and stale `running`
-    requests are reclaimed on worker startup. Requests move
+    requests are reclaimed at startup and then every few minutes. SIGTERM
+    stops the worker after its current request (Compose gives it 90s). Requests move
     `queued → running → succeeded|failed`, with up to 3 attempts and a retry
     endpoint for failed ones.
   - `redaction.py` — redacts provider request/response payloads before they
@@ -140,6 +143,23 @@ should be structured.
 `raw_skritter_payloads` (ingestion audit trail), `story_generation_requests` +
 `raw_generation_payloads` (generation lifecycle/debug trail), `stories` +
 `story_vocabulary_items` (generated output).
+
+## Deployment
+
+Production is one DigitalOcean Droplet running the Compose stack plus Caddy
+(`docker-compose.prod.yml`, layered on `docker-compose.yml`; it requires
+`IMAGE_TAG` set to a git SHA). Merging to `main` runs
+`.github/workflows/deploy-backend.yml`: build and push a SHA-tagged image to
+GHCR, then SSH to the Droplet, where `scripts/droplet-deploy.sh` migrates
+first and then recreates `api` and `worker`. Rollback is the same workflow
+with an older SHA.
+
+- `scripts/droplet-deploy.sh` and `scripts/db-backup.sh` run on the Droplet as
+  hand-installed copies, so changes to them need copying over after merge
+  (see the runbook).
+- `infra/terraform/cloud-init.yaml` must stay plain ASCII.
+- Docs: [docs/droplet-setup.md](docs/droplet-setup.md) (how the server is built),
+  [docs/runbook.md](docs/runbook.md) (operating procedures).
 
 ## Testing conventions
 
