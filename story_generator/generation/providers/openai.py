@@ -84,6 +84,9 @@ class OpenAIStoryGenerationProvider:
         api_key: str,
         model: str,
         base_url: str = _DEFAULT_CHAT_COMPLETIONS_URL,
+        # Keep well under the worker's stop_grace_period (90s in
+        # docker-compose.yml): a stopping worker finishes its current request,
+        # and Compose kills it if that takes longer than the grace period.
         timeout: float = 60.0,
     ):
         self._client = client

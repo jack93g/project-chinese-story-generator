@@ -7,16 +7,22 @@ processes can poll the same table concurrently without ever
 processing the same request twice.
 
 Crash recovery: if a worker dies mid-processing, its claimed request
-is left in "running" state indefinitely — there is no automatic
-in-process liveness detection (no heartbeat). Instead, call
-GenerationRequestService.reclaim_stale() periodically (e.g. at worker
-startup, or on a schedule) to requeue any "running" request whose
-started_at is older than a configured staleness threshold. Requests
-that are both stale AND have already exhausted MAX_ATTEMPTS are
-marked failed directly instead of requeued, so a worker that keeps
-crashing on the same request cannot loop it indefinitely. This is a
-deliberately simple, operator-driven recovery path — no heartbeat,
-no automatic scheduling of reclaim itself.
+is left in "running" state — there is no in-process liveness
+detection (no heartbeat). Instead, run_forever() calls
+GenerationRequestService.reclaim_stale() at startup and then every
+reclaim_interval seconds, requeueing any "running" request whose
+started_at is older than the staleness threshold. Periodic, not just
+at startup, because the worker that replaces a killed one usually
+starts well inside the threshold (e.g. a deploy recreating the
+container), so a startup-only sweep would never see the orphan.
+Requests that are both stale AND have already exhausted MAX_ATTEMPTS
+are marked failed directly instead of requeued, so a worker that
+keeps crashing on the same request cannot loop it indefinitely.
+
+Graceful stop: request_stop() (wired to SIGTERM by the CLI) makes
+run_forever() exit after the request in flight, if any, finishes —
+so an ordinary stop or deploy doesn't orphan a request at all, as
+long as the container's stop grace period outlasts one provider call.
 
 Success persistence is atomic: the Story row, its
 StoryVocabularyItem associations, and the StoryGenerationRequest's
@@ -32,7 +38,9 @@ insufficient coverage, or success — so every failure mode is
 diagnosable from raw_generation_payloads.
 """
 
+import threading
 import time
+from datetime import timedelta
 
 from sqlalchemy.orm import Session, sessionmaker
 
@@ -51,6 +59,12 @@ from story_generator.vocabulary.persistence.models import VocabularyItem
 class GenerationWorker:
     def __init__(self, provider: StoryGenerationProvider):
         self._provider = provider
+        self._stop = threading.Event()
+
+    def request_stop(self) -> None:
+        """Ask run_forever() to exit once the request in flight, if any, is
+        done. Safe to call from a signal handler."""
+        self._stop.set()
 
     def run_once(self, db: Session) -> bool:
         """
@@ -162,31 +176,40 @@ class GenerationWorker:
         db.commit()
         return True
 
+    def reclaim_stale(self, db: Session, stale_after: timedelta) -> None:
+        repository = GenerationRequestRepository(db)
+        service = GenerationRequestService(repository)
+        result = service.reclaim_stale(stale_after)
+        db.commit()
+        if result["failed"]:
+            print(
+                f"Marked {len(result['failed'])} stale request(s) as failed "
+                f"(exhausted retry limit): {result['failed']}"
+            )
+        if result["requeued"]:
+            print(
+                f"Requeued {len(result['requeued'])} stale request(s): {result['requeued']}"
+            )
+
     def run_forever(
         self,
         session_factory: sessionmaker,
         poll_interval: float = 5.0,
-        stale_after=None,
+        stale_after: timedelta | None = None,
+        reclaim_interval: float = 300.0,
     ) -> None:
         db = session_factory()
         try:
-            if stale_after is not None:
-                repository = GenerationRequestRepository(db)
-                service = GenerationRequestService(repository)
-                result = service.reclaim_stale(stale_after)
-                if result["failed"]:
-                    print(
-                        f"Marked {len(result['failed'])} stale request(s) as failed "
-                        f"(exhausted retry limit): {result['failed']}"
-                    )
-                if result["requeued"]:
-                    print(
-                        f"Requeued {len(result['requeued'])} stale request(s): {result['requeued']}"
-                    )
+            # Monotonic, so a wall-clock change can't stall or bunch sweeps.
+            next_reclaim = time.monotonic()
+            while not self._stop.is_set():
+                if stale_after is not None and time.monotonic() >= next_reclaim:
+                    self.reclaim_stale(db, stale_after)
+                    next_reclaim = time.monotonic() + reclaim_interval
 
-            while True:
                 processed = self.run_once(db)
                 if not processed:
-                    time.sleep(poll_interval)
+                    # Returns early if request_stop() is called meanwhile.
+                    self._stop.wait(poll_interval)
         finally:
             db.close()

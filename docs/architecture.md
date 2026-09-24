@@ -24,8 +24,8 @@ External systems, kept at explicit boundaries:
 - **PostgreSQL** — system of record for vocabulary, sync history, and
   stories.
 
-Future infrastructure (Airflow, BigQuery, etc.) is tracked in
-[milestones.md](milestones.md), not here.
+Future infrastructure (Airflow, BigQuery, etc.) is tracked on the
+[GitHub Project board](https://github.com/users/jack93g/projects/1), not here.
 
 ## Data flow
 

@@ -1,5 +1,5 @@
 #cloud-config
-# Replays the manual setup from docs/droplet-setup.md (session 2026-09-20/21)
+# Replays the manual setup from docs/droplet-setup.md
 # so a Terraform-created Droplet reaches the same state as the hand-built one.
 #
 # No top-level package_update/package_upgrade here on purpose: those trigger
@@ -45,6 +45,8 @@ runcmd:
   # input that will never come, and provisioning silently stalls.
   - DEBIAN_FRONTEND=noninteractive apt-get -y -o Dpkg::Options::="--force-confdef" -o Dpkg::Options::="--force-confold" upgrade
   - DEBIAN_FRONTEND=noninteractive apt-get -y -o Dpkg::Options::="--force-confdef" -o Dpkg::Options::="--force-confold" install docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
+  # age encrypts the weekly database backups (scripts/db-backup.sh).
+  - DEBIAN_FRONTEND=noninteractive apt-get -y install age
   # docker group is created by the docker-ce package above, so this has to
   # run now, not in the users: block above. Doing it there fails useradd
   # outright, since the docker group doesn't exist yet at that point.

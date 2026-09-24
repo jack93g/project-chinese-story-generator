@@ -48,14 +48,30 @@ fi
 
 # Migrate first, while the old API/worker keep serving: new code never starts
 # against an old schema, and additive migrations keep the old code working.
-echo "==> running migrations"
-"${compose[@]}" run --rm migrate
+#
+# A rollback past a migration is the exception: the database is then at a
+# revision the older image has never heard of, and its `alembic upgrade head`
+# fails with "Can't locate revision". Migrations are additive, so the older
+# code works against the newer schema as it is; skip the step instead of
+# blocking the rollback. Any other failure still stops the deploy.
+db_rev="$("${compose[@]}" exec -T db sh -c \
+  'psql -U "$POSTGRES_USER" -d "$POSTGRES_DB" -Atc "SELECT version_num FROM alembic_version" 2>/dev/null' \
+  </dev/null || true)"
+known="$("${compose[@]}" run --rm --no-deps migrate alembic show "${db_rev:-head}" </dev/null 2>&1 || true)"
+if [[ -n "$db_rev" && "$known" == *"Can't locate revision"* ]]; then
+  echo "==> database is at $db_rev, newer than this image's migrations: skipping (rollback)"
+else
+  echo "==> running migrations"
+  "${compose[@]}" run --rm migrate
+fi
 
 # Recreate both the API and the worker, never just one, on the new image.
 # Named explicitly so db and caddy are left alone: changes to them (e.g. the
 # Caddyfile) are deliberate manual steps, not something a code deploy bounces.
+# --no-deps: migrate is a dependency of both, and migrations were handled
+# above; without it compose runs migrate again, which fails on a rollback.
 echo "==> restarting api and worker"
-"${compose[@]}" up -d --remove-orphans api worker
+"${compose[@]}" up -d --no-deps --remove-orphans api worker
 
 echo "==> waiting for /health"
 for _ in $(seq 1 30); do

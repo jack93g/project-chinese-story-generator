@@ -18,7 +18,8 @@ durable background workflow.
   usage.
 - Run one or more durable workers safely: database-level claiming prevents two
   workers from processing the same request. Stale running requests are
-  reclaimed when a worker starts.
+  reclaimed at worker startup and every few minutes after, and a stopping
+  worker finishes its current request first.
 - Retain redacted provider request/response payloads and generation metadata
   for debugging. Failed requests can be retried up to three attempts.
 - Compare OpenAI-compatible providers against a shared evaluation set before
@@ -26,6 +27,9 @@ durable background workflow.
 - Version the PostgreSQL schema with SQLAlchemy and Alembic.
 - Run PostgreSQL, migrations, the API, and the worker locally with one
   `docker compose up` (see [Quick start](#quick-start-with-docker-compose)).
+- Deploy to a single DigitalOcean Droplet from GitHub Actions, with
+  SHA-tagged images, migrations before each release, one-step rollback, and
+  encrypted database backups (see [Deployment and operations](#deployment-and-operations)).
 
 ## API
 
@@ -85,6 +89,11 @@ API client → FastAPI routes → services → PostgreSQL
 - `story_generator/database` contains shared SQLAlchemy setup.
 - `story_generator/cli` provides manual vocabulary sync, generation-worker,
   and provider-comparison commands.
+- `scripts/` holds the production deploy, backup, and restore scripts that
+  run on the Droplet.
+- `infra/terraform` defines the Droplet, firewall, SSH key, and DNS record.
+- `docs/` holds the architecture, deployment decisions, server setup, and
+  operations runbook.
 
 Services coordinate workflows, repositories read and write PostgreSQL, and
 external clients make HTTP calls. Keeping these responsibilities separate
@@ -220,6 +229,10 @@ request with `--once`:
 .venv/bin/python -m story_generator.cli.generation_worker
 .venv/bin/python -m story_generator.cli.generation_worker --once
 ```
+
+`--stale-after-minutes` (default 15) and `--reclaim-interval-minutes`
+(default 5) control when a request left `running` by a crashed worker is
+requeued. Ctrl-C or SIGTERM stops the worker after its current request.
 
 Queue a request using the ID from `GET /vocabulary-lists`, then poll its
 status. Replace `1` with an existing vocabulary-list ID and the returned
@@ -368,16 +381,26 @@ approved provider:
 RUN_SMOKE_TESTS=1 .venv/bin/python -m pytest -m smoke
 ```
 
+## Deployment and operations
+
+Merging to `main` builds an image tagged with the commit SHA, pushes it to
+GHCR, and deploys it to a single DigitalOcean Droplet: migrations run first,
+then the API and worker restart on the new image. Rolling back redeploys an
+older SHA through the same workflow.
+
+- [docs/droplet-setup.md](docs/droplet-setup.md): how the server is built,
+  by hand and with Terraform.
+- [docs/runbook.md](docs/runbook.md): how to deploy, roll back, restart the
+  worker, debug failed generations, back up and restore the database, rotate
+  secrets, and patch.
+
+Schema migrations must stay backward-compatible (add, don't rename or drop)
+so a rollback can run older code against the newer schema; see the runbook's
+migration policy.
+
 ## Frontend
 
 A Next.js frontend lives in [frontend/](frontend/README.md). It talks only to
 the FastAPI endpoints above — see that README for setup and for the commands
 to run the API, worker, and frontend together.
 
-## Roadmap
-
-The milestone-level delivery plan is in [docs/milestones.md](docs/milestones.md).
-Vocabulary ingestion, the backend API, and the durable story-generation
-workflow are implemented. Individual tickets are tracked on the
-[GitHub Project board](https://github.com/users/jack93g/projects/1), not in
-markdown.
