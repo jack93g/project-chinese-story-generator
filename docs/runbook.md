@@ -175,8 +175,10 @@ diff ~/db-backup.sh scripts/db-backup.sh && echo "db-backup.sh up to date"
   git fetch origin
   gh workflow run deploy-backend.yml --ref main -f sha=$(git rev-parse origin/main)
   gh run watch
+  gh run view --log | grep -o '==> .*'   # the deploy script's own lines
   ```
-  The run should be green and end with `==> deployed <sha>`.
+  `gh run watch` shows only job status; the last line of the log output should
+  be `==> deployed <sha>`.
 - Backup script, on the Droplet: run `~/db-backup.sh` once and check that a
   new file appears in `~/backups/`.
 
@@ -247,8 +249,11 @@ than the rollback.
    ```bash
    gh workflow run deploy-backend.yml --ref main -f sha=<target-sha>
    gh run watch
+   gh run view --log | grep -o '==> .*'   # the deploy script's own lines
    ```
-   The build is skipped and the same deploy script runs against the old tag.
+   The build is skipped (`gh run watch` shows it with `-` rather than `✓`) and
+   the same deploy script runs against the old tag; the log ends with
+   `==> deployed <target-sha>`.
    If the rollback crosses a migration, the database is at a revision the old
    image doesn't know. The script sees that (`alembic show` can't find it)
    and skips migrations, logging "newer than this image's migrations:
