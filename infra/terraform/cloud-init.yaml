@@ -45,7 +45,7 @@ write_files:
       # Production compose, pinned to the image of the checked-out (deployed) commit.
       dc() { (cd ~/app && IMAGE_TAG="$(git rev-parse HEAD)" docker compose -f docker-compose.yml -f docker-compose.prod.yml "$@"); }
       # psql on the production database; credentials come from the db container.
-      dbsql() { dc exec db sh -c 'psql -U "$POSTGRES_USER" -d "$POSTGRES_DB"' "$@"; }
+      dbsql() { dc exec db sh -c 'psql -U "$POSTGRES_USER" -d "$POSTGRES_DB" "$@"' sh "$@"; }
 
 runcmd:
   # Docker's official apt repo (not Ubuntu's docker.io), matching the manual setup.

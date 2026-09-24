@@ -64,11 +64,11 @@ places.
 # Production compose, pinned to the image of the checked-out (deployed) commit.
 dc() { (cd ~/app && IMAGE_TAG="$(git rev-parse HEAD)" docker compose -f docker-compose.yml -f docker-compose.prod.yml "$@"); }
 # psql on the production database; credentials come from the db container.
-dbsql() { dc exec db sh -c 'psql -U "$POSTGRES_USER" -d "$POSTGRES_DB"' "$@"; }
+dbsql() { dc exec db sh -c 'psql -U "$POSTGRES_USER" -d "$POSTGRES_DB" "$@"' sh "$@"; }
 ```
 
-`dbsql` opens an interactive prompt. For a single query, run `dbsql` and paste
-it. Every SQL snippet below is read-only unless it's wrapped in
+`dbsql` opens an interactive prompt to paste queries into; arguments go to
+`psql`, so `dbsql -c 'SELECT count(*) FROM stories;'` runs a single query. Every SQL snippet below is read-only unless it's wrapped in
 `BEGIN; ... COMMIT;`.
 
 ## Deploy a new version
