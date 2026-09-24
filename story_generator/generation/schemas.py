@@ -8,7 +8,6 @@ from pydantic import BaseModel, Field, field_validator, model_validator
 # layers deliberately; see StoryGenerationRequest docstring.
 MAX_TARGET_WORD_COUNT = 1000
 MAX_TOPIC_LENGTH = 200
-MAX_CUSTOM_WORDS = 15
 MAX_CUSTOM_WORD_LENGTH = 20
 # CJK-only: custom words are interpolated into the LLM prompt, so anything
 # else (latin text, punctuation) is rejected rather than sanitised.
@@ -54,7 +53,9 @@ class CreateGenerationRequestSchema(BaseModel):
     target_word_count: int = Field(gt=0, le=MAX_TARGET_WORD_COUNT)
     target_vocabulary_count: int = Field(ge=1, le=15)
     topic: str | None = Field(default=None, max_length=MAX_TOPIC_LENGTH)
-    custom_words: list[str] = Field(default_factory=list, max_length=MAX_CUSTOM_WORDS)
+    # Raw cap only bounds work; the real limit is checked after dedupe (via
+    # target_vocabulary_count, which is itself at most 15).
+    custom_words: list[str] = Field(default_factory=list, max_length=100)
 
     @field_validator("custom_words")
     @classmethod

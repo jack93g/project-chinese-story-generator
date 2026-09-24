@@ -57,18 +57,18 @@ from story_generator.vocabulary.persistence.models import VocabularyItem
 
 
 def _apply_glossary(db: Session, snapshot: list[dict], glossary: list[dict]) -> None:
-    """Fill missing reading/definition on custom words from the model's
-    glossary. Never touches Skritter-sourced items or fields already set."""
+    """Fill missing (null) reading/definition from the model's glossary.
+    Never overwrites a value that is already set."""
     by_writing = {entry["writing"]: entry for entry in glossary}
     for item in snapshot:
         entry = by_writing.get(item["writing"])
         vocabulary_item = db.get(VocabularyItem, item["id"])
-        if entry is None or vocabulary_item.skritter_vocab_id is not None:
+        if entry is None:
             continue
         if vocabulary_item.reading is None:
-            vocabulary_item.reading = entry["reading"]
+            vocabulary_item.reading = entry.get("reading")
         if vocabulary_item.definition_en is None:
-            vocabulary_item.definition_en = entry["definition_en"]
+            vocabulary_item.definition_en = entry.get("definition_en")
 
 
 class GenerationWorker:

@@ -65,7 +65,9 @@ class VocabularyRepository:
         return (
             self.session.query(VocabularyItem)
             .filter_by(language="zh", writing=writing)
-            .order_by(VocabularyItem.id.asc())
+            .order_by(
+                VocabularyItem.skritter_vocab_id.is_(None), VocabularyItem.id.asc()
+            )
             .first()
         )
 

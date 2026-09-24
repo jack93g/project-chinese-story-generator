@@ -308,6 +308,36 @@ describe("GeneratePage", () => {
     });
   });
 
+  it("allows an empty list when custom words are provided", async () => {
+    createStoryGeneration.mockResolvedValueOnce({ id: 13, status: "queued" });
+    await renderReady();
+
+    fireEvent.change(screen.getByLabelText("Vocabulary list"), {
+      target: { value: "2" },
+    });
+    fireEvent.change(screen.getByLabelText("Custom words (optional)"), {
+      target: { value: "菜单" },
+    });
+    fireEvent.change(screen.getByLabelText("Target HSK level"), {
+      target: { value: "2" },
+    });
+
+    expect(
+      screen.queryByText(/This list has no vocabulary items yet/),
+    ).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Generate" }));
+
+    await waitFor(() => {
+      expect(createStoryGeneration).toHaveBeenCalledWith(
+        expect.objectContaining({
+          vocabulary_list_id: 2,
+          custom_words: ["菜单"],
+          target_vocabulary_count: 1,
+        }),
+      );
+    });
+  });
+
   it("blocks submission and explains when a custom word is not Chinese", async () => {
     await renderReady();
 

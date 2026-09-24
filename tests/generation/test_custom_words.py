@@ -67,6 +67,12 @@ def test_schema_rejects_more_than_fifteen_custom_words():
         CreateGenerationRequestSchema(custom_words=words, **BASE)
 
 
+def test_schema_dedupes_before_applying_the_count_limit():
+    schema = CreateGenerationRequestSchema(custom_words=["菜单"] * 20, **BASE)
+
+    assert schema.custom_words == ["菜单"]
+
+
 # ---- prompt v2 (no database) ----
 
 
@@ -348,3 +354,52 @@ def test_worker_saves_glossary_on_custom_words_but_never_overwrites_skritter(
     assert (custom.reading, custom.definition_en) == ("fan4guan3", "restaurant")
     db_session.refresh(skritter_item)
     assert (skritter_item.reading, skritter_item.definition_en) == ("py0", "def 0")
+
+
+@pytest.mark.db
+def test_lookup_prefers_skritter_item_even_if_custom_row_is_older(db_session):
+    repo = VocabularyRepository(db_session)
+    [custom] = repo.get_or_create_custom_items(["菜单"])
+    skritter = VocabularyItem(
+        skritter_vocab_id="zh-菜单-0",
+        language="zh",
+        writing="菜单",
+        reading="cai4dan1",
+        definition_en="menu",
+    )
+    db_session.add(skritter)
+    db_session.flush()
+    assert custom.id < skritter.id
+
+    [resolved] = repo.get_or_create_custom_items(["菜单"])
+
+    assert resolved.id == skritter.id
+
+
+@pytest.mark.db
+def test_glossary_fills_only_missing_fields_on_any_item(client, db_session):
+    vocab_list = _make_list(db_session, skritter_list_id="partial", writings=["菜单"])
+    item = vocab_list.items[0]
+    item.definition_en = None
+    db_session.flush()
+    client.post(
+        "/story-generations",
+        json={
+            **BASE,
+            "vocabulary_list_id": vocab_list.id,
+            "target_vocabulary_count": 1,
+        },
+    )
+
+    provider = FakeStoryGenerationProvider(
+        scenario="success",
+        raw_response=(
+            '{"title": "故事", "body": "菜单。", "glossary": '
+            '[{"writing": "菜单", "reading": "OTHER", "definition_en": "menu"}]}'
+        ),
+    )
+    GenerationWorker(provider=provider).run_once(db_session)
+    db_session.commit()
+
+    db_session.refresh(item)
+    assert (item.reading, item.definition_en) == ("py0", "menu")

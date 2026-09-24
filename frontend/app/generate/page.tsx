@@ -229,7 +229,7 @@ export default function GeneratePage() {
     (hasList || customWords.length > 0) &&
     customWordsResult.error === null &&
     hskLevel !== "" &&
-    !isSelectedListEmpty &&
+    !(isSelectedListEmpty && customWords.length === 0) &&
     targetWordCountResult.error === null &&
     submitState.status !== "submitting";
 
@@ -403,7 +403,7 @@ export default function GeneratePage() {
               </option>
             ))}
           </select>
-          {isSelectedListEmpty && (
+          {isSelectedListEmpty && customWords.length === 0 && (
             <p role="alert" className="field-error">
               This list has no vocabulary items yet — choose another list.
             </p>
