@@ -51,7 +51,9 @@ def _v2_vocab_line(item: dict) -> str:
 def build_story_v2_prompt(request: GenerationRequestInput) -> str:
     """Like v1, but tolerates vocabulary with no reading/definition (custom
     words) and asks the model to gloss those in the same response."""
-    vocab_lines = "\n".join(_v2_vocab_line(item) for item in request.vocabulary_snapshot)
+    vocab_lines = "\n".join(
+        _v2_vocab_line(item) for item in request.vocabulary_snapshot
+    )
     topic_line = f"Topic: {request.topic}\n" if request.topic else ""
     unglossed = [
         item["writing"]
