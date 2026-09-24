@@ -3,6 +3,7 @@ from story_generator.generation.prompts.builder import (
     build_prompt,
     build_story_v1_prompt,
     build_story_v3_prompt,
+    build_story_v4_prompt,
 )
 from story_generator.generation.providers.types import GenerationRequestInput
 
@@ -96,8 +97,8 @@ def test_prompt_requests_structured_json_output():
     assert '"body"' in prompt
 
 
-def test_current_prompt_version_is_v3():
-    assert CURRENT_PROMPT_VERSION == "story-v3"
+def test_current_prompt_version_is_v4():
+    assert CURRENT_PROMPT_VERSION == "story-v4"
 
 
 def test_v3_prompt_states_a_length_band_and_paragraph_plan():
@@ -140,3 +141,20 @@ def test_v3_prompt_keeps_vocabulary_and_glossary_request():
     assert "- 饭馆\n" in prompt
     assert "glossary entry for each of these words: 饭馆" in prompt
     assert '"glossary"' in prompt
+
+
+def test_v4_prompt_adds_consistency_and_collocation_guidance_to_v3():
+    request = _make_request(prompt_version="story-v4", target_word_count=300)
+
+    v3 = build_story_v3_prompt(request)
+    v4 = build_story_v4_prompt(request)
+
+    assert "plausible and consistent" in v4
+    assert "natural collocation" in v4
+    assert "not into a closing summary or moral" in v4
+    assert "plausible and consistent" not in v3
+    # the guidance sits between the vocabulary and the length section,
+    # and v4 is otherwise v3
+    guidance_start = v4.index("Keep the story plausible")
+    assert guidance_start < v4.index("Length:")
+    assert v4.replace(v4[guidance_start : v4.index("Length:")], "") == v3
