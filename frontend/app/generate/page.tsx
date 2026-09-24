@@ -429,7 +429,9 @@ export default function GeneratePage() {
             <p id="custom-words-hint" className="field-hint">
               {customWords.length > 0
                 ? `${customWords.length} custom word${customWords.length === 1 ? "" : "s"}${hasList ? "; the list fills the remaining slots" : ""}.`
-                : "These are always included in the story. Add a list above to fill the remaining slots."}
+                : hasList
+                  ? "Optional. Custom words are always included; the list fills the remaining slots."
+                  : "Choose a vocabulary list above or enter at least one custom word."}
             </p>
           )}
         </div>

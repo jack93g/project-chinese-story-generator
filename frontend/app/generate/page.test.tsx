@@ -338,6 +338,23 @@ describe("GeneratePage", () => {
     });
   });
 
+  it("tells the user to pick a list or enter custom words when neither is set", async () => {
+    await renderReady();
+
+    expect(
+      screen.getByText(
+        "Choose a vocabulary list above or enter at least one custom word.",
+      ),
+    ).toBeInTheDocument();
+
+    fireEvent.change(screen.getByLabelText("Vocabulary list"), {
+      target: { value: "1" },
+    });
+    expect(
+      screen.getByText(/Optional\. Custom words are always included/),
+    ).toBeInTheDocument();
+  });
+
   it("blocks submission and explains when a custom word is not Chinese", async () => {
     await renderReady();
 

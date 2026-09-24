@@ -57,7 +57,16 @@ class VocabularyRepository:
                         index_where=VocabularyItem.skritter_vocab_id.is_(None),
                     )
                 )
-                item = self._find_by_writing(writing)
+                item = self._find_by_writing(writing) or (
+                    self.session.query(VocabularyItem)
+                    .filter(
+                        VocabularyItem.writing == writing,
+                        VocabularyItem.skritter_vocab_id.is_(None),
+                    )
+                    .first()
+                )
+                if item is None:
+                    raise RuntimeError(f"Could not resolve custom word {writing!r}")
             items.append(item)
         return items
 
