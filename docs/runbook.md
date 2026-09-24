@@ -28,24 +28,47 @@ guess.
 ## Conventions
 
 Everything "on the Droplet" means an SSH session as `deploy` with your admin
-key (not the CI key, which can only run the deploy script):
+key (not the CI key, which can only run the deploy script). The commands in
+this runbook use `deploy@api.huaben.app`, so tell SSH which key that host
+uses, in `~/.ssh/config` on your laptop:
 
-```bash
-ssh deploy@api.huaben.app
+```
+Host story api.huaben.app
+    HostName api.huaben.app
+    User deploy
+    IdentityFile ~/.ssh/story_droplet
+    IdentitiesOnly yes
 ```
 
-Production compose commands always need both files and `IMAGE_TAG`. Add these
-two helpers to `~deploy/.bashrc` once, and the rest of this runbook uses them:
+Then `ssh deploy@api.huaben.app` (or `ssh story`) logs in. Without it, SSH
+offers only your default keys and the Droplet answers "Permission denied
+(publickey)".
+
+**Root access** is `sudo` as `deploy` (passwordless). DigitalOcean's web
+console doesn't work: it logs in as root over SSH, which is disabled. If
+`sudo` ever stops working, the break-glass route is the `docker` group, which
+`deploy` is in and which is root-equivalent. This starts a root shell on the
+host itself; `exit` leaves it:
+
+```bash
+docker run --rm -it --entrypoint chroot -v /:/host postgres:17 /host /bin/bash
+```
+
+Production compose commands always need both files and `IMAGE_TAG`. The rest
+of this runbook uses these two helpers from `~deploy/.bashrc`. A Droplet built
+by Terraform gets them from `infra/terraform/cloud-init.yaml`; on one built by
+hand, add them once, then `source ~/.bashrc`. If you change them, change both
+places.
 
 ```bash
 # Production compose, pinned to the image of the checked-out (deployed) commit.
 dc() { (cd ~/app && IMAGE_TAG="$(git rev-parse HEAD)" docker compose -f docker-compose.yml -f docker-compose.prod.yml "$@"); }
 # psql on the production database; credentials come from the db container.
-dbsql() { dc exec db sh -c 'psql -U "$POSTGRES_USER" -d "$POSTGRES_DB"' "$@"; }
+dbsql() { dc exec db sh -c 'psql -U "$POSTGRES_USER" -d "$POSTGRES_DB" "$@"' sh "$@"; }
 ```
 
-`dbsql` opens an interactive prompt. For a single query, run `dbsql` and paste
-it. Every SQL snippet below is read-only unless it's wrapped in
+`dbsql` opens an interactive prompt to paste queries into; arguments go to
+`psql`, so `dbsql -c 'SELECT count(*) FROM stories;'` runs a single query. Every SQL snippet below is read-only unless it's wrapped in
 `BEGIN; ... COMMIT;`.
 
 ## Deploy a new version
@@ -117,33 +140,47 @@ you copy the new one over.
 don't need to do anything for other code, and nothing for
 `scripts/db-restore.sh`, which you run by hand straight from `~/app`.
 
-**How** (on the Droplet, after the merge's deploy has finished; don't copy
-over `~/deploy.sh` while a deploy is running):
+**How**, on the Droplet, after the merge's deploy has finished (don't copy
+over `~/deploy.sh` while a deploy is running). Do only the script(s) the merge
+changed. Read each `diff` before running the `cp` under it.
 
 ```bash
-cd ~/app && git rev-parse HEAD             # the merged SHA, i.e. the deploy has run
+cd ~/app && git rev-parse HEAD                # must be the merged SHA, i.e. the deploy has run
+```
 
-diff ~/deploy.sh scripts/droplet-deploy.sh # review what changes
+Deploy script:
+
+```bash
+diff ~/deploy.sh scripts/droplet-deploy.sh    # read what changes
 cp scripts/droplet-deploy.sh ~/deploy.sh
+diff ~/deploy.sh scripts/droplet-deploy.sh && echo "deploy.sh up to date"
+```
 
-diff ~/db-backup.sh scripts/db-backup.sh
+Backup script (if `~/db-backup.sh` doesn't exist yet, backups were never set
+up: do [Backups → One-time setup](#one-time-setup) instead):
+
+```bash
+diff ~/db-backup.sh scripts/db-backup.sh      # read what changes
 cp scripts/db-backup.sh ~/db-backup.sh
-
-diff ~/deploy.sh scripts/droplet-deploy.sh && diff ~/db-backup.sh scripts/db-backup.sh && echo "copies up to date"
+diff ~/db-backup.sh scripts/db-backup.sh && echo "db-backup.sh up to date"
 ```
 
 `cp` onto an existing file keeps its permissions, so no `chmod` is needed.
 
 **Check it works:**
 
-- Deploy script: redeploy what's already live, which exercises the new copy
-  without changing anything. (Use the current `main` SHA.)
+- Deploy script, **from your laptop** (in the repo): redeploy what's already
+  live. This runs the new copy without changing anything.
   ```bash
+  git fetch origin
   gh workflow run deploy-backend.yml --ref main -f sha=$(git rev-parse origin/main)
   gh run watch
+  gh run view --log | grep -o '==> .*'   # the deploy script's own lines
   ```
-- Backup script: run `~/db-backup.sh` once and check that a new file appears
-  in `~/backups/`.
+  `gh run watch` shows only job status; the last line of the log output should
+  be `==> deployed <sha>`.
+- Backup script, on the Droplet: run `~/db-backup.sh` once and check that a
+  new file appears in `~/backups/`.
 
 ## Migration policy
 
@@ -212,8 +249,11 @@ than the rollback.
    ```bash
    gh workflow run deploy-backend.yml --ref main -f sha=<target-sha>
    gh run watch
+   gh run view --log | grep -o '==> .*'   # the deploy script's own lines
    ```
-   The build is skipped and the same deploy script runs against the old tag.
+   The build is skipped (`gh run watch` shows it with `-` rather than `✓`) and
+   the same deploy script runs against the old tag; the log ends with
+   `==> deployed <target-sha>`.
    If the rollback crosses a migration, the database is at a revision the old
    image doesn't know. The script sees that (`alembic show` can't find it)
    and skips migrations, logging "newer than this image's migrations:
@@ -240,8 +280,20 @@ The worker can be restarted without touching the API:
 ```bash
 dc restart worker            # waits for a request in flight to finish (up to 90s)
 dc ps worker                 # "Up ..." (not "Restarting")
-dc logs --tail=20 worker     # "Received SIGTERM ... Worker stopped." then a clean start
+dc logs --tail=20 worker
 ```
+
+The logs should end with the old worker stopping and the new one starting:
+
+```
+Received SIGTERM; stopping after the current request.
+Worker stopped.
+Worker started (poll every 5s, reclaim every 5m, stale after 15m).
+```
+
+Check `dc ps worker` again after ~10 seconds: `Up 10 seconds` means it's
+staying up; `Restarting` means it's crashing on startup (see the last bullet
+below).
 
 - `restart` keeps the existing container, **including its environment**. After
   editing `.env`, use `dc up -d --no-deps --force-recreate worker` instead. `restart`
@@ -490,7 +542,7 @@ value once the new one is proven working.
 
 | Secret | Where to get a new one | Also do |
 | --- | --- | --- |
-| `API_ACCESS_KEY` | `openssl rand -hex 32` | Re-enter it in the frontend (it's in your browser's `localStorage`). Old key stops working immediately. |
+| `API_ACCESS_KEY` | `openssl rand -hex 32` | Check `grep '^API_ACCESS_KEY=' ~/app/.env` shows the new key (nano saves with `Ctrl+O`, Enter). Then enter the new key in the frontend when it asks (it's kept in your browser's `localStorage`); stories loading is the proof. The old key stops working immediately. |
 | `OPENAI_API_KEY` (OpenRouter) | Provider dashboard → new key | Queue one story to prove it, then delete the old key in the dashboard. |
 | `SKRITTER_ACCESS_TOKEN` | Skritter account settings | Only `sync-skritter` uses it; prove with `dc run --rm api sync-skritter --list-id <id>`. |
 | DB password (`POSTGRES_PASSWORD`) | `openssl rand -hex 24` (letters and digits only) | See below: `.env` alone doesn't change it. |
@@ -643,7 +695,9 @@ most: they prove code and data can both be recovered.
 | Date | Procedure | Evidence | Notes |
 | --- | --- | --- | --- |
 | 2026-09-23 | Backup + both restore modes, on a local copy of the prod compose stack (not the Droplet) | Scripts run end to end: encrypted dump, pruning, scratch restore, `--replace-live` swap with health check, and the manual undo | Stand-in for `age` was used; not a substitute for the production rehearsal below |
-| | Rollback to previous SHA and roll forward (production) | Actions run URLs | |
-| | Restore rehearsal from a laptop backup (production, `restore_check`) | Row counts vs live | |
-| | Worker restart independent of the API (production) | `dc ps` / logs | |
-| | Secret rotation: at least one (production) | | |
+| 2026-09-24 | Deploy by merge (PR #65), then update the Droplet's `deploy.sh` copy and redeploy the live SHA to prove it (production) | [merge deploy](https://github.com/jack93g/project-chinese-story-generator/actions/runs/35977036214), [redeploy with new script](https://github.com/jack93g/project-chinese-story-generator/actions/runs/35977642641): `api`/`worker` left `Running`, `migrate` not re-run | Runbook's copy steps didn't cover a first install of `db-backup.sh` or say the check runs from the laptop; fixed |
+| 2026-09-24 | Worker restart independent of the API (production) | `Received SIGTERM ... Worker stopped.` in 0.8s, `dc ps` Up | No startup log line, and output was buffered until exit; fixed with `PYTHONUNBUFFERED` and a startup message |
+| 2026-09-24 | Backup setup, first backup, laptop pull and decrypt check (production) | `==> wrote`, then `pg_restore --list` OK on the laptop | `deploy` had no sudo and the web console can't log in as root; gave `deploy` passwordless sudo via the docker break-glass route. Runbook host needed an `~/.ssh/config` entry; both documented |
+| 2026-09-24 | Restore rehearsal from a laptop backup into `restore_check` (production) | Row counts and Alembic version matched live; `restore_check` dropped | |
+| 2026-09-24 | Rollback `8d919dc` → `56637e0` and roll forward (production) | [rollback](https://github.com/jack93g/project-chinese-story-generator/actions/runs/35981613467) (build skipped), [roll forward](https://github.com/jack93g/project-chinese-story-generator/actions/runs/35981959976); `git rev-parse` and `dc ps` image tags checked each way | `gh run watch` hides the script's `==>` lines; runbook now shows `gh run view --log` |
+| 2026-09-24 | Rotate `API_ACCESS_KEY` (production) | `.env` holds the new key, the running `api` has the same value (hash compare), the site works with the new key | A two-key curl test was easy to paste in the wrong order and looked like a failure; runbook now checks `.env` and the site instead |

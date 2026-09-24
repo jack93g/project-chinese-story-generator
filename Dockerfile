@@ -1,5 +1,10 @@
 FROM python:3.12
 
+# Write print() output straight through, so `docker compose logs` shows the
+# API's and worker's lines when they happen rather than when a buffer fills
+# or the process exits.
+ENV PYTHONUNBUFFERED=1
+
 WORKDIR /project-chinese-story-generator
 
 COPY pyproject.toml ./

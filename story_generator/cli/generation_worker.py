@@ -71,6 +71,10 @@ def main() -> None:
     signal.signal(signal.SIGTERM, _stop)
     signal.signal(signal.SIGINT, _stop)
 
+    print(
+        f"Worker started (poll every {args.poll_interval:g}s, reclaim every "
+        f"{args.reclaim_interval_minutes:g}m, stale after {args.stale_after_minutes:g}m)."
+    )
     worker.run_forever(
         session_factory,
         poll_interval=args.poll_interval,
