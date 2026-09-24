@@ -13,6 +13,7 @@ guess.
 
 - [Conventions](#conventions)
 - [Deploy a new version](#deploy-a-new-version)
+- [Update the deploy or backup script](#update-the-deploy-or-backup-script)
 - [Migration policy](#migration-policy)
 - [Roll back application code](#roll-back-application-code)
 - [Restart the worker](#restart-the-worker)
@@ -80,15 +81,69 @@ it failed at or after step 4, the new containers are already live, so decide
 whether to roll back ([below](#roll-back-application-code)) or fix forward.
 If it failed before step 4, nothing that's running changed.
 
-**If you changed a script that's installed as a copy** (`droplet-deploy.sh`
-→ `~deploy/deploy.sh`, `db-backup.sh` → `~deploy/db-backup.sh`), copy it over
-by hand after the merge. The copies don't update themselves:
+**If the merge changed `scripts/droplet-deploy.sh` or `scripts/db-backup.sh`**,
+the deploy doesn't pick that up on its own. Follow
+[Update the deploy or backup script](#update-the-deploy-or-backup-script).
+
+## Update the deploy or backup script
+
+Two scripts run on the Droplet from their **own copies** in the `deploy`
+user's home, not from the git checkout in `~/app`:
+
+| Script in the repo | Copy the Droplet runs | Run by |
+| --- | --- | --- |
+| `scripts/droplet-deploy.sh` | `~/deploy.sh` | every deploy (the CI key can run only this) |
+| `scripts/db-backup.sh` | `~/db-backup.sh` | the weekly cron job |
+
+A merge to `main` updates `~/app` but never these copies. So after a merge
+that changes either script, the Droplet keeps running the old version until
+you copy the new one over.
+
+**Why copies?**
+
+- **The CI key stays limited.** The key GitHub Actions uses is locked to
+  `/home/deploy/deploy.sh`, so that file is everything CI can do on the
+  server. If it lived in `~/app`, whatever code was being deployed would decide
+  what it does. As a copy, only someone logged in over SSH can change it.
+- **A rollback doesn't roll back the scripts.** A deploy checks out the target
+  commit in `~/app`. Rolling back to an older commit would otherwise also bring
+  back an older deploy script (missing later fixes) or remove the backup script
+  if that commit predates it.
+- **A running script isn't edited under itself.** Bash reads a script as it
+  runs, so a deploy that checked out a new version of its own script could end
+  up running a mix of old and new lines.
+
+**When:** only after a merge that changes one of the two files above. You
+don't need to do anything for other code, and nothing for
+`scripts/db-restore.sh`, which you run by hand straight from `~/app`.
+
+**How** (on the Droplet, after the merge's deploy has finished; don't copy
+over `~/deploy.sh` while a deploy is running):
 
 ```bash
-cd ~/app && git log -1 --format=%H   # make sure this is the new SHA
-diff scripts/droplet-deploy.sh ~/deploy.sh; cp scripts/droplet-deploy.sh ~/deploy.sh
-diff scripts/db-backup.sh ~/db-backup.sh;   cp scripts/db-backup.sh ~/db-backup.sh
+cd ~/app && git rev-parse HEAD             # the merged SHA, i.e. the deploy has run
+
+diff ~/deploy.sh scripts/droplet-deploy.sh # review what changes
+cp scripts/droplet-deploy.sh ~/deploy.sh
+
+diff ~/db-backup.sh scripts/db-backup.sh
+cp scripts/db-backup.sh ~/db-backup.sh
+
+diff ~/deploy.sh scripts/droplet-deploy.sh && diff ~/db-backup.sh scripts/db-backup.sh && echo "copies up to date"
 ```
+
+`cp` onto an existing file keeps its permissions, so no `chmod` is needed.
+
+**Check it works:**
+
+- Deploy script: redeploy what's already live, which exercises the new copy
+  without changing anything. (Use the current `main` SHA.)
+  ```bash
+  gh workflow run deploy-backend.yml --ref main -f sha=$(git rev-parse origin/main)
+  gh run watch
+  ```
+- Backup script: run `~/db-backup.sh` once and check that a new file appears
+  in `~/backups/`.
 
 ## Migration policy
 
