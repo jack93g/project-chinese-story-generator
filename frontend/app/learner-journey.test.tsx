@@ -160,7 +160,8 @@ describe("learner journey (real API client, fake HTTP + navigation)", () => {
     expect(
       screen.getByRole("heading", { name: "颜色的公园" }),
     ).toBeInTheDocument();
-    expect(screen.getByText("颜色")).toBeInTheDocument();
+    // 颜色 appears twice: annotated in the story body and in the glossary.
+    expect(screen.getByText("颜色", { selector: "dt" })).toBeInTheDocument();
     expect(screen.getByText("color")).toBeInTheDocument();
   });
 

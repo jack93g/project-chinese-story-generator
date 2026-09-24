@@ -8,6 +8,7 @@ import {
   fetchAllStories,
   type StorySummary,
 } from "@/lib/api";
+import { StoryDate } from "../components/story-date";
 
 type StoriesState =
   | { status: "loading" }
@@ -19,14 +20,6 @@ type DeleteState =
   | { status: "confirming" }
   | { status: "deleting" }
   | { status: "error"; message: string };
-
-function formatDate(isoDate: string): string {
-  return new Date(isoDate).toLocaleDateString("en-US", {
-    year: "numeric",
-    month: "long",
-    day: "numeric",
-  });
-}
 
 export default function StoriesPage() {
   const [state, setState] = useState<StoriesState>({ status: "loading" });
@@ -157,7 +150,7 @@ export default function StoriesPage() {
                   {story.target_hsk !== null && (
                     <>HSK {story.target_hsk} &middot; </>
                   )}
-                  {formatDate(story.created_at)}
+                  <StoryDate isoDate={story.created_at} />
                 </span>
               </Link>
 

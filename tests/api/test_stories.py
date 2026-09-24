@@ -1,5 +1,6 @@
 import pytest
 
+from story_generator.generation.persistence.models import StoryGenerationRequest
 from story_generator.stories.persistence.models import Story, StoryVocabularyItem
 from story_generator.vocabulary.persistence.models import VocabularyItem
 
@@ -174,7 +175,45 @@ def test_get_story_returns_detail_with_vocabulary(client, db_session):
         "target_hsk",
         "content",
         "selected_vocabulary",
+        "provider",
+        "model",
     }
+
+    # This story has no generation request, so there's no model to credit.
+    assert data["provider"] is None
+    assert data["model"] is None
+
+
+def test_get_story_returns_provider_and_model_from_its_generation_request(
+    client, db_session
+):
+    request = StoryGenerationRequest(
+        target_hsk_level=2,
+        target_word_count=150,
+        target_vocabulary_count=1,
+        selected_vocabulary_snapshot=[],
+        prompt_version="story-v1",
+        provider="groq",
+        model="openai/gpt-oss-120b",
+    )
+    db_session.add(request)
+    db_session.flush()
+
+    story = Story(
+        title="第一次点菜",
+        content="我们去饭馆点菜。",
+        target_hsk=2,
+        generation_request_id=request.id,
+    )
+    db_session.add(story)
+    db_session.flush()
+
+    response = client.get(f"/stories/{story.id}")
+
+    assert response.status_code == 200
+    data = response.json()
+    assert data["provider"] == "groq"
+    assert data["model"] == "openai/gpt-oss-120b"
 
 
 def test_get_story_returns_detail_with_no_vocabulary(client, db_session):

@@ -54,6 +54,7 @@ class Story(Base):
         DateTime(timezone=True), nullable=False, server_default=func.now()
     )
 
+    generation_request = relationship("StoryGenerationRequest")
     vocabulary_associations = relationship(
         "StoryVocabularyItem",
         back_populates="story",

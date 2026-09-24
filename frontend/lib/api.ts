@@ -88,6 +88,10 @@ export type CurrentUser = {
 export type StoryDetail = StorySummary & {
   content: string;
   selected_vocabulary: VocabularyGlossaryItem[];
+  // What wrote the story. Null for stories with no generation request, and
+  // missing from an API deployed before these fields existed.
+  provider?: string | null;
+  model?: string | null;
 };
 
 async function parseErrorMessage(response: Response): Promise<string> {

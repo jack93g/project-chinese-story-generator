@@ -6,13 +6,15 @@
   --muted-foreground: #776f5e;
   --border: #ddd2b6;
   --border-strong: #c7b997;
-  --accent: #3454d1;
-  --accent-hover: #2842ad;
+  --accent: #b0301f;
+  --accent-hover: #8f2416;
   --accent-foreground: #ffffff;
   --danger: #c22c22;
   --danger-bg: #fbeae8;
   --danger-border: #f0c4bf;
-  --focus-ring: #3454d1;
+  --focus-ring: #b0301f;
+  --seal: #b8322a;
+  --seal-foreground: #fdf8ec;
 
   --font-sans: var(--font-geist-sans), Arial, Helvetica, sans-serif;
   --font-mono: var(--font-geist-mono), "SFMono-Regular", Consolas, monospace;
@@ -21,6 +23,7 @@
   --font-zh-sans:
     "PingFang SC", "Microsoft YaHei", "Noto Sans SC", "Noto Sans CJK SC",
     "Heiti SC", sans-serif;
+  --font-zh-kai: "Kaiti SC", STKaiti, KaiTi, "AR PL UKai CN", var(--font-zh-serif);
 
   --space-1: 0.25rem;
   --space-2: 0.5rem;
@@ -34,20 +37,20 @@
 
 @media (prefers-color-scheme: dark) {
   :root {
-    --background: #0a0a0a;
-    --surface: #18181b;
-    --surface-hover: #212124;
-    --foreground: #ededed;
-    --muted-foreground: #9a9aa0;
-    --border: #303034;
-    --border-strong: #45454a;
-    --accent: #7b93ff;
-    --accent-hover: #93a7ff;
-    --accent-foreground: #0a0a12;
+    --background: #12100e;
+    --surface: #1c1916;
+    --surface-hover: #25211d;
+    --foreground: #ebe4d6;
+    --muted-foreground: #a69c8a;
+    --border: #332d27;
+    --border-strong: #4a4239;
+    --accent: #e8735a;
+    --accent-hover: #f08a73;
+    --accent-foreground: #1a0c08;
     --danger: #ff6b60;
     --danger-bg: #2c1614;
     --danger-border: #4a2420;
-    --focus-ring: #7b93ff;
+    --focus-ring: #e8735a;
   }
 }
 
@@ -122,6 +125,9 @@ h2 {
 }
 
 .site-title {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.6rem;
   font-weight: 700;
   font-size: 1.05rem;
   letter-spacing: -0.01em;
@@ -199,10 +205,55 @@ h2 {
 }
 
 .home-title-zh {
-  font-family: var(--font-zh-sans);
-  font-size: 1rem;
-  font-weight: 500;
-  color: var(--muted-foreground);
+  display: flex;
+  flex-wrap: wrap;
+  font-size: 1.75rem;
+  color: var(--foreground);
+}
+
+/* 田字格: the squared practice paper for writing characters, a box split
+   by a faint cross and diagonals, drawn in the seal red. Adjacent squares
+   share their borders. */
+.tianzige {
+  --grid-line: color-mix(in srgb, var(--seal) 30%, transparent);
+  --half: calc(50% - 0.5px);
+  position: relative;
+  display: inline-grid;
+  place-items: center;
+  width: 1.6em;
+  height: 1.6em;
+  border: 1px solid color-mix(in srgb, var(--seal) 55%, transparent);
+  background:
+    linear-gradient(
+      to right,
+      transparent var(--half),
+      var(--grid-line) var(--half) calc(50% + 0.5px),
+      transparent 0
+    ),
+    linear-gradient(
+      to bottom,
+      transparent var(--half),
+      var(--grid-line) var(--half) calc(50% + 0.5px),
+      transparent 0
+    ),
+    linear-gradient(
+      45deg,
+      transparent var(--half),
+      var(--grid-line) var(--half) calc(50% + 0.5px),
+      transparent 0
+    ),
+    linear-gradient(
+      -45deg,
+      transparent var(--half),
+      var(--grid-line) var(--half) calc(50% + 0.5px),
+      transparent 0
+    );
+  font-family: var(--font-zh-kai);
+  line-height: 1;
+}
+
+.tianzige + .tianzige {
+  margin-left: -1px;
 }
 
 .page-content .home-actions a {
@@ -214,6 +265,91 @@ h2 {
 .page-content .home-actions a:hover {
   color: var(--foreground);
   text-decoration: underline;
+}
+
+/* Seal (印章): the 话本 brand mark, stacked vertically like a name seal,
+   white characters on red with a thin inner border. */
+
+.seal {
+  display: inline-block;
+  writing-mode: vertical-rl;
+  padding: 0.4em 0.32em;
+  border-radius: 0.2em;
+  background: var(--seal);
+  color: var(--seal-foreground);
+  box-shadow:
+    inset 0 0 0 0.13em var(--seal),
+    inset 0 0 0 0.2em var(--seal-foreground);
+  font-family: var(--font-zh-kai);
+  font-size: 0.8rem;
+  font-weight: 700;
+  line-height: 1;
+  letter-spacing: 0.08em;
+}
+
+.site-title .seal {
+  font-size: 0.95rem;
+}
+
+/* Stamped at the end of a story, slightly askew like a hand-pressed seal. */
+.seal-stamp {
+  align-self: flex-end;
+  font-size: 1.1rem;
+  opacity: 0.9;
+  transform: rotate(-6deg);
+}
+
+/* Brush loader: 话本 written stroke by stroke while a story generates. */
+
+.brush-loader {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.brush-loader-squares {
+  display: flex;
+  font-size: 2.25rem;
+}
+
+.brush-loader .tianzige {
+  width: 60px;
+  height: 60px;
+}
+
+.brush-loader-pinyin {
+  color: var(--muted-foreground);
+  font-size: 0.9rem;
+  letter-spacing: 0.02em;
+}
+
+/* hanzi-writer draws its SVG in here, over the practice-square lines. */
+.brush-canvas {
+  position: absolute;
+  inset: 0;
+}
+
+/* Section break with a 祥云 (auspicious cloud) motif between two rules. */
+.cloud-divider {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  color: var(--seal);
+  opacity: 0.75;
+}
+
+.cloud-divider::before,
+.cloud-divider::after {
+  content: "";
+  flex: 1;
+  height: 1px;
+  background: currentColor;
+  opacity: 0.5;
+}
+
+.cloud-divider svg {
+  width: 3.5rem;
+  height: auto;
 }
 
 /* Forms */
@@ -358,9 +494,134 @@ h2 {
 .story-body {
   white-space: pre-wrap;
   font-family: var(--font-zh-serif);
-  font-size: 1.2rem;
-  line-height: 2;
-  letter-spacing: 0.02em;
+  font-size: 1.25rem;
+  line-height: 2.2;
+  letter-spacing: 0.04em;
+}
+
+/* Keep an annotated word on one line; split across lines, its pinyin
+   would stick out past the edge of the text. */
+.story-body ruby {
+  white-space: nowrap;
+}
+
+.story-body rt {
+  font-family: var(--font-sans);
+  font-size: 0.55em;
+  letter-spacing: 0;
+  color: var(--muted-foreground);
+}
+
+/* Hidden rather than removed so the text doesn't reflow when toggled. */
+.story-body.hide-pinyin rt {
+  visibility: hidden;
+}
+
+/* Traditional layout: columns top to bottom, read right to left. The body
+   scrolls sideways and starts at the right-hand edge. */
+.story-body-vertical {
+  writing-mode: vertical-rl;
+  height: min(70vh, 32rem);
+  overflow-x: auto;
+  overflow-y: hidden;
+  padding: var(--space-2) 0;
+}
+
+/* Entrance for a story that has just been generated: the text soaks in
+   sentence by sentence like ink on rice paper, then the seal is stamped and
+   the glossary fades in. Timings match the constants in app/story/page.tsx.
+   Skipped entirely for readers who prefer reduced motion. */
+
+@media (prefers-reduced-motion: no-preference) {
+  /* Ruby text doesn't take on its sentence's opacity or blur, so the
+     pinyin is animated alongside it (inheriting the sentence's delay). */
+  .story-entrance .sentence,
+  .story-entrance .sentence rt {
+    animation: ink-soak 800ms ease-out both;
+    animation-delay: var(--ink-delay);
+  }
+
+  .story-entrance .seal-stamp {
+    animation: stamp 450ms cubic-bezier(0.3, 0.8, 0.4, 1.15) both;
+    animation-delay: var(--stamp-delay);
+  }
+
+  .story-entrance .cloud-divider,
+  .story-entrance .story-glossary {
+    animation: fade-up 600ms ease-out both;
+    animation-delay: calc(var(--stamp-delay) + 300ms);
+  }
+}
+
+@keyframes ink-soak {
+  from {
+    opacity: 0;
+    filter: blur(6px);
+  }
+  50% {
+    opacity: 1;
+  }
+  to {
+    filter: blur(0);
+  }
+}
+
+/* Ends at the stamp's resting tilt and opacity (from .seal-stamp). */
+@keyframes stamp {
+  from {
+    opacity: 0;
+    transform: scale(1.8) rotate(-16deg);
+  }
+  65% {
+    opacity: 0.9;
+    transform: scale(0.92) rotate(-5deg);
+  }
+}
+
+@keyframes fade-up {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+}
+
+.story-options {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  margin-top: var(--space-1);
+}
+
+.toggle {
+  padding: 0.35rem 0.85rem;
+  border: 1px solid var(--border-strong);
+  border-radius: 999px;
+  background: transparent;
+  color: var(--muted-foreground);
+  font: inherit;
+  font-size: 0.875rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition:
+    color 0.15s ease,
+    border-color 0.15s ease,
+    background-color 0.15s ease;
+}
+
+.toggle:hover {
+  color: var(--foreground);
+  border-color: var(--foreground);
+}
+
+.toggle[aria-pressed="true"] {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: var(--accent-foreground);
+}
+
+.toggle[aria-pressed="true"]:hover {
+  background: var(--accent-hover);
+  border-color: var(--accent-hover);
 }
 
 .story-glossary dl {

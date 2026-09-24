@@ -15,7 +15,7 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Chinese Story Generator",
+  title: "话本 Huaben",
   description: "Generate and read Chinese-language learning stories.",
 };
 

@@ -44,6 +44,8 @@ class StoryService:
         if story is None:
             raise StoryNotFoundError(story_id)
 
+        request = story.generation_request
+
         return StoryDetail(
             id=story.id,
             title=story.title,
@@ -61,6 +63,8 @@ class StoryService:
                 )
                 for item in story.vocabulary_items
             ],
+            provider=request.provider if request else None,
+            model=request.model if request else None,
         )
 
     def delete(self, story_id: int) -> None:

@@ -446,7 +446,7 @@ describe("GeneratePage", () => {
       await vi.advanceTimersByTimeAsync(2500);
     });
 
-    expect(routerPush).toHaveBeenCalledWith("/story?id=99");
+    expect(routerPush).toHaveBeenCalledWith("/story?id=99&fresh=1");
   });
 
   it("shows the safe failure message and stops polling once a request fails", async () => {
