@@ -168,3 +168,16 @@ def test_database_rejects_succeeded_request_without_started_at(db_session):
         db_session.flush()
 
     db_session.rollback()
+
+
+def test_database_accepts_thirty_vocabulary_words(db_session):
+    request = _make_request(db_session, target_vocabulary_count=30)
+
+    assert request.id is not None
+
+
+def test_database_rejects_more_than_thirty_vocabulary_words(db_session):
+    with pytest.raises(IntegrityError, match="vocabulary_count_check"):
+        _make_request(db_session, target_vocabulary_count=31)
+
+    db_session.rollback()

@@ -7,6 +7,10 @@ from pydantic import BaseModel, Field, field_validator, model_validator
 # word-count CHECK constraint (migration) — this is validated at both
 # layers deliberately; see StoryGenerationRequest docstring.
 MAX_TARGET_WORD_COUNT = 1000
+# Mirror any change in the vocabulary-count CHECK constraint (migration).
+# Enough for a long story; density is left to the user (the frontend warns
+# when words are packed tighter than it has seen work).
+MAX_TARGET_VOCABULARY_COUNT = 30
 MAX_TOPIC_LENGTH = 200
 MAX_CUSTOM_WORD_LENGTH = 20
 # CJK-only: custom words are interpolated into the LLM prompt, so anything
@@ -51,10 +55,11 @@ class CreateGenerationRequestSchema(BaseModel):
     vocabulary_list_id: int | None = None
     target_hsk_level: int = Field(ge=1, le=6)
     target_word_count: int = Field(gt=0, le=MAX_TARGET_WORD_COUNT)
-    target_vocabulary_count: int = Field(ge=1, le=15)
+    target_vocabulary_count: int = Field(ge=1, le=MAX_TARGET_VOCABULARY_COUNT)
     topic: str | None = Field(default=None, max_length=MAX_TOPIC_LENGTH)
     # Raw cap only bounds work; the real limit is checked after dedupe (via
-    # target_vocabulary_count, which is itself at most 15).
+    # target_vocabulary_count, which is itself at most
+    # MAX_TARGET_VOCABULARY_COUNT).
     custom_words: list[str] = Field(default_factory=list, max_length=100)
 
     @field_validator("custom_words")

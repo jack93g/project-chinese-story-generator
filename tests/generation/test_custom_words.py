@@ -61,11 +61,11 @@ def test_schema_rejects_more_custom_words_than_target_count():
         )
 
 
-def test_schema_rejects_more_than_fifteen_custom_words():
-    words = [f"词{chr(0x4E00 + i)}" for i in range(16)]
+def test_schema_rejects_more_than_thirty_custom_words():
+    words = [f"词{chr(0x4E00 + i)}" for i in range(31)]
     with pytest.raises(ValidationError):
         CreateGenerationRequestSchema(
-            custom_words=words, **{**BASE, "target_vocabulary_count": 15}
+            custom_words=words, **{**BASE, "target_vocabulary_count": 30}
         )
 
 

@@ -16,12 +16,15 @@ import { BrushLoader } from "../components/brush-loader";
 const HSK_LEVELS = [1, 2, 3, 4, 5, 6];
 const DEFAULT_TARGET_WORD_COUNT = 150;
 const MAX_TARGET_WORD_COUNT = 1000;
-const MAX_VOCABULARY_COUNT = 15;
+const MAX_VOCABULARY_COUNT = 30;
 // The suggested number of vocabulary words is one per this many characters
 // of story: dense enough to practise, loose enough to read naturally. It
 // depends only on story length, never on list size (lists can hold
 // hundreds of words; a story still uses at most MAX_VOCABULARY_COUNT).
 const CHARACTERS_PER_VOCABULARY_WORD = 25;
+// Denser than this (one word per 15 characters, e.g. 10 in 150) is past
+// what stories have been seen to handle, so the form warns, but allows it.
+const MIN_CHARACTERS_PER_VOCABULARY_WORD = 15;
 const MAX_CUSTOM_WORD_LENGTH = 20;
 const CUSTOM_WORD_PATTERN = /^[\u3400-\u4dbf\u4e00-\u9fff]+$/;
 const POLL_INTERVAL_MS = 2500;
@@ -278,9 +281,8 @@ export default function GeneratePage() {
   const customWordsResult = parseCustomWords(customWordsInput);
   const customWords = customWordsResult.words;
   const hasList = selectedListId !== "";
-  const suggestedCount = suggestedVocabularyCount(
-    targetWordCountResult.value ?? DEFAULT_TARGET_WORD_COUNT,
-  );
+  const storyLength = targetWordCountResult.value ?? DEFAULT_TARGET_WORD_COUNT;
+  const suggestedCount = suggestedVocabularyCount(storyLength);
   const vocabularyCountResult = parseVocabularyCount(
     vocabularyCountInput ?? "",
     suggestedCount,
@@ -295,6 +297,10 @@ export default function GeneratePage() {
         )
       : 0;
   const vocabularyCount = Math.max(1, customWords.length + listSlots);
+  const densityWarning =
+    vocabularyCount * MIN_CHARACTERS_PER_VOCABULARY_WORD > storyLength
+      ? `${vocabularyCount} words in ${storyLength} characters is dense: the story may read stiffly or leave some out. A longer story helps.`
+      : null;
   const canSubmit =
     (hasList || customWords.length > 0) &&
     customWordsResult.error === null &&
@@ -376,13 +382,17 @@ export default function GeneratePage() {
 
   function vocabularyCountHint(): string {
     const requested = vocabularyCountResult.value ?? 0;
+    let hint: string;
     if (selectedList && vocabularyCount < requested) {
-      return `This list has only ${selectedList.item_count} word${selectedList.item_count === 1 ? "" : "s"}, so the story will use ${vocabularyCount}.`;
+      hint = `This list has only ${selectedList.item_count} word${selectedList.item_count === 1 ? "" : "s"}, so the story will use ${vocabularyCount}.`;
+    } else {
+      const lengthNote = `Suggested for a ${storyLength}-character story: ${suggestedCount}.`;
+      hint =
+        customWords.length > 0
+          ? `${lengthNote} Includes your ${customWords.length} custom word${customWords.length === 1 ? "" : "s"}; the list fills the rest.`
+          : lengthNote;
     }
-    const lengthNote = `Suggested for a ${targetWordCountResult.value ?? DEFAULT_TARGET_WORD_COUNT}-character story: ${suggestedCount}.`;
-    return customWords.length > 0
-      ? `${lengthNote} Includes your ${customWords.length} custom word${customWords.length === 1 ? "" : "s"}; the list fills the rest.`
-      : lengthNote;
+    return densityWarning ? `${hint} ${densityWarning}` : hint;
   }
 
   if (listsState.status === "loading") {
@@ -517,7 +527,7 @@ export default function GeneratePage() {
           ) : (
             <p id="custom-words-hint" className="field-hint">
               {customWords.length > 0
-                ? `${customWords.length} custom word${customWords.length === 1 ? "" : "s"}${hasList ? "; the list fills the remaining slots" : ""}.`
+                ? `${customWords.length} custom word${customWords.length === 1 ? "" : "s"}${hasList ? "; the list fills the remaining slots" : ""}.${!hasList && densityWarning ? ` ${densityWarning}` : ""}`
                 : hasList
                   ? "Optional. Custom words are always included; the list fills the remaining slots."
                   : "Choose a vocabulary list above or enter at least one custom word."}

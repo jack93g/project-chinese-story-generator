@@ -350,10 +350,10 @@ describe("GeneratePage", () => {
     it.each([
       ["150", "6"],
       ["300", "12"],
-      ["1000", "15"],
+      ["1000", "30"],
       ["20", "1"],
     ])(
-      "suggests one word per 25 characters, from 1 to 15 (%s characters -> %s)",
+      "suggests one word per 25 characters, from 1 to 30 (%s characters -> %s)",
       async (length, expected) => {
         await renderWithList(
           [{ id: 5, name: "Huge list", item_count: 696 }],
@@ -415,7 +415,7 @@ describe("GeneratePage", () => {
       });
     });
 
-    it.each(["0", "16", "2.5"])(
+    it.each(["0", "31", "2.5"])(
       "shows an error and disables Generate for an invalid count (%s)",
       async (value) => {
         await renderWithList();
@@ -424,11 +424,47 @@ describe("GeneratePage", () => {
 
         expect(screen.getByRole("button", { name: "Generate" })).toBeDisabled();
         expect(screen.getByRole("alert")).toHaveTextContent(
-          "Enter a whole number from 1 to 15",
+          "Enter a whole number from 1 to 30",
         );
         expect(countField()).toHaveAttribute("aria-invalid", "true");
       },
     );
+
+    it("allows more than 15 words from a large enough list", async () => {
+      createStoryGeneration.mockResolvedValueOnce({ id: 24, status: "queued" });
+      await renderWithList(
+        [{ id: 6, name: "Society, Skills & Values", item_count: 28 }],
+        "6",
+      );
+      setLength("300");
+
+      fireEvent.change(countField(), { target: { value: "20" } });
+
+      expect(screen.queryByRole("alert")).not.toBeInTheDocument();
+      fireEvent.click(screen.getByRole("button", { name: "Generate" }));
+      await waitFor(() => {
+        expect(createStoryGeneration).toHaveBeenCalledWith(
+          expect.objectContaining({ target_vocabulary_count: 20 }),
+        );
+      });
+    });
+
+    it("warns, without blocking, when words are packed densely", async () => {
+      await renderWithList(
+        [{ id: 6, name: "Society, Skills & Values", item_count: 28 }],
+        "6",
+      );
+      setLength("300");
+
+      fireEvent.change(countField(), { target: { value: "20" } });
+      expect(screen.queryByText(/is dense/)).not.toBeInTheDocument();
+
+      fireEvent.change(countField(), { target: { value: "21" } });
+      expect(
+        screen.getByText(/21 words in 300 characters is dense/),
+      ).toBeInTheDocument();
+      expect(screen.getByRole("button", { name: "Generate" })).toBeEnabled();
+    });
 
     it("won't go below the number of custom words", async () => {
       await renderWithList();
