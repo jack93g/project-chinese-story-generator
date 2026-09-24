@@ -55,13 +55,16 @@ def api_access_key(monkeypatch):
 
 
 @pytest.fixture(autouse=True)
-def reset_generation_rate_limit():
-    """The limiter is module-level state; keep tests independent."""
+def reset_rate_limits():
+    """The limiters are module-level state; keep tests independent."""
     from story_generator.api import rate_limit
 
-    rate_limit._generation_limiter.reset()
+    limiters = (rate_limit._generation_limiter, rate_limit._login_limiter)
+    for limiter in limiters:
+        limiter.reset()
     yield
-    rate_limit._generation_limiter.reset()
+    for limiter in limiters:
+        limiter.reset()
 
 
 @pytest.fixture(scope="session")

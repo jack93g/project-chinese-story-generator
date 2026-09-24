@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
-import { AccessKeyGate } from "./components/access-key-gate";
+import { LoginGate } from "./components/login-gate";
 import { SiteNav } from "./components/site-nav";
 import "./globals.css";
 
@@ -25,7 +25,7 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
       <body>
         <SiteNav />
         <main className="site-main">
-          <AccessKeyGate>{children}</AccessKeyGate>
+          <LoginGate>{children}</LoginGate>
         </main>
       </body>
     </html>
