@@ -255,8 +255,20 @@ The worker can be restarted without touching the API:
 ```bash
 dc restart worker            # waits for a request in flight to finish (up to 90s)
 dc ps worker                 # "Up ..." (not "Restarting")
-dc logs --tail=20 worker     # "Received SIGTERM ... Worker stopped." then a clean start
+dc logs --tail=20 worker
 ```
+
+The logs should end with the old worker stopping and the new one starting:
+
+```
+Received SIGTERM; stopping after the current request.
+Worker stopped.
+Worker started (poll every 5s, reclaim every 5m, stale after 15m).
+```
+
+Check `dc ps worker` again after ~10 seconds: `Up 10 seconds` means it's
+staying up; `Restarting` means it's crashing on startup (see the last bullet
+below).
 
 - `restart` keeps the existing container, **including its environment**. After
   editing `.env`, use `dc up -d --no-deps --force-recreate worker` instead. `restart`
