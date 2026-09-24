@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { annotateVocabulary } from "./annotate";
+import { annotateVocabulary, groupSentences } from "./annotate";
 
 describe("annotateVocabulary", () => {
   it("marks each occurrence of a vocabulary word with tone-marked pinyin", () => {
@@ -42,6 +42,34 @@ describe("annotateVocabulary", () => {
     ).toEqual([
       { kind: "text", text: "第一行。\n" },
       { kind: "word", text: "天气", reading: "tiānqì" },
+    ]);
+  });
+});
+
+describe("groupSentences", () => {
+  it("splits after sentence-ending punctuation and line breaks, keeping words whole", () => {
+    const segments = annotateVocabulary("今天天气好。他说：“下雨吗？”\n好！", [
+      { writing: "天气", reading: "tian1qi4" },
+    ]);
+
+    expect(
+      groupSentences(segments).map((sentence) =>
+        sentence.map((segment) => segment.text).join(""),
+      ),
+    ).toEqual(["今天天气好。", "他说：“下雨吗？”\n", "好！"]);
+    expect(groupSentences(segments)[0]).toContainEqual({
+      kind: "word",
+      text: "天气",
+      reading: "tiānqì",
+    });
+  });
+
+  it("keeps trailing text without end punctuation as a final sentence", () => {
+    expect(
+      groupSentences([{ kind: "text", text: "第一句。没有句号" }]),
+    ).toEqual([
+      [{ kind: "text", text: "第一句。" }],
+      [{ kind: "text", text: "没有句号" }],
     ]);
   });
 });

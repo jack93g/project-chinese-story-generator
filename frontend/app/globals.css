@@ -205,10 +205,55 @@ h2 {
 }
 
 .home-title-zh {
-  font-family: var(--font-zh-sans);
-  font-size: 1rem;
-  font-weight: 500;
-  color: var(--muted-foreground);
+  display: flex;
+  flex-wrap: wrap;
+  font-size: 1.75rem;
+  color: var(--foreground);
+}
+
+/* 田字格: the squared practice paper for writing characters, a box split
+   by a faint cross and diagonals, drawn in the seal red. Adjacent squares
+   share their borders. */
+.tianzige {
+  --grid-line: color-mix(in srgb, var(--seal) 30%, transparent);
+  --half: calc(50% - 0.5px);
+  position: relative;
+  display: inline-grid;
+  place-items: center;
+  width: 1.6em;
+  height: 1.6em;
+  border: 1px solid color-mix(in srgb, var(--seal) 55%, transparent);
+  background:
+    linear-gradient(
+      to right,
+      transparent var(--half),
+      var(--grid-line) var(--half) calc(50% + 0.5px),
+      transparent 0
+    ),
+    linear-gradient(
+      to bottom,
+      transparent var(--half),
+      var(--grid-line) var(--half) calc(50% + 0.5px),
+      transparent 0
+    ),
+    linear-gradient(
+      45deg,
+      transparent var(--half),
+      var(--grid-line) var(--half) calc(50% + 0.5px),
+      transparent 0
+    ),
+    linear-gradient(
+      -45deg,
+      transparent var(--half),
+      var(--grid-line) var(--half) calc(50% + 0.5px),
+      transparent 0
+    );
+  font-family: var(--font-zh-kai);
+  line-height: 1;
+}
+
+.tianzige + .tianzige {
+  margin-left: -1px;
 }
 
 .page-content .home-actions a {
@@ -252,6 +297,59 @@ h2 {
   font-size: 1.1rem;
   opacity: 0.9;
   transform: rotate(-6deg);
+}
+
+/* Brush loader: 话本 written stroke by stroke while a story generates. */
+
+.brush-loader {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.brush-loader-squares {
+  display: flex;
+  font-size: 2.25rem;
+}
+
+.brush-loader .tianzige {
+  width: 60px;
+  height: 60px;
+}
+
+.brush-loader-pinyin {
+  color: var(--muted-foreground);
+  font-size: 0.9rem;
+  letter-spacing: 0.02em;
+}
+
+/* hanzi-writer draws its SVG in here, over the practice-square lines. */
+.brush-canvas {
+  position: absolute;
+  inset: 0;
+}
+
+/* Section break with a 祥云 (auspicious cloud) motif between two rules. */
+.cloud-divider {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  color: var(--seal);
+  opacity: 0.75;
+}
+
+.cloud-divider::before,
+.cloud-divider::after {
+  content: "";
+  flex: 1;
+  height: 1px;
+  background: currentColor;
+  opacity: 0.5;
+}
+
+.cloud-divider svg {
+  width: 3.5rem;
+  height: auto;
 }
 
 /* Forms */
@@ -401,6 +499,12 @@ h2 {
   letter-spacing: 0.04em;
 }
 
+/* Keep an annotated word on one line; split across lines, its pinyin
+   would stick out past the edge of the text. */
+.story-body ruby {
+  white-space: nowrap;
+}
+
 .story-body rt {
   font-family: var(--font-sans);
   font-size: 0.55em;
@@ -421,6 +525,64 @@ h2 {
   overflow-x: auto;
   overflow-y: hidden;
   padding: var(--space-2) 0;
+}
+
+/* Entrance for a story that has just been generated: the text soaks in
+   sentence by sentence like ink on rice paper, then the seal is stamped and
+   the glossary fades in. Timings match the constants in app/story/page.tsx.
+   Skipped entirely for readers who prefer reduced motion. */
+
+@media (prefers-reduced-motion: no-preference) {
+  /* Ruby text doesn't take on its sentence's opacity or blur, so the
+     pinyin is animated alongside it (inheriting the sentence's delay). */
+  .story-entrance .sentence,
+  .story-entrance .sentence rt {
+    animation: ink-soak 800ms ease-out both;
+    animation-delay: var(--ink-delay);
+  }
+
+  .story-entrance .seal-stamp {
+    animation: stamp 450ms cubic-bezier(0.3, 0.8, 0.4, 1.15) both;
+    animation-delay: var(--stamp-delay);
+  }
+
+  .story-entrance .cloud-divider,
+  .story-entrance .story-glossary {
+    animation: fade-up 600ms ease-out both;
+    animation-delay: calc(var(--stamp-delay) + 300ms);
+  }
+}
+
+@keyframes ink-soak {
+  from {
+    opacity: 0;
+    filter: blur(6px);
+  }
+  50% {
+    opacity: 1;
+  }
+  to {
+    filter: blur(0);
+  }
+}
+
+/* Ends at the stamp's resting tilt and opacity (from .seal-stamp). */
+@keyframes stamp {
+  from {
+    opacity: 0;
+    transform: scale(1.8) rotate(-16deg);
+  }
+  65% {
+    opacity: 0.9;
+    transform: scale(0.92) rotate(-5deg);
+  }
+}
+
+@keyframes fade-up {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
 }
 
 .story-options {

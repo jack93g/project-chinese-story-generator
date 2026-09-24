@@ -180,6 +180,33 @@ describe("StoryPage", () => {
     expect(screen.queryByText(/Written by/)).not.toBeInTheDocument();
   });
 
+  it("plays the entrance for a freshly generated story, then tidies the URL", async () => {
+    useSearchParams.mockReturnValue(new URLSearchParams("id=5&fresh=1"));
+    fetchStory.mockResolvedValueOnce(STORY);
+    const replaceState = vi.spyOn(window.history, "replaceState");
+    const { container } = render(<StoryPage />);
+
+    await screen.findByRole("heading", { name: "天气小记" });
+
+    expect(container.querySelector("article")).toHaveClass("story-entrance");
+    expect(replaceState).toHaveBeenCalledWith(null, "", "/story?id=5");
+    // One animated span per sentence.
+    expect(container.querySelectorAll(".sentence")).toHaveLength(2);
+    replaceState.mockRestore();
+  });
+
+  it("skips the entrance when opening a saved story", async () => {
+    useSearchParams.mockReturnValue(new URLSearchParams("id=5"));
+    fetchStory.mockResolvedValueOnce(STORY);
+    const { container } = render(<StoryPage />);
+
+    await screen.findByRole("heading", { name: "天气小记" });
+
+    expect(container.querySelector("article")).not.toHaveClass(
+      "story-entrance",
+    );
+  });
+
   it("omits the HSK badge when target_hsk is null but still shows the date", async () => {
     useSearchParams.mockReturnValue(new URLSearchParams("id=5"));
     fetchStory.mockResolvedValueOnce({ ...STORY, target_hsk: null });
@@ -188,7 +215,10 @@ describe("StoryPage", () => {
     await screen.findByRole("heading", { name: "天气小记" });
 
     expect(screen.queryByText(/HSK/)).not.toBeInTheDocument();
-    expect(screen.getByText(/September 6, 2026/)).toBeInTheDocument();
+    expect(screen.getByText("二〇二六年九月六日")).toHaveAttribute(
+      "title",
+      "September 6, 2026",
+    );
   });
 
   it("omits pinyin parentheses and shows an explicit missing-definition note for null glossary fields", async () => {

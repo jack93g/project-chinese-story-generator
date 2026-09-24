@@ -11,6 +11,7 @@ import {
   type GenerationStatusValue,
   type VocabularyListSummary,
 } from "@/lib/api";
+import { BrushLoader } from "../components/brush-loader";
 
 const HSK_LEVELS = [1, 2, 3, 4, 5, 6];
 const DEFAULT_TARGET_WORD_COUNT = 150;
@@ -152,7 +153,7 @@ export default function GeneratePage() {
           }
           consecutiveFailures = 0;
           if (result.status === "succeeded" && result.story_id !== null) {
-            router.push(`/story?id=${result.story_id}`);
+            router.push(`/story?id=${result.story_id}&fresh=1`);
             return;
           }
           if (result.status === "failed") {
@@ -281,7 +282,7 @@ export default function GeneratePage() {
     try {
       const result = await retryStoryGeneration(generation.id);
       if (result.status === "succeeded" && result.story_id !== null) {
-        router.push(`/story?id=${result.story_id}`);
+        router.push(`/story?id=${result.story_id}&fresh=1`);
         return;
       }
       if (result.status === "failed") {
@@ -348,6 +349,16 @@ export default function GeneratePage() {
     return (
       <div className="page-content">
         <h1>Generate a story</h1>
+        {generation.phase === "polling" &&
+          (generation.status === "running" ? (
+            <BrushLoader
+              key="writing"
+              text="正在写故事"
+              pinyin="zhèngzài xiě gùshi"
+            />
+          ) : (
+            <BrushLoader key="queued" text="排队中" pinyin="páiduì zhōng" />
+          ))}
         {generation.phase === "polling" && (
           <p role="status" className="state">
             {generation.status === "running"

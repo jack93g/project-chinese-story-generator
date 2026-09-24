@@ -49,3 +49,38 @@ export function annotateVocabulary(
   }
   return segments;
 }
+
+// A sentence ends at 。！？!? or a line break, plus any closing quotes and
+// the line breaks after them.
+const SENTENCE = /[^。！？!?\n]*(?:[。！？!?\n]+[”」』"]*\n*)?/g;
+const SENTENCE_END = /[。！？!?\n][”」』"]*$/;
+
+/**
+ * Group segments into sentences (so they can be animated one at a time),
+ * splitting plain text after sentence-ending punctuation. Vocabulary words
+ * never contain that punctuation, so they're never split.
+ */
+export function groupSentences(segments: TextSegment[]): TextSegment[][] {
+  const sentences: TextSegment[][] = [];
+  let current: TextSegment[] = [];
+  for (const segment of segments) {
+    if (segment.kind === "word") {
+      current.push(segment);
+      continue;
+    }
+    for (const piece of segment.text.match(SENTENCE) ?? []) {
+      if (!piece) {
+        continue;
+      }
+      current.push({ kind: "text", text: piece });
+      if (SENTENCE_END.test(piece)) {
+        sentences.push(current);
+        current = [];
+      }
+    }
+  }
+  if (current.length > 0) {
+    sentences.push(current);
+  }
+  return sentences;
+}

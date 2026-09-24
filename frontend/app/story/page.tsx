@@ -1,26 +1,26 @@
 "use client";
 
-import { Suspense, useEffect, useMemo, useState } from "react";
+import {
+  Suspense,
+  useEffect,
+  useMemo,
+  useState,
+  type CSSProperties,
+} from "react";
 import { useSearchParams } from "next/navigation";
-import { annotateVocabulary } from "@/lib/annotate";
+import { annotateVocabulary, groupSentences } from "@/lib/annotate";
 import { ApiError, fetchStory, type StoryDetail } from "@/lib/api";
 import { describeModel } from "@/lib/model-label";
 import { toToneMarks } from "@/lib/pinyin";
+import { CloudDivider } from "../components/cloud-divider";
 import { Seal } from "../components/seal";
+import { StoryDate } from "../components/story-date";
 
 type StoryState =
   | { status: "loading" }
   | { status: "not-found" }
   | { status: "error"; message: string }
   | { status: "ready"; story: StoryDetail };
-
-function formatDate(isoDate: string): string {
-  return new Date(isoDate).toLocaleDateString("en-US", {
-    year: "numeric",
-    month: "long",
-    day: "numeric",
-  });
-}
 
 const PINYIN_KEY = "story-reader:show-pinyin";
 const VERTICAL_KEY = "story-reader:vertical";
@@ -43,6 +43,15 @@ function writePreference(key: string, value: boolean) {
     // Not remembered, but the toggle still works for this visit.
   }
 }
+
+// Entrance for a story that has just been generated (timings in ms; the
+// animations themselves are in globals.css): the text soaks in sentence by
+// sentence, then the seal is stamped and the glossary fades in.
+const INK_START = 150;
+const INK_STAGGER = 110;
+const INK_STAGGER_MAX_SENTENCES = 24;
+const INK_DURATION = 800;
+const STAMP_AND_GLOSSARY = 1400;
 
 // A static export can't pre-render one page per story ID (IDs are created at
 // runtime), so the story is addressed as /story?id=<id> and fetched client-side.
@@ -79,7 +88,10 @@ function StoryNotFound() {
 function StoryContent() {
   // The ID comes from the URL, so only accept plain digits; anything else
   // (missing, or something like "../vocabulary") is treated as not found.
-  const rawId = useSearchParams().get("id");
+  const searchParams = useSearchParams();
+  const rawId = searchParams.get("id");
+  // Set by the generate page when it sends the reader here with a new story.
+  const fresh = searchParams.get("fresh") === "1";
   const id = rawId !== null && /^\d+$/.test(rawId) ? rawId : null;
   const [state, setState] = useState<StoryState>({ status: "loading" });
 
@@ -141,12 +153,18 @@ function StoryContent() {
     );
   }
 
-  return <StoryReader story={state.story} />;
+  return <StoryReader story={state.story} fresh={fresh} />;
 }
 
 // Rendered only once the story has loaded in the browser, so reading
 // localStorage while initialising state can't cause a hydration mismatch.
-function StoryReader({ story }: { story: StoryDetail }) {
+function StoryReader({
+  story,
+  fresh,
+}: {
+  story: StoryDetail;
+  fresh: boolean;
+}) {
   const [showPinyin, setShowPinyin] = useState(() =>
     readPreference(PINYIN_KEY, true),
   );
@@ -154,10 +172,36 @@ function StoryReader({ story }: { story: StoryDetail }) {
     readPreference(VERTICAL_KEY, false),
   );
   const writtenBy = describeModel(story.provider, story.model);
-  const segments = useMemo(
-    () => annotateVocabulary(story.content, story.selected_vocabulary),
+  const sentences = useMemo(
+    () =>
+      groupSentences(
+        annotateVocabulary(story.content, story.selected_vocabulary),
+      ),
     [story],
   );
+
+  // Captured once: `fresh` turns false when the URL is tidied below, but the
+  // entrance should still finish.
+  const [entrance, setEntrance] = useState(fresh);
+  const stampDelay =
+    INK_START +
+    Math.min(sentences.length - 1, INK_STAGGER_MAX_SENTENCES) * INK_STAGGER +
+    INK_DURATION * 0.6;
+
+  useEffect(() => {
+    if (!entrance) {
+      return;
+    }
+    // Drop ?fresh=1 so reloading or sharing the page doesn't replay it.
+    window.history.replaceState(null, "", `/story?id=${story.id}`);
+    // Afterwards, remove the animation classes so that toggling the layout
+    // doesn't restart them.
+    const timer = setTimeout(
+      () => setEntrance(false),
+      stampDelay + STAMP_AND_GLOSSARY,
+    );
+    return () => clearTimeout(timer);
+  }, [entrance, stampDelay, story.id]);
 
   function togglePinyin() {
     setShowPinyin(!showPinyin);
@@ -178,14 +222,19 @@ function StoryReader({ story }: { story: StoryDetail }) {
   }
 
   return (
-    <article className="page-content story">
+    <article
+      className={
+        entrance ? "page-content story story-entrance" : "page-content story"
+      }
+      style={{ "--stamp-delay": `${stampDelay}ms` } as CSSProperties}
+    >
       <header className="story-header">
         <h1 lang="zh" className="story-title">
           {story.title}
         </h1>
         <p className="story-meta">
           {story.target_hsk !== null && <>HSK {story.target_hsk} &middot; </>}
-          {formatDate(story.created_at)}
+          <StoryDate isoDate={story.created_at} />
           {writtenBy && <> &middot; Written by {writtenBy}</>}
         </p>
         <div role="group" aria-label="Reading options" className="story-options">
@@ -215,19 +264,37 @@ function StoryReader({ story }: { story: StoryDetail }) {
         className={bodyClasses.join(" ")}
         tabIndex={vertical ? 0 : undefined}
       >
-        {segments.map((segment, index) =>
-          segment.kind === "word" ? (
-            <ruby key={index}>
-              {segment.text}
-              <rt>{segment.reading}</rt>
-            </ruby>
-          ) : (
-            segment.text
-          ),
-        )}
+        {sentences.map((sentence, sentenceIndex) => (
+          <span
+            key={sentenceIndex}
+            className="sentence"
+            style={
+              {
+                "--ink-delay": `${
+                  INK_START +
+                  Math.min(sentenceIndex, INK_STAGGER_MAX_SENTENCES) *
+                    INK_STAGGER
+                }ms`,
+              } as CSSProperties
+            }
+          >
+            {sentence.map((segment, index) =>
+              segment.kind === "word" ? (
+                <ruby key={index}>
+                  {segment.text}
+                  <rt>{segment.reading}</rt>
+                </ruby>
+              ) : (
+                segment.text
+              ),
+            )}
+          </span>
+        ))}
       </p>
 
       <Seal decorative className="seal-stamp" />
+
+      <CloudDivider />
 
       <section aria-labelledby="glossary-heading" className="story-glossary">
         <h2 id="glossary-heading">Glossary</h2>
