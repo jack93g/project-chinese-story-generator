@@ -151,7 +151,7 @@ export default function GeneratePage() {
     String(DEFAULT_TARGET_WORD_COUNT),
   );
   // null until the user types in the field: until then it follows the
-  // suggestion, so changing the story length updates it.
+  // suggestion, so changing the story length or list updates it.
   const [vocabularyCountInput, setVocabularyCountInput] = useState<
     string | null
   >(null);
@@ -379,7 +379,7 @@ export default function GeneratePage() {
     if (selectedList && vocabularyCount < requested) {
       return `This list has only ${selectedList.item_count} word${selectedList.item_count === 1 ? "" : "s"}, so the story will use ${vocabularyCount}.`;
     }
-    const lengthNote = `Suggested for this length: ${suggestedCount}.`;
+    const lengthNote = `Suggested for a ${targetWordCountResult.value ?? DEFAULT_TARGET_WORD_COUNT}-character story: ${suggestedCount}.`;
     return customWords.length > 0
       ? `${lengthNote} Includes your ${customWords.length} custom word${customWords.length === 1 ? "" : "s"}; the list fills the rest.`
       : lengthNote;
@@ -479,7 +479,11 @@ export default function GeneratePage() {
           <select
             id="vocabulary-list"
             value={selectedListId}
-            onChange={(event) => setSelectedListId(event.target.value)}
+            onChange={(event) => {
+              setSelectedListId(event.target.value);
+              // A different list starts from the suggestion again.
+              setVocabularyCountInput(null);
+            }}
           >
             <option value="">No list (custom words only)</option>
             {listsState.lists.map((list) => (
@@ -590,10 +594,9 @@ export default function GeneratePage() {
               min={Math.max(1, customWords.length)}
               max={MAX_VOCABULARY_COUNT}
               step={1}
-              value={
-                vocabularyCountInput ??
-                String(Math.max(suggestedCount, customWords.length))
-              }
+              // Until the user types, show the count that will actually be
+              // sent: the suggestion, capped by the list's size.
+              value={vocabularyCountInput ?? String(vocabularyCount)}
               onChange={(event) => setVocabularyCountInput(event.target.value)}
               aria-invalid={vocabularyCountResult.error !== null}
               aria-describedby="vocabulary-count-hint"

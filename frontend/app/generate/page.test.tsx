@@ -355,7 +355,10 @@ describe("GeneratePage", () => {
     ])(
       "suggests one word per 25 characters, from 1 to 15 (%s characters -> %s)",
       async (length, expected) => {
-        await renderWithList();
+        await renderWithList(
+          [{ id: 5, name: "Huge list", item_count: 696 }],
+          "5",
+        );
         setLength(length);
         expect(countField()).toHaveValue(Number(expected));
       },
@@ -463,12 +466,45 @@ describe("GeneratePage", () => {
         "3",
       );
 
-      expect(countField()).toHaveValue(6);
+      expect(countField()).toHaveValue(4);
       expect(
         screen.getByText(
           "This list has only 4 words, so the story will use 4.",
         ),
       ).toBeInTheDocument();
+    });
+
+    it("updates when a different list is chosen", async () => {
+      await renderWithList(
+        [
+          { id: 3, name: "Small list", item_count: 4 },
+          { id: 5, name: "Huge list", item_count: 696 },
+        ],
+        "3",
+      );
+      expect(countField()).toHaveValue(4);
+
+      fireEvent.change(screen.getByLabelText("Vocabulary list"), {
+        target: { value: "5" },
+      });
+      expect(countField()).toHaveValue(6);
+      expect(
+        screen.getByText("Suggested for a 150-character story: 6."),
+      ).toBeInTheDocument();
+    });
+
+    it("goes back to the suggestion when a different list is chosen", async () => {
+      await renderWithList();
+      fireEvent.change(countField(), { target: { value: "3" } });
+
+      fireEvent.change(screen.getByLabelText("Vocabulary list"), {
+        target: { value: "2" },
+      });
+      fireEvent.change(screen.getByLabelText("Vocabulary list"), {
+        target: { value: "1" },
+      });
+
+      expect(countField()).toHaveValue(6);
     });
   });
 
