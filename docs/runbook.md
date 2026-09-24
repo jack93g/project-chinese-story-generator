@@ -520,11 +520,10 @@ ALTER DATABASE <live>_before_restore_<stamp> RENAME TO <live>;
 dc up -d --no-deps api worker
 ```
 
-**If the Droplet itself is gone:** recreate it with Terraform
-([droplet-setup.md](droplet-setup.md#infrastructure-as-code-terraform)),
-redo the one-time setup (clone, `.env` from the password manager, deploy key,
-backup setup), deploy the current `main` SHA with the workflow (this creates
-an empty schema), then `--replace-live` from the newest laptop backup.
+**If the Droplet itself is gone:** follow
+[Rebuild from scratch](droplet-setup.md#rebuild-from-scratch) in
+droplet-setup.md. Its step 9 restores the newest laptop backup with
+`--replace-live`.
 
 ## Rotate a secret
 
@@ -570,7 +569,7 @@ password.
 (`ssh-keygen -t ed25519 -f ~/.ssh/story_ci_deploy_new -N "" -C ci-deploy`).
 Append its forced-command line to `~deploy/.ssh/authorized_keys` next to the
 old one (same format as in
-[droplet-setup.md](droplet-setup.md#one-time-setup-by-hand)). Set the
+[droplet-setup.md](droplet-setup.md#rebuild-from-scratch)). Set the
 `production` Environment secret `DEPLOY_SSH_KEY` to the new private key.
 Prove it by redeploying the current SHA:
 
