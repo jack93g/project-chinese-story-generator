@@ -26,6 +26,9 @@ python3.12 -m venv .venv
 
 .venv/bin/sync-skritter --list-id YOUR_LIST_ID   # import one vocabulary list
 .venv/bin/sync-skritter --all                    # import every list
+
+.venv/bin/manage-users create USERNAME           # create a frontend login (prompts for password)
+.venv/bin/manage-users set-password USERNAME     # change it; revokes that user's sessions
 ```
 
 Tests:
@@ -64,9 +67,12 @@ Environment (`.env` in repo root, never commit it): `DATABASE_URL`,
 `TEST_DATABASE_URL` (must contain `test` and differ from `DATABASE_URL` — the
 test suite refuses to run otherwise), `SKRITTER_ACCESS_TOKEN`, `OPENAI_API_KEY`,
 `OPENAI_PROVIDER_LABEL`, `OPENAI_MODEL`, `OPENAI_BASE_URL`, `API_ACCESS_KEY` (required: the API won't start without it;
-clients send it as an `X-API-Key` header; only `GET /health` is open),
+scripts/curl send it as an `X-API-Key` header, while the browser logs in and
+uses a session cookie; see Authentication below),
 `CORS_ALLOWED_ORIGINS` (comma-separated browser origins; defaults to the
-local Next.js dev server), plus `POSTGRES_USER`, `POSTGRES_PASSWORD`,
+local Next.js dev server; also the allowlist for cookie-authenticated writes),
+`SESSION_COOKIE_SECURE` (optional, default `true`; `false` only for local
+http if a browser drops the Secure cookie), plus `POSTGRES_USER`, `POSTGRES_PASSWORD`,
 `POSTGRES_DB` (used by Compose to create the database and build the
 containers' `DATABASE_URL`).
 
@@ -107,6 +113,11 @@ should be structured.
 
 - `api/` — FastAPI app assembly (`app.py`), routers, request-scoped DB
   dependency (`dependencies.py`).
+- `auth/` — login accounts and sessions: argon2 password hashing, random
+  session tokens stored only as SHA-256 hashes, 30-day expiry, logout
+  revocation. Accounts are created by `cli/users.py` (`manage-users`); there is
+  no sign-up endpoint. Every account sees the same data (a login gate, not
+  multi-tenancy).
 - `ingestion/` — Skritter client and sync orchestration; retains raw
   API payloads for reprocessing/debugging. Sync is idempotent.
 - `vocabulary/` — vocabulary parsing, services, persistence.
@@ -142,7 +153,18 @@ should be structured.
 `vocabulary_lists`/`list_vocabulary` (Skritter list membership), `sync_runs` +
 `raw_skritter_payloads` (ingestion audit trail), `story_generation_requests` +
 `raw_generation_payloads` (generation lifecycle/debug trail), `stories` +
-`story_vocabulary_items` (generated output).
+`story_vocabulary_items` (generated output), `users` + `auth_sessions`
+(frontend logins).
+
+**Authentication** (`api/security.py`): `require_auth` guards every router
+except health and `/auth/*`. It accepts either the `X-API-Key` header or the
+`session` cookie set by `POST /auth/login`. It rejects a request carrying
+neither before opening a DB session, because the no-database unit tests rely on
+that. Cookie-authenticated writes must also send an `Origin` in
+`CORS_ALLOWED_ORIGINS`. The frontend (a static site on `huaben.app`) and the
+API (`api.huaben.app`) are the same site, so the `SameSite=Lax` cookie is
+sent with `credentials: "include"`. Locally, use `localhost` for both, not
+`127.0.0.1`.
 
 ## Deployment
 

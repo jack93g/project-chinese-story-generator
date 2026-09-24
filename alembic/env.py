@@ -13,6 +13,7 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
+import story_generator.auth.persistence.models  # noqa: F401
 import story_generator.ingestion.persistence.models  # noqa: F401
 import story_generator.stories.persistence.models  # noqa: F401
 import story_generator.vocabulary.persistence.models  # noqa: F401

@@ -14,8 +14,13 @@ cp .env.example .env.local
 ```
 
 `.env.local` sets `NEXT_PUBLIC_API_BASE_URL`, the base URL of the FastAPI
-backend. It defaults to `http://127.0.0.1:8000`, matching the backend's local
-development server; change it if the API runs elsewhere. `NEXT_PUBLIC_*`
+backend. It defaults to `http://localhost:8000`, matching the backend's local
+development server; change it if the API runs elsewhere. Keep it on
+`localhost` rather than `127.0.0.1`: the dev server runs on `localhost`, and
+the browser only sends the login cookie to an API on the same site.
+
+The site asks you to log in. Create an account first with `manage-users`
+(see the root README's [Login accounts](../README.md#login-accounts)). `NEXT_PUBLIC_*`
 variables are inlined into the browser bundle, so keep secrets out of them.
 
 ## Commands

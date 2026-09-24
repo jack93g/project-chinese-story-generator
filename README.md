@@ -36,13 +36,24 @@ durable background workflow.
 Start the application and open the interactive documentation at
 <http://127.0.0.1:8000/docs>.
 
-Every endpoint except `/health` requires an `X-API-Key` header matching
-`API_ACCESS_KEY` from your `.env`; the API refuses to start if that variable
-is unset.
+Every endpoint except `/health` and the login/logout endpoints needs one of
+two credentials:
+
+- **A session cookie**, which is how the browser frontend authenticates. Log in
+  with `POST /auth/login` using an account created with `manage-users` (see
+  [Login accounts](#login-accounts)). The cookie is `HttpOnly`, `Secure` and
+  `SameSite=Lax`, and it lasts 30 days unless you log out first. A write
+  (`POST`/`DELETE`) authenticated by the cookie must also come from an origin
+  listed in `CORS_ALLOWED_ORIGINS`.
+- **An `X-API-Key` header** matching `API_ACCESS_KEY` from your `.env`, for
+  scripts and `curl`. The API refuses to start if that variable is unset.
 
 | Method | Path | Description |
 | --- | --- | --- |
 | `GET` | `/health` | Returns `{"status": "ok"}` without requiring database configuration or an API key. |
+| `POST` | `/auth/login` | Checks `{"username", "password"}` and sets the session cookie. `401` for a wrong username or password; limited to 10 attempts a minute (`429`). |
+| `POST` | `/auth/logout` | Ends the current session and clears the cookie. Returns `204 No Content`. |
+| `GET` | `/auth/me` | Returns `{"username"}` for the logged-in session; `401` otherwise (including for API-key requests, which have no user). |
 | `GET` | `/vocabulary` | Returns paginated vocabulary items. |
 | `GET` | `/vocabulary-lists` | Returns paginated vocabulary-list summaries, including item counts. |
 | `GET` | `/vocabulary-lists/{list_id}` | Returns a vocabulary list and its items. |
@@ -120,8 +131,8 @@ nothing else installed. (The frontend dev server runs separately; see
    OPENAI_MODEL=openai/gpt-oss-120b
    OPENAI_BASE_URL=https://api.groq.com/openai/v1/chat/completions
 
-   # Required: clients must send this as the X-API-Key header; the API
-   # refuses to start without it.
+   # Required: scripts and curl send this as the X-API-Key header (the
+   # browser logs in instead); the API refuses to start without it.
    API_ACCESS_KEY=choose-a-random-key
    ```
 
@@ -145,7 +156,13 @@ nothing else installed. (The frontend dev server runs separately; see
    docker compose run --rm api sync-skritter --all
    ```
 
-4. Generate a story. Follow [Generate a story](#generate-a-story) starting from
+4. Create a login for the frontend (it prompts for the password):
+
+   ```bash
+   docker compose run --rm api manage-users create yourname
+   ```
+
+5. Generate a story. Follow [Generate a story](#generate-a-story) starting from
    the `curl` commands (the API is on `http://127.0.0.1:8000` and the worker is
    already running), then read the result at `GET /stories/{story_id}`. To read
    it in the browser instead, start the frontend as described in
@@ -200,6 +217,9 @@ the importer. `SKRITTER_ACCESS_TOKEN` is required only for a Skritter import.
 `OPENAI_API_KEY` and the three `OPENAI_*` provider settings are required only
 by the generation worker and live-provider smoke test. `API_ACCESS_KEY` is
 required by the API itself — it refuses to start without it.
+`SESSION_COOKIE_SECURE` (optional, default `true`) can be set to `false` if
+your browser won't keep the Secure login cookie from `http://localhost`;
+never set it in production.
 
 ## Run the API
 
@@ -217,6 +237,21 @@ Check the health endpoint:
 ```bash
 curl http://127.0.0.1:8000/health
 ```
+
+## Login accounts
+
+The frontend asks you to log in. There is no sign-up page: create accounts
+from the command line. The password is prompted for (at least 12 characters)
+rather than passed as an argument, so it stays out of shell history.
+
+```bash
+.venv/bin/manage-users create yourname
+.venv/bin/manage-users set-password yourname   # also logs out all of its sessions
+```
+
+With Docker Compose, prefix these with `docker compose run --rm api` and drop
+the `.venv/bin/`. Every account sees the same vocabulary and stories: the login
+is a gate, not separate user data.
 
 ## Generate a story
 

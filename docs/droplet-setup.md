@@ -9,7 +9,7 @@ procedures (deploys, rollbacks, backups, secret rotation) are in
 
 ```
  Browser (https://huaben.app, static frontend on GitHub Pages)
-    │  HTTPS, X-API-Key header
+    │  HTTPS, session cookie (browser) or X-API-Key header (scripts)
     ▼
  Cloudflare DNS: api.huaben.app ──► Droplet public IP (DNS only, not proxied)
     │
@@ -187,8 +187,9 @@ where it runs. Expect about an hour.
    Otherwise, import vocabulary: `dc run --rm api sync-skritter --all`.
 
 10. **Frontend.** Nothing to do unless the API's URL changed; the site is
-    built with `api.huaben.app` baked in. Enter the `API_ACCESS_KEY` when the
-    site asks for it.
+    built with `api.huaben.app` baked in. A restored backup brings its login
+    accounts with it; on a fresh database, create one with
+    `dc run --rm api manage-users create <name>` and log in on the site.
 
 ## How it's configured
 
@@ -239,11 +240,24 @@ Droplet, cloud-init does all of them.
 
 ### API access control
 
-Every route except `GET /health` requires an `X-API-Key` header matching
-`API_ACCESS_KEY` (compared in constant time; 401 otherwise). The API refuses to
-start without the key, and its interactive docs are disabled. The frontend asks
-for the key at runtime and keeps it in the browser's `localStorage`; it's never
-in the build or a `NEXT_PUBLIC_*` variable, because the static site is public.
+Every route except `GET /health` and `/auth/login`/`/auth/logout` requires
+either a login session or an `X-API-Key` header matching `API_ACCESS_KEY`
+(compared in constant time); anything else gets 401. The API refuses to start
+without the key, and its interactive docs are disabled.
+
+- **Browser:** the frontend shows a login form. `POST /auth/login` checks the
+  password against an argon2 hash and sets a `session` cookie scoped to
+  `api.huaben.app`. The cookie is `HttpOnly` (page scripts can't read it),
+  `Secure` and `SameSite=Lax`, and lasts 30 days. `huaben.app` and
+  `api.huaben.app` count as the same site, so the browser sends the cookie with
+  the frontend's requests but not with other sites'. Only a SHA-256 hash of
+  each session token is stored (`auth_sessions`). Logging out revokes it, and
+  `manage-users set-password` revokes all of a user's sessions.
+  Cookie-authenticated writes must also carry an `Origin` in
+  `CORS_ALLOWED_ORIGINS`, else 403. Login attempts are limited to 10 a minute
+  in total, not per caller.
+- **Scripts and `curl`:** the `X-API-Key` header. The frontend no longer uses
+  the key at all, so nothing secret is kept in the browser.
 Creating or retrying a generation returns 429 when 3 are already queued or
 running, and is rate limited to 10 per minute per API process. `topic` is
 capped at 200 characters.

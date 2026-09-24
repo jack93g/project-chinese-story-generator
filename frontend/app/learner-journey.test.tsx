@@ -81,7 +81,7 @@ describe("learner journey (real API client, fake HTTP + navigation)", () => {
       async (url: string, init?: RequestInit): Promise<Response> => {
         const method = init?.method ?? "GET";
 
-        if (url.startsWith("http://127.0.0.1:8000/vocabulary-lists")) {
+        if (url.startsWith("http://localhost:8000/vocabulary-lists")) {
           return jsonResponse({
             items: [LIST],
             total: 1,
@@ -90,12 +90,12 @@ describe("learner journey (real API client, fake HTTP + navigation)", () => {
           });
         }
         if (
-          url === "http://127.0.0.1:8000/story-generations" &&
+          url === "http://localhost:8000/story-generations" &&
           method === "POST"
         ) {
           return jsonResponse({ id: 10, status: "queued" }, 202);
         }
-        if (url === "http://127.0.0.1:8000/story-generations/10") {
+        if (url === "http://localhost:8000/story-generations/10") {
           statusPolls += 1;
           if (statusPolls === 1) {
             return jsonResponse({
@@ -114,7 +114,7 @@ describe("learner journey (real API client, fake HTTP + navigation)", () => {
             story_id: 55,
           });
         }
-        if (url === "http://127.0.0.1:8000/stories/55") {
+        if (url === "http://localhost:8000/stories/55") {
           return jsonResponse({
             id: 55,
             title: "颜色的公园",
@@ -170,7 +170,7 @@ describe("learner journey (real API client, fake HTTP + navigation)", () => {
       async (url: string, init?: RequestInit): Promise<Response> => {
         const method = init?.method ?? "GET";
 
-        if (url.startsWith("http://127.0.0.1:8000/vocabulary-lists")) {
+        if (url.startsWith("http://localhost:8000/vocabulary-lists")) {
           return jsonResponse({
             items: [LIST],
             total: 1,
@@ -179,13 +179,13 @@ describe("learner journey (real API client, fake HTTP + navigation)", () => {
           });
         }
         if (
-          url === "http://127.0.0.1:8000/story-generations" &&
+          url === "http://localhost:8000/story-generations" &&
           method === "POST"
         ) {
           return jsonResponse({ id: 20, status: "queued" }, 202);
         }
         if (
-          url === "http://127.0.0.1:8000/story-generations/20" &&
+          url === "http://localhost:8000/story-generations/20" &&
           method === "GET"
         ) {
           if (!retried) {
@@ -207,7 +207,7 @@ describe("learner journey (real API client, fake HTTP + navigation)", () => {
           });
         }
         if (
-          url === "http://127.0.0.1:8000/story-generations/20/retry" &&
+          url === "http://localhost:8000/story-generations/20/retry" &&
           method === "POST"
         ) {
           retried = true;
@@ -251,7 +251,7 @@ describe("learner journey (real API client, fake HTTP + navigation)", () => {
     expect(
       fetchMock.mock.calls.some(
         ([url, init]) =>
-          url === "http://127.0.0.1:8000/story-generations/20/retry" &&
+          url === "http://localhost:8000/story-generations/20/retry" &&
           init?.method === "POST",
       ),
     ).toBe(true);

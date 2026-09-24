@@ -17,7 +17,7 @@ describe("apiUrl", () => {
     delete process.env[ENV_KEY];
     const { apiUrl } = await import("./api");
     expect(apiUrl("/vocabulary-lists")).toBe(
-      "http://127.0.0.1:8000/vocabulary-lists",
+      "http://localhost:8000/vocabulary-lists",
     );
   });
 
@@ -44,8 +44,8 @@ describe("fetchVocabularyLists", () => {
     await fetchVocabularyLists({ limit: 10, offset: 5 });
 
     expect(fetchMock).toHaveBeenCalledWith(
-      "http://127.0.0.1:8000/vocabulary-lists?limit=10&offset=5",
-      undefined,
+      "http://localhost:8000/vocabulary-lists?limit=10&offset=5",
+      { credentials: "include" },
     );
   });
 });
@@ -84,8 +84,8 @@ describe("fetchAllVocabularyLists", () => {
     expect(fetchMock).toHaveBeenCalledTimes(2);
     expect(fetchMock).toHaveBeenNthCalledWith(
       2,
-      "http://127.0.0.1:8000/vocabulary-lists?limit=2&offset=2",
-      undefined,
+      "http://localhost:8000/vocabulary-lists?limit=2&offset=2",
+      { credentials: "include" },
     );
   });
 
@@ -144,8 +144,8 @@ describe("fetchStories / fetchAllStories", () => {
     await fetchStories({ limit: 10, offset: 0 });
 
     expect(fetchMock).toHaveBeenCalledWith(
-      "http://127.0.0.1:8000/stories?limit=10&offset=0",
-      undefined,
+      "http://localhost:8000/stories?limit=10&offset=0",
+      { credentials: "include" },
     );
   });
 
@@ -197,8 +197,8 @@ describe("fetchStory", () => {
     await fetchStory("../vocabulary");
 
     expect(fetchMock).toHaveBeenCalledWith(
-      "http://127.0.0.1:8000/stories/..%2Fvocabulary",
-      undefined,
+      "http://localhost:8000/stories/..%2Fvocabulary",
+      { credentials: "include" },
     );
   });
 });
@@ -216,8 +216,8 @@ describe("deleteStory", () => {
     await deleteStory(7);
 
     expect(fetchMock).toHaveBeenCalledWith(
-      "http://127.0.0.1:8000/stories/7",
-      { method: "DELETE" },
+      "http://localhost:8000/stories/7",
+      { method: "DELETE", credentials: "include" },
     );
   });
 
@@ -229,8 +229,8 @@ describe("deleteStory", () => {
     await deleteStory("../vocabulary");
 
     expect(fetchMock).toHaveBeenCalledWith(
-      "http://127.0.0.1:8000/stories/..%2Fvocabulary",
-      { method: "DELETE" },
+      "http://localhost:8000/stories/..%2Fvocabulary",
+      { method: "DELETE", credentials: "include" },
     );
   });
 
@@ -250,15 +250,15 @@ describe("deleteStory", () => {
   });
 });
 
-describe("access key handling", () => {
-  afterEach(() => {
+describe("session handling", () => {
+  afterEach(async () => {
     vi.unstubAllGlobals();
-    window.localStorage.clear();
+    const { resetSessionState } = await import("./session");
+    resetSessionState();
     vi.resetModules();
   });
 
-  it("sends the stored key in an X-API-Key header and keeps other headers", async () => {
-    window.localStorage.setItem("story-generator-access-key", "secret");
+  it("sends the login cookie with every request and no API key", async () => {
     const fetchMock = vi.fn().mockResolvedValue({
       ok: true,
       json: async () => ({ id: 1, status: "queued" }),
@@ -275,12 +275,12 @@ describe("access key handling", () => {
 
     const init = fetchMock.mock.calls[0][1] as RequestInit;
     const headers = new Headers(init.headers);
-    expect(headers.get("X-API-Key")).toBe("secret");
+    expect(init.credentials).toBe("include");
+    expect(headers.get("X-API-Key")).toBeNull();
     expect(headers.get("content-type")).toBe("application/json");
   });
 
-  it("sends the key on DELETE requests too", async () => {
-    window.localStorage.setItem("story-generator-access-key", "secret");
+  it("sends the cookie on DELETE requests too", async () => {
     const fetchMock = vi.fn().mockResolvedValue({ ok: true });
     vi.stubGlobal("fetch", fetchMock);
 
@@ -288,27 +288,62 @@ describe("access key handling", () => {
     await deleteStory(3);
 
     const init = fetchMock.mock.calls[0][1] as RequestInit;
-    expect(new Headers(init.headers).get("X-API-Key")).toBe("secret");
+    expect(init.credentials).toBe("include");
   });
 
-  it("clears the stored key and signals the gate when the API answers 401", async () => {
-    window.localStorage.setItem("story-generator-access-key", "wrong");
+  it("signs the page out when an ordinary request gets a 401", async () => {
     vi.stubGlobal(
       "fetch",
       vi.fn().mockResolvedValue({
         ok: false,
         status: 401,
-        json: async () => ({ detail: "Invalid or missing API key" }),
+        json: async () => ({ detail: "Not logged in" }),
       }),
     );
-    const onRejected = vi.fn();
-    window.addEventListener("access-key-rejected", onRejected);
+    const { setSignedIn, getSessionState } = await import("./session");
+    setSignedIn("jack");
 
     const { fetchStories, ApiError } = await import("./api");
     await expect(fetchStories()).rejects.toBeInstanceOf(ApiError);
 
-    window.removeEventListener("access-key-rejected", onRejected);
-    expect(onRejected).toHaveBeenCalledOnce();
-    expect(window.localStorage.getItem("story-generator-access-key")).toBeNull();
+    expect(getSessionState()).toEqual({ status: "signed-out", expired: true });
+  });
+
+  it("treats a rejected login as a wrong password, not an expired session", async () => {
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: false,
+      status: 401,
+      json: async () => ({ detail: "Incorrect username or password" }),
+    });
+    vi.stubGlobal("fetch", fetchMock);
+    const { setSignedIn, getSessionState } = await import("./session");
+    setSignedIn("jack");
+
+    const { logIn, ApiError } = await import("./api");
+    await expect(logIn("jack", "nope")).rejects.toMatchObject(
+      new ApiError("Incorrect username or password", 401),
+    );
+
+    expect(getSessionState().status).toBe("signed-in");
+    const [url, init] = fetchMock.mock.calls[0] as [string, RequestInit];
+    expect(url).toBe("http://localhost:8000/auth/login");
+    expect(init.method).toBe("POST");
+    expect(JSON.parse(init.body as string)).toEqual({
+      username: "jack",
+      password: "nope",
+    });
+  });
+
+  it("logs out with a POST", async () => {
+    const fetchMock = vi.fn().mockResolvedValue({ ok: true, status: 204 });
+    vi.stubGlobal("fetch", fetchMock);
+
+    const { logOut } = await import("./api");
+    await logOut();
+
+    const [url, init] = fetchMock.mock.calls[0] as [string, RequestInit];
+    expect(url).toBe("http://localhost:8000/auth/logout");
+    expect(init.method).toBe("POST");
+    expect(init.credentials).toBe("include");
   });
 });

@@ -1,6 +1,8 @@
-import { getAccessKey, reportAccessKeyRejected } from "./access-key";
+import { reportSessionExpired } from "./session";
 
-const DEFAULT_API_BASE_URL = "http://127.0.0.1:8000";
+// "localhost", not 127.0.0.1: the dev frontend runs on localhost:3000, and the
+// browser only sends the login cookie to an API on the same site.
+const DEFAULT_API_BASE_URL = "http://localhost:8000";
 
 export const API_BASE_URL =
   process.env.NEXT_PUBLIC_API_BASE_URL ?? DEFAULT_API_BASE_URL;
@@ -79,6 +81,10 @@ export type StoriesResponse = {
   offset: number;
 };
 
+export type CurrentUser = {
+  username: string;
+};
+
 export type StoryDetail = StorySummary & {
   content: string;
   selected_vocabulary: VocabularyGlossaryItem[];
@@ -105,29 +111,31 @@ async function parseErrorMessage(response: Response): Promise<string> {
   return `Request failed with status ${response.status}`;
 }
 
-// Every API call goes through here so the access key header is added in one
-// place and a rejected key (401) is handled in one place.
+// Every API call goes through here so the login cookie is always sent and an
+// expired session (401) is handled in one place.
 async function apiFetch(
   path: string,
   init?: RequestInit,
+  { reportUnauthorized = true }: { reportUnauthorized?: boolean } = {},
 ): Promise<Response> {
-  const accessKey = getAccessKey();
-  let requestInit = init;
-  if (accessKey) {
-    const headers = new Headers(init?.headers);
-    headers.set("X-API-Key", accessKey);
-    requestInit = { ...init, headers };
-  }
-
-  const response = await fetch(apiUrl(path), requestInit);
-  if (response.status === 401) {
-    reportAccessKeyRejected();
+  // "include": send the session cookie even though the API is on another
+  // origin (api.huaben.app, or localhost:8000 in development).
+  const response = await fetch(apiUrl(path), {
+    ...init,
+    credentials: "include",
+  });
+  if (response.status === 401 && reportUnauthorized) {
+    reportSessionExpired();
   }
   return response;
 }
 
-async function requestJson<T>(path: string, init?: RequestInit): Promise<T> {
-  const response = await apiFetch(path, init);
+async function requestJson<T>(
+  path: string,
+  init?: RequestInit,
+  options?: { reportUnauthorized?: boolean },
+): Promise<T> {
+  const response = await apiFetch(path, init, options);
   if (!response.ok) {
     throw new ApiError(await parseErrorMessage(response), response.status);
   }
@@ -235,4 +243,36 @@ export function retryStoryGeneration(id: number): Promise<GenerationStatus> {
   return requestJson<GenerationStatus>(`/story-generations/${id}/retry`, {
     method: "POST",
   });
+}
+
+// The auth calls answer 401 as part of their normal job (not logged in yet,
+// wrong password), so they don't report it as an expired session.
+
+export function fetchCurrentUser(): Promise<CurrentUser> {
+  return requestJson<CurrentUser>("/auth/me", undefined, {
+    reportUnauthorized: false,
+  });
+}
+
+export function logIn(username: string, password: string): Promise<CurrentUser> {
+  return requestJson<CurrentUser>(
+    "/auth/login",
+    {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ username, password }),
+    },
+    { reportUnauthorized: false },
+  );
+}
+
+export async function logOut(): Promise<void> {
+  const response = await apiFetch(
+    "/auth/logout",
+    { method: "POST" },
+    { reportUnauthorized: false },
+  );
+  if (!response.ok) {
+    throw new ApiError(await parseErrorMessage(response), response.status);
+  }
 }

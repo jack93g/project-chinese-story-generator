@@ -21,6 +21,7 @@ guess.
 - [Backups](#backups)
 - [Restore from a backup](#restore-from-a-backup)
 - [Rotate a secret](#rotate-a-secret)
+- [Login accounts](#login-accounts)
 - [Abuse response](#abuse-response)
 - [Patching](#patching)
 - [Rehearsal log](#rehearsal-log)
@@ -541,7 +542,8 @@ value once the new one is proven working.
 
 | Secret | Where to get a new one | Also do |
 | --- | --- | --- |
-| `API_ACCESS_KEY` | `openssl rand -hex 32` | Check `grep '^API_ACCESS_KEY=' ~/app/.env` shows the new key (nano saves with `Ctrl+O`, Enter). Then enter the new key in the frontend when it asks (it's kept in your browser's `localStorage`); stories loading is the proof. The old key stops working immediately. |
+| `API_ACCESS_KEY` | `openssl rand -hex 32` | Check `grep '^API_ACCESS_KEY=' ~/app/.env` shows the new key (nano saves with `Ctrl+O`, Enter). The browser doesn't use it (it logs in), so prove it with `curl -s -o /dev/null -w '%{http_code}\n' -H "X-API-Key: $NEW_KEY" https://api.huaben.app/stories` → `200`. The old key stops working immediately. |
+| Login password | See [Login accounts](#login-accounts) | Not in `.env`; stored hashed in the database. |
 | `OPENAI_API_KEY` (OpenRouter) | Provider dashboard → new key | Queue one story to prove it, then delete the old key in the dashboard. |
 | `SKRITTER_ACCESS_TOKEN` | Skritter account settings | Only `sync-skritter` uses it; prove with `dc run --rm api sync-skritter --list-id <id>`. |
 | DB password (`POSTGRES_PASSWORD`) | `openssl rand -hex 24` (letters and digits only) | See below: `.env` alone doesn't change it. |
@@ -595,6 +597,28 @@ aged out (90 days).
 ever live in your shell for a Terraform run. Rotate them in each dashboard;
 nothing on the Droplet uses them.
 
+## Login accounts
+
+The site's login accounts live in the `users` table. There's no sign-up page
+and no emailed password reset: both are done on the Droplet. The password is
+prompted for twice (at least 12 characters) and never appears in shell
+history. Keep it in the password manager.
+
+```bash
+dc run --rm api manage-users create <name>          # first account, after the release that added login
+dc run --rm api manage-users set-password <name>    # forgotten or leaked password
+```
+
+`set-password` also logs that account out everywhere, which makes it the way
+to cut off a stolen session cookie. To log out every session for every
+account without changing passwords (in `dbsql`):
+
+```sql
+BEGIN;
+UPDATE auth_sessions SET revoked_at = now() WHERE revoked_at IS NULL;
+COMMIT;
+```
+
 ## Abuse response
 
 Signs: requests you didn't make, the provider bill jumping, the 3-request cap
@@ -604,8 +628,10 @@ always full.
    ```bash
    dc stop worker
    ```
-2. **Cut off access** by [rotating `API_ACCESS_KEY`](#rotate-a-secret). Every
-   request with the old key gets 401 from then on.
+2. **Cut off access.** [Rotate `API_ACCESS_KEY`](#rotate-a-secret) (every
+   request with the old key gets 401 from then on). Then change each login's
+   password with `manage-users set-password`, which also ends its sessions
+   (see [Login accounts](#login-accounts)).
 3. **Look at the volume:**
    ```sql
    SELECT date_trunc('hour', created_at) AS hour, status, count(*),

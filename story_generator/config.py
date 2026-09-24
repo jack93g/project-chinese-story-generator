@@ -72,3 +72,12 @@ def get_api_access_key() -> str:
             "API_ACCESS_KEY environment variable is not set. Add it to your .env file."
         )
     return key
+
+
+def get_session_cookie_secure() -> bool:
+    """
+    Whether the login cookie is marked Secure (sent over HTTPS only). On by
+    default; set SESSION_COOKIE_SECURE=false only for local development over
+    plain http, if your browser won't keep a Secure cookie from localhost.
+    """
+    return os.getenv("SESSION_COOKIE_SECURE", "true").strip().lower() != "false"
