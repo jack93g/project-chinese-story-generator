@@ -119,6 +119,8 @@ SOURCE_PREFIXES = (
     "frontend/app/",
     "frontend/lib/",
 )
+# Source files outside those folders, e.g. the uvicorn entrypoint.
+SOURCE_FILES = {"main.py"}
 TEST_FILE_PATTERN = re.compile(
     r"(^|/)(tests?/|__tests__/)|(^|/)test_[^/]*\.py$|\.(test|spec)\.[jt]sx?$"
 )
@@ -132,8 +134,10 @@ LOW_PRIORITY_NAMES = {
 
 
 def file_priority(path: str) -> int:
-    """Rank a changed file for review: 0 source, 1 tests, 2 other, 3 docs/lockfiles.
+    """Rank a changed file for review: 0 source, 1 other, 2 tests, 3 docs/lockfiles.
 
+    "Other" (Dockerfile, Caddyfile, compose files, workflows, pyproject.toml)
+    ranks above tests: it is usually small and often security-relevant.
     Tests are checked before source because frontend tests sit next to the
     code they test (e.g. frontend/app/page.test.tsx).
     """
@@ -145,10 +149,10 @@ def file_priority(path: str) -> int:
     ):
         return 3
     if TEST_FILE_PATTERN.search(path):
-        return 1
-    if path.startswith(SOURCE_PREFIXES):
+        return 2
+    if path in SOURCE_FILES or path.startswith(SOURCE_PREFIXES):
         return 0
-    return 2
+    return 1
 
 
 def diff_file_path(section: str) -> str:
@@ -179,7 +183,7 @@ def fit_diff_to_budget(diff: str, max_chars: int) -> tuple[str, list[str]]:
 
     Diffs arrive in alphabetical file order, so a plain cut would keep docs
     and drop backend code. Instead, whole files are kept in priority order
-    (source, tests, other, docs/lockfiles; ties keep diff order) until the
+    (source, other, tests, docs/lockfiles; ties keep diff order) until the
     budget is used, skipping any file that doesn't fit in what's left. The
     kept files are returned with a note listing the omitted paths appended
     (the note itself isn't counted against the budget), plus that list.

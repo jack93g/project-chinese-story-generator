@@ -82,17 +82,19 @@ def test_diff_file_path_reads_post_change_path(header, expected):
 @pytest.mark.parametrize(
     ("path", "expected"),
     [
+        ("main.py", 0),
         ("story_generator/api/routers/auth.py", 0),
         ("alembic/versions/0007_add_users.py", 0),
         ("scripts/openrouter_pr_review.py", 0),
         ("frontend/app/login/page.tsx", 0),
         ("frontend/lib/api.ts", 0),
-        ("tests/api/test_auth.py", 1),
-        ("tests/conftest.py", 1),
-        ("frontend/app/page.test.tsx", 1),
-        ("frontend/lib/api.test.ts", 1),
-        ("pyproject.toml", 2),
-        (".github/workflows/deploy-backend.yml", 2),
+        ("pyproject.toml", 1),
+        ("Dockerfile", 1),
+        (".github/workflows/deploy-backend.yml", 1),
+        ("tests/api/test_auth.py", 2),
+        ("tests/conftest.py", 2),
+        ("frontend/app/page.test.tsx", 2),
+        ("frontend/lib/api.test.ts", 2),
         ("CLAUDE.md", 3),
         ("frontend/README.md", 3),
         ("docs/runbook.md", 3),
@@ -100,7 +102,7 @@ def test_diff_file_path_reads_post_change_path(header, expected):
         ("frontend/package-lock.json", 3),
     ],
 )
-def test_file_priority_ranks_source_then_tests_then_other_then_docs(path, expected):
+def test_file_priority_ranks_source_then_other_then_tests_then_docs(path, expected):
     assert file_priority(path) == expected
 
 
@@ -122,6 +124,16 @@ def test_fit_diff_to_budget_keeps_source_over_alphabetically_earlier_docs():
     assert "2 file(s) omitted" in result
     assert "- CLAUDE.md\n- docs/runbook.md\n]" in result
     assert "x" * 100 not in result.split(test, 1)[1]
+
+
+def test_fit_diff_to_budget_drops_tests_before_config():
+    config = _file_diff("Dockerfile", 100)
+    test = _file_diff("tests/test_x.py", 100)
+
+    result, omitted = fit_diff_to_budget(config + test, len(config) + 10)
+
+    assert result.startswith(config)
+    assert omitted == ["tests/test_x.py"]
 
 
 def test_fit_diff_to_budget_drops_tests_before_source():
