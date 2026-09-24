@@ -33,7 +33,8 @@ export type VocabularyListsResponse = {
 };
 
 export type CreateStoryGenerationPayload = {
-  vocabulary_list_id: number;
+  vocabulary_list_id?: number | null;
+  custom_words?: string[];
   target_hsk_level: number;
   target_word_count: number;
   target_vocabulary_count: number;
@@ -57,7 +58,7 @@ export type GenerationStatus = {
 
 export type VocabularyGlossaryItem = {
   id: number;
-  skritter_vocab_id: string;
+  skritter_vocab_id: string | null;
   language: string;
   writing: string;
   reading: string | null;

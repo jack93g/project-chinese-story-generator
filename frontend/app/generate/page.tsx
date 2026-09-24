@@ -16,6 +16,9 @@ const HSK_LEVELS = [1, 2, 3, 4, 5, 6];
 const DEFAULT_TARGET_WORD_COUNT = 150;
 const DEFAULT_TARGET_VOCABULARY_COUNT = 10;
 const MAX_TARGET_WORD_COUNT = 1000;
+const MAX_VOCABULARY_COUNT = 15;
+const MAX_CUSTOM_WORD_LENGTH = 20;
+const CUSTOM_WORD_PATTERN = /^[\u3400-\u4dbf\u4e00-\u9fff]+$/;
 const POLL_INTERVAL_MS = 2500;
 const MAX_TRANSIENT_STATUS_FAILURES = 5;
 
@@ -59,12 +62,41 @@ function parseTargetWordCount(input: string): TargetWordCountResult {
   return { value: parsed, error: null };
 }
 
+type CustomWordsResult =
+  | { words: string[]; error: null }
+  | { words: string[]; error: string };
+
+function parseCustomWords(input: string): CustomWordsResult {
+  const words = [
+    ...new Set(input.split(/[\s,，、;；]+/).filter((word) => word !== "")),
+  ];
+
+  const invalid = words.find(
+    (word) =>
+      word.length > MAX_CUSTOM_WORD_LENGTH || !CUSTOM_WORD_PATTERN.test(word),
+  );
+  if (invalid !== undefined) {
+    return {
+      words,
+      error: `"${invalid}" isn't a Chinese word. Use Chinese characters only, up to ${MAX_CUSTOM_WORD_LENGTH} per word.`,
+    };
+  }
+  if (words.length > MAX_VOCABULARY_COUNT) {
+    return {
+      words,
+      error: `Enter at most ${MAX_VOCABULARY_COUNT} custom words (you entered ${words.length}).`,
+    };
+  }
+  return { words, error: null };
+}
+
 export default function GeneratePage() {
   const router = useRouter();
   const [listsState, setListsState] = useState<ListsState>({
     status: "loading",
   });
   const [selectedListId, setSelectedListId] = useState("");
+  const [customWordsInput, setCustomWordsInput] = useState("");
   const [hskLevel, setHskLevel] = useState("");
   const [topic, setTopic] = useState("");
   const [targetWordCount, setTargetWordCount] = useState(
@@ -190,8 +222,12 @@ export default function GeneratePage() {
 
   const isSelectedListEmpty = selectedList?.item_count === 0;
   const targetWordCountResult = parseTargetWordCount(targetWordCount);
+  const customWordsResult = parseCustomWords(customWordsInput);
+  const customWords = customWordsResult.words;
+  const hasList = selectedListId !== "";
   const canSubmit =
-    selectedListId !== "" &&
+    (hasList || customWords.length > 0) &&
+    customWordsResult.error === null &&
     hskLevel !== "" &&
     !isSelectedListEmpty &&
     targetWordCountResult.error === null &&
@@ -199,20 +235,25 @@ export default function GeneratePage() {
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    if (!canSubmit || !selectedList || targetWordCountResult.value === null) {
+    if (!canSubmit || targetWordCountResult.value === null) {
       return;
     }
 
-    const vocabularyCount = Math.max(
-      1,
-      Math.min(DEFAULT_TARGET_VOCABULARY_COUNT, selectedList.item_count),
-    );
+    // Custom words always count; the list fills the rest up to the default.
+    const listSlots = selectedList
+      ? Math.min(
+          selectedList.item_count,
+          Math.max(DEFAULT_TARGET_VOCABULARY_COUNT - customWords.length, 0),
+        )
+      : 0;
+    const vocabularyCount = Math.max(1, customWords.length + listSlots);
     const trimmedTopic = topic.trim();
 
     setSubmitState({ status: "submitting" });
     try {
       const result = await createStoryGeneration({
-        vocabulary_list_id: Number(selectedListId),
+        vocabulary_list_id: hasList ? Number(selectedListId) : null,
+        ...(customWords.length > 0 ? { custom_words: customWords } : {}),
         target_hsk_level: Number(hskLevel),
         target_word_count: targetWordCountResult.value,
         target_vocabulary_count: vocabularyCount,
@@ -354,11 +395,8 @@ export default function GeneratePage() {
             id="vocabulary-list"
             value={selectedListId}
             onChange={(event) => setSelectedListId(event.target.value)}
-            required
           >
-            <option value="" disabled>
-              Select a vocabulary list
-            </option>
+            <option value="">No list (custom words only)</option>
             {listsState.lists.map((list) => (
               <option key={list.id} value={list.id}>
                 {list.name} ({list.item_count} words)
@@ -368,6 +406,30 @@ export default function GeneratePage() {
           {isSelectedListEmpty && (
             <p role="alert" className="field-error">
               This list has no vocabulary items yet — choose another list.
+            </p>
+          )}
+        </div>
+
+        <div className="form-field">
+          <label htmlFor="custom-words">Custom words (optional)</label>
+          <textarea
+            id="custom-words"
+            rows={3}
+            value={customWordsInput}
+            onChange={(event) => setCustomWordsInput(event.target.value)}
+            placeholder="Paste words here, separated by spaces, commas or new lines"
+            aria-invalid={customWordsResult.error !== null}
+            aria-describedby="custom-words-hint"
+          />
+          {customWordsResult.error ? (
+            <p id="custom-words-hint" role="alert" className="field-error">
+              {customWordsResult.error}
+            </p>
+          ) : (
+            <p id="custom-words-hint" className="field-hint">
+              {customWords.length > 0
+                ? `${customWords.length} custom word${customWords.length === 1 ? "" : "s"}${hasList ? "; the list fills the remaining slots" : ""}.`
+                : "These are always included in the story. Add a list above to fill the remaining slots."}
             </p>
           )}
         </div>

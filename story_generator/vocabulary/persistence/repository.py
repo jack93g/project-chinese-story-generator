@@ -24,6 +24,7 @@ class VocabularyRepository:
     def list_page(self, limit: int, offset: int) -> list[VocabularyItem]:
         return (
             self.session.query(VocabularyItem)
+            .filter(VocabularyItem.skritter_vocab_id.is_not(None))
             .order_by(VocabularyItem.id.asc())
             .limit(limit)
             .offset(offset)
@@ -31,7 +32,42 @@ class VocabularyRepository:
         )
 
     def count(self) -> int:
-        return self.session.query(VocabularyItem).count()
+        return (
+            self.session.query(VocabularyItem)
+            .filter(VocabularyItem.skritter_vocab_id.is_not(None))
+            .count()
+        )
+
+    def get_or_create_custom_items(self, writings: list[str]) -> list[VocabularyItem]:
+        """Resolve user-entered words to items, in input order.
+
+        Reuses an existing item with the same writing (so Skritter's reading
+        and definition come along); otherwise creates a custom item with no
+        reading/definition. Does not touch list membership.
+        """
+        items = []
+        for writing in writings:
+            item = self._find_by_writing(writing)
+            if item is None:
+                self.session.execute(
+                    pg_insert(VocabularyItem)
+                    .values(language="zh", writing=writing)
+                    .on_conflict_do_nothing(
+                        index_elements=["writing"],
+                        index_where=VocabularyItem.skritter_vocab_id.is_(None),
+                    )
+                )
+                item = self._find_by_writing(writing)
+            items.append(item)
+        return items
+
+    def _find_by_writing(self, writing: str) -> VocabularyItem | None:
+        return (
+            self.session.query(VocabularyItem)
+            .filter_by(language="zh", writing=writing)
+            .order_by(VocabularyItem.id.asc())
+            .first()
+        )
 
     def ensure_list(self, skritter_list_id: str, name: str) -> int:
         insert_stmt = pg_insert(VocabularyList).values(

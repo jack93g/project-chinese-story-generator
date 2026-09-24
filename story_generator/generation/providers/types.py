@@ -57,3 +57,6 @@ class GenerationResult:
     title: str
     body: str
     usage: UsageMetadata
+    # Optional model-supplied glosses [{"writing", "reading", "definition_en"}]
+    # for requested words that had none; best-effort, never required.
+    glossary: list[dict] = field(default_factory=list)

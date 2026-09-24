@@ -258,6 +258,70 @@ describe("GeneratePage", () => {
     });
   });
 
+  it("submits custom words only, with no list, using the number of words as the vocabulary count", async () => {
+    createStoryGeneration.mockResolvedValueOnce({ id: 11, status: "queued" });
+    await renderReady();
+
+    fireEvent.change(screen.getByLabelText("Custom words (optional)"), {
+      target: { value: "菜单, 饭馆、点菜\n菜单" },
+    });
+    fireEvent.change(screen.getByLabelText("Target HSK level"), {
+      target: { value: "2" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Generate" }));
+
+    await waitFor(() => {
+      expect(createStoryGeneration).toHaveBeenCalledWith({
+        vocabulary_list_id: null,
+        custom_words: ["菜单", "饭馆", "点菜"],
+        target_hsk_level: 2,
+        target_word_count: 150,
+        target_vocabulary_count: 3,
+        topic: null,
+      });
+    });
+  });
+
+  it("combines a list with custom words, leaving the remaining slots to the list", async () => {
+    createStoryGeneration.mockResolvedValueOnce({ id: 12, status: "queued" });
+    await renderReady();
+
+    fireEvent.change(screen.getByLabelText("Vocabulary list"), {
+      target: { value: "1" },
+    });
+    fireEvent.change(screen.getByLabelText("Custom words (optional)"), {
+      target: { value: "菜单 饭馆" },
+    });
+    fireEvent.change(screen.getByLabelText("Target HSK level"), {
+      target: { value: "2" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Generate" }));
+
+    await waitFor(() => {
+      expect(createStoryGeneration).toHaveBeenCalledWith(
+        expect.objectContaining({
+          vocabulary_list_id: 1,
+          custom_words: ["菜单", "饭馆"],
+          target_vocabulary_count: 10,
+        }),
+      );
+    });
+  });
+
+  it("blocks submission and explains when a custom word is not Chinese", async () => {
+    await renderReady();
+
+    fireEvent.change(screen.getByLabelText("Custom words (optional)"), {
+      target: { value: "菜单 hello" },
+    });
+    fireEvent.change(screen.getByLabelText("Target HSK level"), {
+      target: { value: "2" },
+    });
+
+    expect(screen.getByRole("alert")).toHaveTextContent("hello");
+    expect(screen.getByRole("button", { name: "Generate" })).toBeDisabled();
+  });
+
   it("shows an API error message when submission fails", async () => {
     createStoryGeneration.mockRejectedValueOnce(
       new ApiError("Vocabulary list 1 not found", 404),
