@@ -15,9 +15,13 @@ import { BrushLoader } from "../components/brush-loader";
 
 const HSK_LEVELS = [1, 2, 3, 4, 5, 6];
 const DEFAULT_TARGET_WORD_COUNT = 150;
-const DEFAULT_TARGET_VOCABULARY_COUNT = 10;
 const MAX_TARGET_WORD_COUNT = 1000;
 const MAX_VOCABULARY_COUNT = 15;
+// The suggested number of vocabulary words is one per this many characters
+// of story: dense enough to practise, loose enough to read naturally. It
+// depends only on story length, never on list size (lists can hold
+// hundreds of words; a story still uses at most MAX_VOCABULARY_COUNT).
+const CHARACTERS_PER_VOCABULARY_WORD = 25;
 const MAX_CUSTOM_WORD_LENGTH = 20;
 const CUSTOM_WORD_PATTERN = /^[\u3400-\u4dbf\u4e00-\u9fff]+$/;
 const POLL_INTERVAL_MS = 2500;
@@ -57,6 +61,49 @@ function parseTargetWordCount(input: string): TargetWordCountResult {
     return {
       value: null,
       error: `Enter a whole number from 1 to ${MAX_TARGET_WORD_COUNT}, or leave this blank to use the default of ${DEFAULT_TARGET_WORD_COUNT}.`,
+    };
+  }
+
+  return { value: parsed, error: null };
+}
+
+function suggestedVocabularyCount(targetWordCount: number): number {
+  return Math.min(
+    MAX_VOCABULARY_COUNT,
+    Math.max(1, Math.round(targetWordCount / CHARACTERS_PER_VOCABULARY_WORD)),
+  );
+}
+
+type VocabularyCountResult =
+  | { value: number; error: null }
+  | { value: null; error: string };
+
+// A blank input means "use the suggestion", like a blank story length.
+function parseVocabularyCount(
+  input: string,
+  suggested: number,
+  customWordCount: number,
+): VocabularyCountResult {
+  const trimmed = input.trim();
+  if (trimmed === "") {
+    return { value: Math.max(suggested, customWordCount), error: null };
+  }
+
+  const parsed = Number(trimmed);
+  if (
+    !Number.isInteger(parsed) ||
+    parsed < 1 ||
+    parsed > MAX_VOCABULARY_COUNT
+  ) {
+    return {
+      value: null,
+      error: `Enter a whole number from 1 to ${MAX_VOCABULARY_COUNT}, or leave this blank to use the suggested ${suggested}.`,
+    };
+  }
+  if (parsed < customWordCount) {
+    return {
+      value: null,
+      error: `You entered ${customWordCount} custom words, and they're always used, so enter at least ${customWordCount}.`,
     };
   }
 
@@ -103,6 +150,11 @@ export default function GeneratePage() {
   const [targetWordCount, setTargetWordCount] = useState(
     String(DEFAULT_TARGET_WORD_COUNT),
   );
+  // null until the user types in the field: until then it follows the
+  // suggestion, so changing the story length updates it.
+  const [vocabularyCountInput, setVocabularyCountInput] = useState<
+    string | null
+  >(null);
   const [submitState, setSubmitState] = useState<SubmitState>({
     status: "idle",
   });
@@ -226,12 +278,31 @@ export default function GeneratePage() {
   const customWordsResult = parseCustomWords(customWordsInput);
   const customWords = customWordsResult.words;
   const hasList = selectedListId !== "";
+  const suggestedCount = suggestedVocabularyCount(
+    targetWordCountResult.value ?? DEFAULT_TARGET_WORD_COUNT,
+  );
+  const vocabularyCountResult = parseVocabularyCount(
+    vocabularyCountInput ?? "",
+    suggestedCount,
+    customWords.length,
+  );
+  // Custom words always count; the list fills the rest, up to its size.
+  const listSlots =
+    selectedList && vocabularyCountResult.value !== null
+      ? Math.min(
+          selectedList.item_count,
+          Math.max(vocabularyCountResult.value - customWords.length, 0),
+        )
+      : 0;
+  const vocabularyCount = Math.max(1, customWords.length + listSlots);
   const canSubmit =
     (hasList || customWords.length > 0) &&
     customWordsResult.error === null &&
     hskLevel !== "" &&
     !(isSelectedListEmpty && customWords.length === 0) &&
     targetWordCountResult.error === null &&
+    // The count only applies with a list; without one, it's the custom words.
+    (!hasList || vocabularyCountResult.error === null) &&
     submitState.status !== "submitting";
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
@@ -240,14 +311,6 @@ export default function GeneratePage() {
       return;
     }
 
-    // Custom words always count; the list fills the rest up to the default.
-    const listSlots = selectedList
-      ? Math.min(
-          selectedList.item_count,
-          Math.max(DEFAULT_TARGET_VOCABULARY_COUNT - customWords.length, 0),
-        )
-      : 0;
-    const vocabularyCount = Math.max(1, customWords.length + listSlots);
     const trimmedTopic = topic.trim();
 
     setSubmitState({ status: "submitting" });
@@ -309,6 +372,17 @@ export default function GeneratePage() {
     } finally {
       setIsRetrying(false);
     }
+  }
+
+  function vocabularyCountHint(): string {
+    const requested = vocabularyCountResult.value ?? 0;
+    if (selectedList && vocabularyCount < requested) {
+      return `This list has only ${selectedList.item_count} word${selectedList.item_count === 1 ? "" : "s"}, so the story will use ${vocabularyCount}.`;
+    }
+    const lengthNote = `Suggested for this length: ${suggestedCount}.`;
+    return customWords.length > 0
+      ? `${lengthNote} Includes your ${customWords.length} custom word${customWords.length === 1 ? "" : "s"}; the list fills the rest.`
+      : lengthNote;
   }
 
   if (listsState.status === "loading") {
@@ -479,7 +553,7 @@ export default function GeneratePage() {
 
         <div className="form-field">
           <label htmlFor="target-word-count">
-            Target word count (optional)
+            Story length in characters (optional)
           </label>
           <input
             id="target-word-count"
@@ -506,6 +580,39 @@ export default function GeneratePage() {
             </p>
           )}
         </div>
+
+        {hasList && (
+          <div className="form-field">
+            <label htmlFor="vocabulary-count">Vocabulary words to use</label>
+            <input
+              id="vocabulary-count"
+              type="number"
+              min={Math.max(1, customWords.length)}
+              max={MAX_VOCABULARY_COUNT}
+              step={1}
+              value={
+                vocabularyCountInput ??
+                String(Math.max(suggestedCount, customWords.length))
+              }
+              onChange={(event) => setVocabularyCountInput(event.target.value)}
+              aria-invalid={vocabularyCountResult.error !== null}
+              aria-describedby="vocabulary-count-hint"
+            />
+            {vocabularyCountResult.error ? (
+              <p
+                id="vocabulary-count-hint"
+                role="alert"
+                className="field-error"
+              >
+                {vocabularyCountResult.error}
+              </p>
+            ) : (
+              <p id="vocabulary-count-hint" className="field-hint">
+                {vocabularyCountHint()}
+              </p>
+            )}
+          </div>
+        )}
 
         {submitState.status === "error" && (
           <p role="alert" className="state state-error">
