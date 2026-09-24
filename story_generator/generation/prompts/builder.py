@@ -17,8 +17,9 @@ import math
 
 from story_generator.generation.providers.types import GenerationRequestInput
 
-# story-v4/v5 are registered for evaluation but not current: v4 showed no
-# improvement over v3 on the dense_vocabulary fixture (2026-09-24 reports).
+# story-v4/v5 are registered for evaluation but not current: across 5
+# samples each on the dense_vocabulary fixture, neither was clearly better
+# than v3 (2026-09-24T18* reports).
 CURRENT_PROMPT_VERSION = "story-v3"
 
 
