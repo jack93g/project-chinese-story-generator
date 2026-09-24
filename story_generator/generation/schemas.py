@@ -70,7 +70,7 @@ class CreateGenerationRequestSchema(BaseModel):
             ):
                 raise ValueError(
                     f"Custom words must be Chinese characters only, at most "
-                    f"{MAX_CUSTOM_WORD_LENGTH} long: {word!r}"
+                    f"{MAX_CUSTOM_WORD_LENGTH} long: {word[:30]!r}"
                 )
             cleaned.append(word)
         return cleaned

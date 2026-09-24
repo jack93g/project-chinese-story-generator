@@ -64,7 +64,9 @@ def test_schema_rejects_more_custom_words_than_target_count():
 def test_schema_rejects_more_than_fifteen_custom_words():
     words = [f"词{chr(0x4E00 + i)}" for i in range(16)]
     with pytest.raises(ValidationError):
-        CreateGenerationRequestSchema(custom_words=words, **BASE)
+        CreateGenerationRequestSchema(
+            custom_words=words, **{**BASE, "target_vocabulary_count": 15}
+        )
 
 
 def test_schema_dedupes_before_applying_the_count_limit():
@@ -377,7 +379,7 @@ def test_lookup_prefers_skritter_item_even_if_custom_row_is_older(db_session):
 
 
 @pytest.mark.db
-def test_glossary_fills_only_missing_fields_on_any_item(client, db_session):
+def test_glossary_never_writes_to_skritter_rows(client, db_session):
     vocab_list = _make_list(db_session, skritter_list_id="partial", writings=["菜单"])
     item = vocab_list.items[0]
     item.definition_en = None
@@ -402,4 +404,14 @@ def test_glossary_fills_only_missing_fields_on_any_item(client, db_session):
     db_session.commit()
 
     db_session.refresh(item)
-    assert (item.reading, item.definition_en) == ("py0", "menu")
+    assert (item.reading, item.definition_en) == ("py0", None)
+
+
+@pytest.mark.db
+def test_post_more_custom_words_than_target_count_returns_422(client):
+    response = client.post(
+        "/story-generations",
+        json={**BASE, "target_vocabulary_count": 2, "custom_words": ["一", "二", "三"]},
+    )
+
+    assert response.status_code == 422
