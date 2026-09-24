@@ -117,33 +117,45 @@ you copy the new one over.
 don't need to do anything for other code, and nothing for
 `scripts/db-restore.sh`, which you run by hand straight from `~/app`.
 
-**How** (on the Droplet, after the merge's deploy has finished; don't copy
-over `~/deploy.sh` while a deploy is running):
+**How**, on the Droplet, after the merge's deploy has finished (don't copy
+over `~/deploy.sh` while a deploy is running). Do only the script(s) the merge
+changed. Read each `diff` before running the `cp` under it.
 
 ```bash
-cd ~/app && git rev-parse HEAD             # the merged SHA, i.e. the deploy has run
+cd ~/app && git rev-parse HEAD                # must be the merged SHA, i.e. the deploy has run
+```
 
-diff ~/deploy.sh scripts/droplet-deploy.sh # review what changes
+Deploy script:
+
+```bash
+diff ~/deploy.sh scripts/droplet-deploy.sh    # read what changes
 cp scripts/droplet-deploy.sh ~/deploy.sh
+diff ~/deploy.sh scripts/droplet-deploy.sh && echo "deploy.sh up to date"
+```
 
-diff ~/db-backup.sh scripts/db-backup.sh
+Backup script (if `~/db-backup.sh` doesn't exist yet, backups were never set
+up: do [Backups → One-time setup](#one-time-setup) instead):
+
+```bash
+diff ~/db-backup.sh scripts/db-backup.sh      # read what changes
 cp scripts/db-backup.sh ~/db-backup.sh
-
-diff ~/deploy.sh scripts/droplet-deploy.sh && diff ~/db-backup.sh scripts/db-backup.sh && echo "copies up to date"
+diff ~/db-backup.sh scripts/db-backup.sh && echo "db-backup.sh up to date"
 ```
 
 `cp` onto an existing file keeps its permissions, so no `chmod` is needed.
 
 **Check it works:**
 
-- Deploy script: redeploy what's already live, which exercises the new copy
-  without changing anything. (Use the current `main` SHA.)
+- Deploy script, **from your laptop** (in the repo): redeploy what's already
+  live. This runs the new copy without changing anything.
   ```bash
+  git fetch origin
   gh workflow run deploy-backend.yml --ref main -f sha=$(git rev-parse origin/main)
   gh run watch
   ```
-- Backup script: run `~/db-backup.sh` once and check that a new file appears
-  in `~/backups/`.
+  The run should be green and end with `==> deployed <sha>`.
+- Backup script, on the Droplet: run `~/db-backup.sh` once and check that a
+  new file appears in `~/backups/`.
 
 ## Migration policy
 
