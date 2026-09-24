@@ -17,7 +17,9 @@ import math
 
 from story_generator.generation.providers.types import GenerationRequestInput
 
-CURRENT_PROMPT_VERSION = "story-v4"
+# story-v4/v5 are registered for evaluation but not current: v4 showed no
+# improvement over v3 on the dense_vocabulary fixture (2026-09-24 reports).
+CURRENT_PROMPT_VERSION = "story-v3"
 
 
 def build_story_v1_prompt(request: GenerationRequestInput) -> str:
@@ -144,6 +146,26 @@ def build_story_v4_prompt(request: GenerationRequestInput) -> str:
     return _length_band_prompt(request, craft_guidance=V4_CRAFT_GUIDANCE)
 
 
+# v5's addition to v4. On the dense_vocabulary fixture, v4 set the story
+# in 1989 for 监狱/反抗/暴力, then showed a meme (表情包) on a phone: the
+# randomly chosen words pulled toward different eras.
+V5_SETTING_GUIDANCE = (
+    "Choose a setting where every word fits naturally, usually the present "
+    "day. If some words belong to different eras or worlds (for example "
+    "internet slang alongside historical terms), pick a present-day setting "
+    "that can hold them all, such as characters talking about or remembering "
+    "the past, rather than putting modern things in the past.\n\n"
+)
+
+
+def build_story_v5_prompt(request: GenerationRequestInput) -> str:
+    """Like v4, with V5_SETTING_GUIDANCE first: pick a setting, usually the
+    present day, where all the words fit."""
+    return _length_band_prompt(
+        request, craft_guidance=V5_SETTING_GUIDANCE + V4_CRAFT_GUIDANCE
+    )
+
+
 def _length_band_prompt(
     request: GenerationRequestInput, craft_guidance: str = ""
 ) -> str:
@@ -197,6 +219,7 @@ PROMPT_BUILDERS = {
     "story-v2": build_story_v2_prompt,
     "story-v3": build_story_v3_prompt,
     "story-v4": build_story_v4_prompt,
+    "story-v5": build_story_v5_prompt,
 }
 
 

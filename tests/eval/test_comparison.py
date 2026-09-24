@@ -133,6 +133,7 @@ def test_load_outcomes_accepts_reports_without_newer_fields(tmp_path):
     for item in old:
         del item["prompt_version"]
         del item["meets_length_threshold"]
+        del item["sample"]
     path = tmp_path / "old.json"
     path.write_text(json.dumps(old), encoding="utf-8")
 
@@ -140,6 +141,7 @@ def test_load_outcomes_accepts_reports_without_newer_fields(tmp_path):
 
     assert outcome.prompt_version is None
     assert outcome.meets_length_threshold is None
+    assert outcome.sample == 1
     assert "| — |" in to_markdown([outcome])
 
 
@@ -357,3 +359,41 @@ def test_render_workflow_end_to_end(tmp_path):
     markdown = to_markdown(reloaded)
 
     assert "Human reviewed this after the fact." in markdown
+
+
+def test_run_comparison_repeats_each_pair_and_numbers_the_samples():
+    fixture = _fixture(
+        [{"id": 1, "writing": "菜单", "reading": "càidān", "definition_en": "menu"}],
+        name="f1",
+    )
+    spec = ProviderSpec(
+        label="fake",
+        provider=FakeStoryGenerationProvider(),
+        model="fake-model",
+        base_url="https://fake.test",
+    )
+
+    outcomes = run_comparison([fixture], [spec], repeat=3)
+
+    assert [o.sample for o in outcomes] == [1, 2, 3]
+    markdown = to_markdown(outcomes)
+    assert "| f1 #1 |" in markdown
+    assert "### f1 #3 — fake" in markdown
+
+
+def test_to_markdown_omits_sample_numbers_for_a_single_run():
+    fixture = _fixture(
+        [{"id": 1, "writing": "菜单", "reading": "càidān", "definition_en": "menu"}],
+        name="f1",
+    )
+    spec = ProviderSpec(
+        label="fake",
+        provider=FakeStoryGenerationProvider(),
+        model="fake-model",
+        base_url="https://fake.test",
+    )
+
+    markdown = to_markdown(run_comparison([fixture], [spec]))
+
+    assert "| f1 |" in markdown
+    assert "#1" not in markdown

@@ -4,6 +4,7 @@ from story_generator.generation.prompts.builder import (
     build_story_v1_prompt,
     build_story_v3_prompt,
     build_story_v4_prompt,
+    build_story_v5_prompt,
 )
 from story_generator.generation.providers.types import GenerationRequestInput
 
@@ -97,8 +98,8 @@ def test_prompt_requests_structured_json_output():
     assert '"body"' in prompt
 
 
-def test_current_prompt_version_is_v4():
-    assert CURRENT_PROMPT_VERSION == "story-v4"
+def test_current_prompt_version_is_v3():
+    assert CURRENT_PROMPT_VERSION == "story-v3"
 
 
 def test_v3_prompt_states_a_length_band_and_paragraph_plan():
@@ -158,3 +159,17 @@ def test_v4_prompt_adds_consistency_and_collocation_guidance_to_v3():
     guidance_start = v4.index("Keep the story plausible")
     assert guidance_start < v4.index("Length:")
     assert v4.replace(v4[guidance_start : v4.index("Length:")], "") == v3
+
+
+def test_v5_prompt_adds_setting_guidance_before_v4_guidance():
+    request = _make_request(prompt_version="story-v5", target_word_count=300)
+
+    v4 = build_story_v4_prompt(request)
+    v5 = build_story_v5_prompt(request)
+
+    assert "Choose a setting where every word fits naturally" not in v4
+    setting_start = v5.index("Choose a setting where every word fits naturally")
+    assert setting_start < v5.index("Keep the story plausible")
+    assert (
+        v5.replace(v5[setting_start : v5.index("Keep the story plausible")], "") == v4
+    )

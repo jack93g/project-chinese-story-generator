@@ -329,6 +329,10 @@ to measure a baseline on the same day. The summary flags any story shorter
 than 80% of its target length; if a model is routinely short, fix the prompt
 before approving it.
 
+One sample per fixture is enough for length and coverage but too noisy to
+judge a prompt on writing quality. For that, generate one fixture several
+times per prompt, e.g. `--fixture dense_vocabulary --repeat 5`.
+
 The comparison command does not write to the application database. For local
 OpenAI-compatible servers that do not require a key, the final part of the
 provider specification may name an unset environment variable.

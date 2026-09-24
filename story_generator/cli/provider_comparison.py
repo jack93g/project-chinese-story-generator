@@ -104,18 +104,29 @@ def _run(args: argparse.Namespace) -> None:
             f"Known: {', '.join(PROMPT_BUILDERS)}."
         )
 
+    known_fixtures = {fixture.name for fixture in EVAL_FIXTURES}
+    unknown = [name for name in args.fixture if name not in known_fixtures]
+    if unknown:
+        raise SystemExit(
+            f"Unknown --fixture {', '.join(unknown)}. "
+            f"Known: {', '.join(sorted(known_fixtures))}."
+        )
+    if args.repeat < 1:
+        raise SystemExit("--repeat must be at least 1.")
+
     provider_specs = [_build_provider_spec(spec_str) for spec_str in args.provider]
     fixtures = [
         dataclasses.replace(fixture, prompt_version=args.prompt_version)
         for fixture in EVAL_FIXTURES
+        if not args.fixture or fixture.name in args.fixture
     ]
 
+    total = len(fixtures) * len(provider_specs) * args.repeat
     print(
         f"Running {len(fixtures)} fixtures x {len(provider_specs)} providers "
-        f"= {len(fixtures) * len(provider_specs)} generations "
-        f"(prompt {args.prompt_version})..."
+        f"x {args.repeat} = {total} generations (prompt {args.prompt_version})..."
     )
-    outcomes = run_comparison(fixtures, provider_specs)
+    outcomes = run_comparison(fixtures, provider_specs, repeat=args.repeat)
 
     timestamp = dt.datetime.now(dt.UTC).strftime("%Y-%m-%dT%H%M%SZ")
     output_dir = Path(args.output_dir)
@@ -182,6 +193,22 @@ def main() -> None:
             "Prompt version to send (default: the one production uses, "
             f"{CURRENT_PROMPT_VERSION}). Pass an older one to measure a "
             "baseline for a prompt change."
+        ),
+    )
+    run_parser.add_argument(
+        "--fixture",
+        action="append",
+        default=[],
+        metavar="NAME",
+        help="Only run this fixture, repeatable (default: all of them).",
+    )
+    run_parser.add_argument(
+        "--repeat",
+        type=int,
+        default=1,
+        help=(
+            "Generate each fixture this many times. One sample is enough for "
+            "length and coverage, but too noisy to judge a prompt on quality."
         ),
     )
     run_parser.add_argument("--output-dir", default="reports/provider-comparisons")

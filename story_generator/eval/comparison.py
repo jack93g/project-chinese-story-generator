@@ -83,6 +83,8 @@ class EvalOutcome:
     # Defaulted so reports written before these fields existed still load.
     prompt_version: str | None = None
     meets_length_threshold: bool | None = None
+    # 1-based; >1 only when a run repeats each fixture (--repeat).
+    sample: int = 1
 
 
 def compute_coverage(vocabulary_snapshot: list[dict], result: GenerationResult) -> dict:
@@ -177,12 +179,27 @@ def run_single(fixture: EvalFixture, provider_spec: ProviderSpec) -> EvalOutcome
 
 
 def run_comparison(
-    fixtures: list[EvalFixture], provider_specs: list[ProviderSpec]
+    fixtures: list[EvalFixture],
+    provider_specs: list[ProviderSpec],
+    repeat: int = 1,
 ) -> list[EvalOutcome]:
-    return [
-        run_single(fixture, provider_spec)
-        for fixture, provider_spec in itertools.product(fixtures, provider_specs)
-    ]
+    """Every fixture against every provider, `repeat` times each: a single
+    sample is too noisy to judge a prompt change on quality."""
+    outcomes = []
+    for fixture, provider_spec in itertools.product(fixtures, provider_specs):
+        for sample in range(1, repeat + 1):
+            outcome = run_single(fixture, provider_spec)
+            outcome.sample = sample
+            outcomes.append(outcome)
+    return outcomes
+
+
+def _fixture_label(outcome: EvalOutcome, repeated: bool) -> str:
+    return (
+        f"{outcome.fixture_name} #{outcome.sample}"
+        if repeated
+        else outcome.fixture_name
+    )
 
 
 def to_json(outcomes: list[EvalOutcome]) -> str:
@@ -234,6 +251,7 @@ def to_markdown(outcomes: list[EvalOutcome]) -> str:
         "|---|---|---|---|---|---|---|---|---|---|---|---|---|---|",
     ]
 
+    repeated = any(o.sample > 1 for o in outcomes)
     for o in outcomes:
         coverage_str = f"{o.coverage:.0%}" if o.coverage is not None else "—"
         meets_str = (
@@ -259,7 +277,7 @@ def to_markdown(outcomes: list[EvalOutcome]) -> str:
             else "_(fill in)_"
         )
         lines.append(
-            f"| {o.fixture_name} | {o.category} | {o.provider_label} | {o.model} | `{o.base_url}` | "
+            f"| {_fixture_label(o, repeated)} | {o.category} | {o.provider_label} | {o.model} | `{o.base_url}` | "
             f"{o.prompt_version or '—'} | "
             f"{'✅' if o.schema_valid else '❌'} | {coverage_str} | {meets_str} | "
             f"{chars_str} | {length_str} | {latency_str} | {error_str} | {notes_str} |"
@@ -285,7 +303,8 @@ def to_markdown(outcomes: list[EvalOutcome]) -> str:
     lines += ["## Transcripts", ""]
     for o in outcomes:
         lines.append(
-            f"### {o.fixture_name} — {o.provider_label} ({o.model} @ {o.base_url})"
+            f"### {_fixture_label(o, repeated)} — {o.provider_label} "
+            f"({o.model} @ {o.base_url})"
         )
         lines.append("")
         if not o.schema_valid:
