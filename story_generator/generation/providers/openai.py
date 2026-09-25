@@ -86,13 +86,16 @@ class OpenAIStoryGenerationProvider:
         api_key: str,
         model: str,
         base_url: str = _DEFAULT_CHAT_COMPLETIONS_URL,
-        # httpx applies `timeout` to each read, not the whole request, and
-        # OpenRouter sends a keep-alive every ~3s while the model works, so a
-        # slow generation never trips it. `total_timeout` bounds the whole
-        # call; `timeout` only catches a connection that goes silent.
-        # total_timeout + timeout must stay under the worker's
-        # stop_grace_period (90s in docker-compose.yml): a stopping worker
-        # finishes its current request, and Compose kills it after that.
+        # `timeout` is for connecting and sending. `total_timeout` bounds the
+        # whole call, and must stay under the worker's stop_grace_period (90s
+        # in docker-compose.yml): a stopping worker finishes its current
+        # request, and Compose kills it after that. httpx only has per-read
+        # timeouts, so two cases need covering: a server that sends nothing
+        # until the answer is ready (e.g. Groq) hits the read timeout, set to
+        # total_timeout; OpenRouter, which sends a keep-alive every ~3s and so
+        # never trips a read timeout, hits the deadline checked per chunk in
+        # _post. Only a server going silent partway through a body could run
+        # longer.
         timeout: float = 10.0,
         total_timeout: float = 75.0,
     ):
@@ -100,7 +103,7 @@ class OpenAIStoryGenerationProvider:
         self._api_key = api_key
         self._model = model
         self._base_url = base_url
-        self._timeout = timeout
+        self._timeout = httpx.Timeout(timeout, read=total_timeout)
         self._total_timeout = total_timeout
 
     def generate(

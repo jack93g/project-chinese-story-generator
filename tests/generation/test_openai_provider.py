@@ -335,5 +335,8 @@ def test_generate_reads_a_body_sent_in_pieces_before_the_deadline():
     result = _make_provider().generate(SAMPLE_REQUEST)
 
     assert result.title == "标题"
-    # a connection that goes silent is caught by the short per-read timeout
-    assert route.calls.last.request.extensions["timeout"]["read"] == 10.0
+    # A server that sends nothing until the answer is ready may take the whole
+    # budget before its first byte; connecting still fails fast.
+    timeout = route.calls.last.request.extensions["timeout"]
+    assert timeout["read"] == 75.0
+    assert timeout["connect"] == 10.0
