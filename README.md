@@ -10,8 +10,8 @@ durable background workflow.
 - Store vocabulary, list membership, sync-run history, and raw Skritter API
   payloads. Re-running an import is idempotent and does not duplicate
   vocabulary or list memberships. Words removed from a Skritter list are
-  unlinked from it, and lists deleted in Skritter are archived (hidden), not
-  deleted.
+  unlinked from it, and lists deleted in Skritter are archived (left out of
+  the app), not deleted. Lists can also be hidden by hand with `manage-lists`.
 - Serve a FastAPI for vocabulary, vocabulary lists, saved stories, sync
   status, and asynchronous story-generation requests.
 - Queue generation requests, select a random vocabulary sample,
@@ -57,8 +57,8 @@ two credentials:
 | `POST` | `/auth/logout` | Ends the current session and clears the cookie. Returns `204 No Content`. |
 | `GET` | `/auth/me` | Returns `{"username"}` for the logged-in session; `401` otherwise (including for API-key requests, which have no user). |
 | `GET` | `/vocabulary` | Returns paginated vocabulary items, including words no longer in any list (they stay because saved stories refer to them). |
-| `GET` | `/vocabulary-lists` | Returns paginated vocabulary-list summaries, including item counts. Lists deleted in Skritter (archived) are left out. |
-| `GET` | `/vocabulary-lists/{list_id}` | Returns a vocabulary list and its items. `404` for an unknown or archived list. |
+| `GET` | `/vocabulary-lists` | Returns paginated vocabulary-list summaries, including item counts. Lists deleted in Skritter (archived) or hidden with `manage-lists` are left out. |
+| `GET` | `/vocabulary-lists/{list_id}` | Returns a vocabulary list and its items. `404` for an unknown, archived or hidden list. |
 | `GET` | `/stories` | Returns paginated saved-story summaries. |
 | `GET` | `/stories/{story_id}` | Returns a saved story and its selected vocabulary. |
 | `DELETE` | `/stories/{story_id}` | Permanently deletes a saved story and its vocabulary associations. Returns `204 No Content`. |
@@ -100,8 +100,9 @@ API client → FastAPI routes → services → PostgreSQL
   vocabulary selection, versioned prompts, provider adapters, validation, and
   the durable worker.
 - `story_generator/database` contains shared SQLAlchemy setup.
-- `story_generator/cli` provides manual vocabulary sync, generation-worker,
-  and provider-comparison commands.
+- `story_generator/cli` provides the vocabulary sync, list hiding
+  (`manage-lists`), login accounts (`manage-users`), generation-worker, and
+  provider-comparison commands.
 - `scripts/` holds the production deploy, backup, and restore scripts that
   run on the Droplet.
 - `infra/terraform` defines the Droplet, firewall, SSH key, and DNS record.
@@ -238,6 +239,19 @@ Check the health endpoint:
 
 ```bash
 curl http://127.0.0.1:8000/health
+```
+
+## Hide vocabulary lists
+
+To keep a Skritter list out of the app without deleting it in Skritter, hide
+it by its Skritter list ID. A hidden list keeps syncing, but it's left out of
+the Generate page and the API and can't be used for new stories. Stories
+already made from it are unaffected.
+
+```bash
+.venv/bin/manage-lists list                  # Skritter ID, word count, status, name
+.venv/bin/manage-lists hide 5057150779981824 # one or more IDs
+.venv/bin/manage-lists show 5057150779981824 # undo
 ```
 
 ## Login accounts

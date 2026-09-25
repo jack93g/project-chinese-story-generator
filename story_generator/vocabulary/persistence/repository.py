@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from sqlalchemy import delete, func, update
+from sqlalchemy import and_, delete, func, update
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.orm import Session
 
@@ -10,6 +10,11 @@ from story_generator.vocabulary.persistence.models import (
     list_vocabulary,
 )
 from story_generator.vocabulary.types import SkritterVocabularyRecord
+
+
+def _available_lists():
+    """SQL twin of VocabularyList.is_available."""
+    return and_(VocabularyList.archived_at.is_(None), VocabularyList.hidden.is_(False))
 
 
 class VocabularyRepository:
@@ -180,7 +185,7 @@ class VocabularyRepository:
                 VocabularyList, func.count(list_vocabulary.c.vocabulary_id)
             )
             .outerjoin(list_vocabulary, list_vocabulary.c.list_id == VocabularyList.id)
-            .filter(VocabularyList.archived_at.is_(None))
+            .filter(_available_lists())
             .group_by(VocabularyList.id)
             .order_by(VocabularyList.id.asc())
             .limit(limit)
@@ -188,16 +193,42 @@ class VocabularyRepository:
             .all()
         )
 
-    def count_lists(self) -> int:
+    def list_all_lists(self) -> list[tuple[VocabularyList, int]]:
+        """Every list, hidden and archived included, with its word count."""
         return (
-            self.session.query(VocabularyList)
-            .filter(VocabularyList.archived_at.is_(None))
-            .count()
+            self.session.query(
+                VocabularyList, func.count(list_vocabulary.c.vocabulary_id)
+            )
+            .outerjoin(list_vocabulary, list_vocabulary.c.list_id == VocabularyList.id)
+            .group_by(VocabularyList.id)
+            .order_by(VocabularyList.id.asc())
+            .all()
         )
 
+    def set_hidden(self, skritter_list_ids: list[str], hidden: bool) -> None:
+        self.session.execute(
+            update(VocabularyList)
+            .where(VocabularyList.skritter_list_id.in_(skritter_list_ids))
+            .values(hidden=hidden, updated_at=func.now())
+        )
+
+    def get_lists_by_skritter_ids(
+        self, skritter_list_ids: list[str]
+    ) -> list[VocabularyList]:
+        """Lists with these Skritter IDs, hidden and archived included."""
+        return (
+            self.session.query(VocabularyList)
+            .filter(VocabularyList.skritter_list_id.in_(skritter_list_ids))
+            .order_by(VocabularyList.id.asc())
+            .all()
+        )
+
+    def count_lists(self) -> int:
+        return self.session.query(VocabularyList).filter(_available_lists()).count()
+
     def get_list_by_id(self, list_id: int) -> VocabularyList | None:
-        """An active (not archived) list, or None."""
+        """An available (not archived or hidden) list, or None."""
         vocab_list = self.session.get(VocabularyList, list_id)
-        if vocab_list is None or vocab_list.archived_at is not None:
+        if vocab_list is None or not vocab_list.is_available:
             return None
         return vocab_list

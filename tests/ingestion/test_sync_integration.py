@@ -449,3 +449,22 @@ def test_full_sync_archives_missing_lists_and_restores_returning_ones(
     assert result["lists_archived"] == 0
     session.refresh(other)
     assert other.archived_at is None
+
+
+@pytest.mark.db
+@respx.mock
+def test_sync_keeps_a_hidden_list_hidden(two_sessions, sync_lock):
+    session, tracking_session = two_sessions
+    _mock_successful_list([])
+    _mock_list_index(("123", "Test List"))
+    service = _service(session, tracking_session, sync_lock)
+
+    service.run_all_lists()
+    vocab_list = session.query(VocabularyList).one()
+    vocab_list.hidden = True
+    session.commit()
+
+    service.run_all_lists()
+    session.refresh(vocab_list)
+    assert vocab_list.hidden is True
+    assert vocab_list.archived_at is None

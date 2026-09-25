@@ -1,3 +1,6 @@
+from __future__ import annotations
+
+from story_generator.vocabulary.persistence.models import VocabularyList
 from story_generator.vocabulary.persistence.repository import VocabularyRepository
 from story_generator.vocabulary.schemas import (
     PaginatedVocabularyListResponse,
@@ -42,6 +45,15 @@ class VocabularyListNotFoundError(Exception):
         super().__init__(f"Vocabulary list {list_id} not found")
 
 
+class SkritterListNotFoundError(Exception):
+    def __init__(self, skritter_list_id: str):
+        self.skritter_list_id = skritter_list_id
+        super().__init__(
+            f"No vocabulary list with Skritter ID {skritter_list_id} "
+            "(run `manage-lists list` to see them)"
+        )
+
+
 class VocabularyListService:
     def __init__(self, repository: VocabularyRepository):
         self.repository = repository
@@ -68,6 +80,22 @@ class VocabularyListService:
             limit=limit,
             offset=offset,
         )
+
+    def list_all(self) -> list[tuple[VocabularyList, int]]:
+        """Every list with its word count, for the manage-lists command."""
+        return self.repository.list_all_lists()
+
+    def set_hidden(
+        self, skritter_list_ids: list[str], hidden: bool
+    ) -> list[VocabularyList]:
+        """Hide or show lists by Skritter ID; changes nothing if any is unknown."""
+        lists = self.repository.get_lists_by_skritter_ids(skritter_list_ids)
+        found = {vocab_list.skritter_list_id for vocab_list in lists}
+        missing = [list_id for list_id in skritter_list_ids if list_id not in found]
+        if missing:
+            raise SkritterListNotFoundError(missing[0])
+        self.repository.set_hidden(skritter_list_ids, hidden)
+        return lists
 
     def get(self, list_id: int) -> VocabularyListDetail:
         vocab_list = self.repository.get_list_by_id(list_id)
