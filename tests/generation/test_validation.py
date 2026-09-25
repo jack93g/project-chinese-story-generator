@@ -2,7 +2,11 @@ import pytest
 
 from story_generator.generation.persistence.models import StoryGenerationRequest
 from story_generator.generation.providers.types import GenerationResult, UsageMetadata
-from story_generator.generation.validation import validate_story, word_appears
+from story_generator.generation.validation import (
+    split_paragraphs,
+    validate_story,
+    word_appears,
+)
 
 
 def _make_request(snapshot):
@@ -18,10 +22,11 @@ def _make_request(snapshot):
     )
 
 
-def _make_result(title, body):
+def _make_result(title, body, translation=None):
     return GenerationResult(
         title=title,
         body=body,
+        translation=translation,
         usage=UsageMetadata(
             prompt_tokens=1, completion_tokens=1, total_tokens=2, latency_ms=10
         ),
@@ -173,3 +178,27 @@ def test_validate_story_counts_a_spaced_skritter_entry_as_used():
 
     assert used_map == {691: True}
     assert report["missing_vocabulary"] == []
+
+
+def test_split_paragraphs_uses_non_blank_lines():
+    body = "第一段。\n\n  第二段。 \n第三段。\n\n\n"
+
+    assert split_paragraphs(body) == ["第一段。", "第二段。", "第三段。"]
+
+
+def test_validate_story_records_whether_the_translation_lines_up():
+    request = _make_request(
+        [{"id": 1, "writing": "你好", "reading": "", "definition_en": ""}]
+    )
+
+    aligned, _ = validate_story(
+        request, _make_result("故事", "你好。\n\n再见。", ["Hello.", "Bye."])
+    )
+    misaligned, _ = validate_story(
+        request, _make_result("故事", "你好。\n\n再见。", ["Hello. Bye."])
+    )
+    untranslated, _ = validate_story(request, _make_result("故事", "你好。"))
+
+    assert aligned["translation_aligned"] is True
+    assert misaligned["translation_aligned"] is False
+    assert "translation_aligned" not in untranslated

@@ -169,6 +169,7 @@ class GenerationWorker:
             generation_request_id=request.id,
             title=result.title,
             content=result.body,
+            translation_en=result.translation,
             target_hsk=request.target_hsk_level,
         )
         for item in request.selected_vocabulary_snapshot:

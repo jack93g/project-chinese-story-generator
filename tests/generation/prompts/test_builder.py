@@ -5,6 +5,7 @@ from story_generator.generation.prompts.builder import (
     build_story_v3_prompt,
     build_story_v4_prompt,
     build_story_v5_prompt,
+    build_story_v6_prompt,
 )
 from story_generator.generation.providers.types import GenerationRequestInput
 
@@ -173,3 +174,49 @@ def test_v5_prompt_adds_setting_guidance_before_v4_guidance():
     assert (
         v5.replace(v5[setting_start : v5.index("Keep the story plausible")], "") == v4
     )
+
+
+def test_v6_prompt_adds_a_per_paragraph_translation_to_v3():
+    request = _make_request(prompt_version="story-v6", target_word_count=300)
+
+    v3 = build_story_v3_prompt(request)
+    v6 = build_story_v6_prompt(request)
+
+    assert build_prompt(request) == v6
+    assert '"translation"' not in v3
+    assert "one English string per paragraph of the body" in v6
+    # one example entry per planned paragraph, right after the body
+    assert (
+        '"body": "<Chinese story body, 270-360 characters>", "translation": '
+        '["<English translation of paragraph 1>", '
+        '"<English translation of paragraph 2>", '
+        '"<English translation of paragraph 3>"]}'
+    ) in v6
+    # the guidance follows the length section, and v6 is otherwise v3
+    guidance_start = v6.index("Translation:")
+    assert v6.index("Length:") < guidance_start < v6.index("Respond with")
+    guidance = v6[guidance_start : v6.index("Respond with")]
+    translation_field = v6[v6.index(', "translation": [') : v6.index("]}") + 1]
+    assert v6.replace(guidance, "").replace(translation_field, "") == v3
+
+
+def test_v6_prompt_shows_one_translation_entry_for_a_one_paragraph_story():
+    request = _make_request(prompt_version="story-v6", target_word_count=60)
+
+    prompt = build_story_v6_prompt(request)
+
+    assert '"translation": ["<English translation of the paragraph>"]' in prompt
+
+
+def test_v6_prompt_keeps_the_glossary_after_the_translation():
+    request = _make_request(
+        prompt_version="story-v6",
+        vocabulary_snapshot=[
+            {"id": 2, "writing": "饭馆", "reading": None, "definition_en": None},
+        ],
+    )
+
+    prompt = build_story_v6_prompt(request)
+
+    assert "glossary entry for each of these words: 饭馆" in prompt
+    assert prompt.index('"translation"') < prompt.index('"glossary"')

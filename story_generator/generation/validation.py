@@ -63,6 +63,14 @@ def word_appears(writing: str, text: str) -> bool:
     return re.search(pattern, text) is not None
 
 
+def split_paragraphs(body: str) -> list[str]:
+    """A story body's paragraphs: its non-blank lines. story-v3+ asks for
+    blank lines between paragraphs, but a single line break also separates
+    them. The reader (frontend/lib/paragraphs.ts) must split the same way,
+    as it pairs paragraph i with translation entry i."""
+    return [line.strip() for line in body.split("\n") if line.strip()]
+
+
 def length_ratio(body: str, target_word_count: int) -> float:
     """Body length (characters, punctuation included) over the target."""
     return len(body) / target_word_count
@@ -110,4 +118,10 @@ def validate_story(
         "coverage_threshold": VOCABULARY_COVERAGE_THRESHOLD,
         "meets_coverage_threshold": coverage >= VOCABULARY_COVERAGE_THRESHOLD,
     }
+    # Recorded, not enforced, like length: the reader shows an English list
+    # that doesn't line up with the paragraphs as one block instead.
+    if result.translation is not None:
+        report["translation_aligned"] = len(result.translation) == len(
+            split_paragraphs(result.body)
+        )
     return report, used_map

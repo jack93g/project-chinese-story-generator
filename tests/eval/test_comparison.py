@@ -397,3 +397,29 @@ def test_to_markdown_omits_sample_numbers_for_a_single_run():
 
     assert "| f1 |" in markdown
     assert "#1" not in markdown
+
+
+def test_run_single_records_the_translation_and_whether_it_lines_up():
+    snapshot = [
+        {"id": 1, "writing": "菜单", "reading": "càidān", "definition_en": "menu"}
+    ]
+    provider = FakeStoryGenerationProvider(
+        raw_response=(
+            '{"title": "故事", "body": "他看菜单。\\n\\n他点菜。\\n\\n他吃饭。", '
+            '"translation": ["He reads the menu.", "He orders and eats."]}'
+        )
+    )
+    spec = ProviderSpec(
+        label="fake",
+        provider=provider,
+        model="fake-model",
+        base_url="https://fake.test",
+    )
+
+    outcome = run_single(_fixture(snapshot, prompt_version="story-v6"), spec)
+
+    assert outcome.translation == ["He reads the menu.", "He orders and eats."]
+    assert outcome.translation_aligned is False
+    markdown = to_markdown([outcome])
+    assert "| 2/3 ❌ |" in markdown
+    assert "**Translation:**\n\nHe reads the menu.\n\nHe orders and eats." in markdown

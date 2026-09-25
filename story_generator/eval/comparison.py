@@ -36,6 +36,7 @@ from story_generator.generation.validation import (
     MIN_LENGTH_RATIO,
     VOCABULARY_COVERAGE_THRESHOLD,
     length_ratio,
+    split_paragraphs,
     word_appears,
 )
 
@@ -85,6 +86,10 @@ class EvalOutcome:
     meets_length_threshold: bool | None = None
     # 1-based; >1 only when a run repeats each fixture (--repeat).
     sample: int = 1
+    # story-v6+: the English per paragraph, and whether it has one entry
+    # per paragraph of body (None when the model gave no translation).
+    translation: list[str] | None = None
+    translation_aligned: bool | None = None
 
 
 def compute_coverage(vocabulary_snapshot: list[dict], result: GenerationResult) -> dict:
@@ -175,6 +180,10 @@ def run_single(fixture: EvalFixture, provider_spec: ProviderSpec) -> EvalOutcome
         body=result.body,
         prompt_version=fixture.prompt_version,
         meets_length_threshold=ratio >= MIN_LENGTH_RATIO,
+        translation=result.translation,
+        translation_aligned=None
+        if result.translation is None
+        else len(result.translation) == len(split_paragraphs(result.body)),
     )
 
 
@@ -247,8 +256,11 @@ def to_markdown(outcomes: list[EvalOutcome]) -> str:
         "target. It doesn't fail a generation in production, but a model that is "
         "routinely short needs a prompt fix before it's approved.",
         "",
-        "| Fixture | Category | Provider | Model | Base URL | Prompt | Schema valid | Coverage | Meets threshold | Chars (actual/target) | Meets length | Latency (ms) | Error | Manual quality notes |",
-        "|---|---|---|---|---|---|---|---|---|---|---|---|---|---|",
+        "Translation (story-v6+) shows English entries/paragraphs; ❌ means they "
+        "don't line up, so the reader shows the English as one block.",
+        "",
+        "| Fixture | Category | Provider | Model | Base URL | Prompt | Schema valid | Coverage | Meets threshold | Chars (actual/target) | Meets length | Translation | Latency (ms) | Error | Manual quality notes |",
+        "|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|",
     ]
 
     repeated = any(o.sample > 1 for o in outcomes)
@@ -269,6 +281,12 @@ def to_markdown(outcomes: list[EvalOutcome]) -> str:
             if o.meets_length_threshold is None
             else ("✅" if o.meets_length_threshold else "❌")
         )
+        translation_str = (
+            "—"
+            if o.translation is None
+            else f"{len(o.translation)}/{len(split_paragraphs(o.body or ''))} "
+            f"{'✅' if o.translation_aligned else '❌'}"
+        )
         latency_str = str(o.latency_ms) if o.latency_ms is not None else "—"
         error_str = o.error_code or "—"
         notes_str = (
@@ -280,7 +298,8 @@ def to_markdown(outcomes: list[EvalOutcome]) -> str:
             f"| {_fixture_label(o, repeated)} | {o.category} | {o.provider_label} | {o.model} | `{o.base_url}` | "
             f"{o.prompt_version or '—'} | "
             f"{'✅' if o.schema_valid else '❌'} | {coverage_str} | {meets_str} | "
-            f"{chars_str} | {length_str} | {latency_str} | {error_str} | {notes_str} |"
+            f"{chars_str} | {length_str} | {translation_str} | {latency_str} | "
+            f"{error_str} | {notes_str} |"
         )
 
     lines += [
@@ -319,6 +338,10 @@ def to_markdown(outcomes: list[EvalOutcome]) -> str:
         lines.append("")
         lines.append(f"**Body:**\n\n{o.body}")
         lines.append("")
+        if o.translation is not None:
+            translation = "\n\n".join(o.translation)
+            lines.append(f"**Translation:**\n\n{translation}")
+            lines.append("")
         if o.manual_quality_notes:
             lines.append(f"**Manual quality notes:** {o.manual_quality_notes}")
         else:

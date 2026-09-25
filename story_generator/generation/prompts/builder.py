@@ -54,10 +54,11 @@ def _v2_vocab_line(item: dict) -> str:
 
 
 def _glossary_parts(
-    request: GenerationRequestInput, body_placeholder: str
+    request: GenerationRequestInput, body_placeholder: str, extra_fields: str = ""
 ) -> tuple[str, str]:
     """(JSON response shape, glossary instruction line) for v2+: asks for a
-    glossary entry for each custom word with no reading/definition."""
+    glossary entry for each custom word with no reading/definition.
+    extra_fields (e.g. ', "translation": [...]') goes right after the body."""
     unglossed = [
         item["writing"]
         for item in request.vocabulary_snapshot
@@ -65,12 +66,16 @@ def _glossary_parts(
     ]
 
     if not unglossed:
-        shape = f'{{"title": "<Chinese title>", "body": "{body_placeholder}"}}'
+        shape = (
+            f'{{"title": "<Chinese title>", "body": "{body_placeholder}"'
+            f"{extra_fields}}}"
+        )
         return shape, "\n"
 
     shape = (
-        f'{{"title": "<Chinese title>", "body": "{body_placeholder}", '
-        '"glossary": [{"writing": "<word>", "reading": "<pinyin>", '
+        f'{{"title": "<Chinese title>", "body": "{body_placeholder}"'
+        f'{extra_fields}, "glossary": '
+        '[{"writing": "<word>", "reading": "<pinyin>", '
         '"definition_en": "<short English definition>"}]}'
     )
     glossary_line = (
@@ -167,11 +172,46 @@ def build_story_v5_prompt(request: GenerationRequestInput) -> str:
     )
 
 
+# v6's addition to v3: an English translation, one entry per paragraph, so
+# the reader can show each paragraph's English under it.
+V6_TRANSLATION_GUIDANCE = (
+    "Translation: also translate the body into natural, faithful English "
+    'for the learner to check their reading, as the "translation" list: '
+    "one English string per paragraph of the body, in the same order, so "
+    "it has exactly as many entries as the body has paragraphs. Never break "
+    "a line inside a paragraph. Only the body counts towards its length, "
+    "not the translation.\n\n"
+)
+
+
+def build_story_v6_prompt(request: GenerationRequestInput) -> str:
+    """Like v3, plus an English translation per paragraph
+    (V6_TRANSLATION_GUIDANCE after the length section, and a "translation"
+    field in the JSON shape)."""
+    return _length_band_prompt(request, translation=True)
+
+
+def _translation_field(paragraphs: int) -> str:
+    """v6's "translation" JSON field, with one example entry per planned
+    paragraph (so a one-paragraph story isn't shown two)."""
+    if paragraphs == 1:
+        entries = '"<English translation of the paragraph>"'
+    else:
+        entries = ", ".join(
+            f'"<English translation of paragraph {n}>"'
+            for n in range(1, paragraphs + 1)
+        )
+    return f', "translation": [{entries}]'
+
+
 def _length_band_prompt(
-    request: GenerationRequestInput, craft_guidance: str = ""
+    request: GenerationRequestInput,
+    craft_guidance: str = "",
+    translation: bool = False,
 ) -> str:
     """The v3 prompt; later versions add craft_guidance before the length
-    section. Empty craft_guidance must keep producing v3 exactly."""
+    section, or a translation request after it. With neither, this must
+    keep producing v3 exactly."""
     target = request.target_word_count
     min_chars = math.ceil(target * V3_MIN_LENGTH_FRACTION)
     max_chars = math.floor(target * V3_MAX_LENGTH_FRACTION)
@@ -188,7 +228,9 @@ def _length_band_prompt(
     )
     topic_line = f"Topic: {request.topic}\n" if request.topic else ""
     shape, glossary_line = _glossary_parts(
-        request, f"<Chinese story body, {min_chars}-{max_chars} characters>"
+        request,
+        f"<Chinese story body, {min_chars}-{max_chars} characters>",
+        _translation_field(paragraphs) if translation else "",
     )
 
     return (
@@ -210,6 +252,7 @@ def _length_band_prompt(
         "scenes, dialogue and detail — not with a list of unrelated "
         "sentences or repetition. Before answering, check the body is at "
         f"least {min_chars} characters; if it is shorter, keep writing.\n\n"
+        f"{V6_TRANSLATION_GUIDANCE if translation else ''}"
         f"Respond with a single JSON object of the exact shape {shape} "
         "and nothing else — no markdown, no commentary, no code fences."
     )
@@ -221,6 +264,7 @@ PROMPT_BUILDERS = {
     "story-v3": build_story_v3_prompt,
     "story-v4": build_story_v4_prompt,
     "story-v5": build_story_v5_prompt,
+    "story-v6": build_story_v6_prompt,
 }
 
 

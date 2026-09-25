@@ -60,3 +60,6 @@ class GenerationResult:
     # Optional model-supplied glosses [{"writing", "reading", "definition_en"}]
     # for requested words that had none; best-effort, never required.
     glossary: list[dict] = field(default_factory=list)
+    # Optional English translation, one string per paragraph of body
+    # (story-v6+); best-effort, None when absent or malformed.
+    translation: list[str] | None = None

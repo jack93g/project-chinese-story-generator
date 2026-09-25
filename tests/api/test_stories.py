@@ -174,6 +174,7 @@ def test_get_story_returns_detail_with_vocabulary(client, db_session):
         "created_at",
         "target_hsk",
         "content",
+        "translation_en",
         "selected_vocabulary",
         "provider",
         "model",
@@ -182,6 +183,26 @@ def test_get_story_returns_detail_with_vocabulary(client, db_session):
     # This story has no generation request, so there's no model to credit.
     assert data["provider"] is None
     assert data["model"] is None
+    # Nor a translation, like every story from before story-v6.
+    assert data["translation_en"] is None
+
+
+def test_get_story_returns_its_translation(client, db_session):
+    story = Story(
+        title="第一次点菜",
+        content="我们去饭馆。\n\n我们点菜。",
+        translation_en=["We go to a restaurant.", "We order."],
+    )
+    db_session.add(story)
+    db_session.flush()
+
+    response = client.get(f"/stories/{story.id}")
+
+    assert response.status_code == 200
+    assert response.json()["translation_en"] == [
+        "We go to a restaurant.",
+        "We order.",
+    ]
 
 
 def test_get_story_returns_provider_and_model_from_its_generation_request(
