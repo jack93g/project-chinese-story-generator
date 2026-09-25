@@ -225,8 +225,9 @@ def test_resync_does_not_refetch_known_vocab_unless_refreshing(two_sessions, syn
     session, tracking_session = two_sessions
 
     _mock_successful_list(["zh-你好-0"])
-    vocab_route = respx.get(VOCAB_URL, params={"ids": "zh-你好-0"}).mock(
-        return_value=httpx.Response(
+
+    def vocab_response(definition):
+        return httpx.Response(
             200,
             json={
                 "Vocabs": [
@@ -235,11 +236,15 @@ def test_resync_does_not_refetch_known_vocab_unless_refreshing(two_sessions, syn
                         "language": "zh",
                         "writing": "你好",
                         "reading": "ni3 hao3",
-                        "definitions": {"en": "hello"},
+                        "definitions": {"en": definition},
                     }
                 ]
             },
         )
+
+    # The definition was edited in Skritter after the first sync.
+    vocab_route = respx.get(VOCAB_URL, params={"ids": "zh-你好-0"}).mock(
+        side_effect=[vocab_response("hello"), vocab_response("hello; hi")]
     )
 
     def make_service(refresh):
@@ -258,10 +263,15 @@ def test_resync_does_not_refetch_known_vocab_unless_refreshing(two_sessions, syn
     assert vocab_route.call_count == 1
     assert second["vocab_fetched"] == 0
 
+    item = session.query(VocabularyItem).one()
+    assert item.definition_en == "hello"
+
     third = make_service(refresh=True).run_single_list("123")
     assert vocab_route.call_count == 2
     assert third["vocab_fetched"] == 1
     assert third["vocab_skipped"] == 1
+    session.refresh(item)
+    assert item.definition_en == "hello; hi"
 
 
 @pytest.mark.db
