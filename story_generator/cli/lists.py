@@ -32,9 +32,14 @@ def build_parser() -> argparse.ArgumentParser:
 
 
 def _status(vocab_list) -> str:
+    # Independent flags: a hidden list that's archived stays hidden if it
+    # comes back to Skritter.
+    flags = []
     if vocab_list.archived_at is not None:
-        return "archived"
-    return "hidden" if vocab_list.hidden else ""
+        flags.append("archived")
+    if vocab_list.hidden:
+        flags.append("hidden")
+    return ",".join(flags)
 
 
 def run(argv: Sequence[str], session: Session) -> str:
@@ -44,11 +49,11 @@ def run(argv: Sequence[str], session: Session) -> str:
 
     if args.command == "list":
         rows = [
-            f"{vocab_list.skritter_list_id:<18} {count:>5}  {_status(vocab_list):<8}  "
+            f"{vocab_list.skritter_list_id:<18} {count:>5}  {_status(vocab_list):<15}  "
             f"{vocab_list.name}"
             for vocab_list, count in service.list_all()
         ]
-        header = f"{'SKRITTER ID':<18} {'WORDS':>5}  {'STATUS':<8}  NAME"
+        header = f"{'SKRITTER ID':<18} {'WORDS':>5}  {'STATUS':<15}  NAME"
         return "\n".join([header, *rows])
 
     hidden = args.command == "hide"

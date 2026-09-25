@@ -1,3 +1,5 @@
+from datetime import UTC, datetime
+
 import pytest
 
 from story_generator.cli.lists import run
@@ -40,8 +42,10 @@ def test_unknown_id_changes_nothing(db_session, lists):
 
 
 def test_list_shows_status(db_session, lists):
-    run(["hide", "222"], db_session)
+    basics, _ = lists
+    basics.archived_at = datetime.now(UTC)
+    run(["hide", "111", "222"], db_session)
 
     lines = run(["list"], db_session).splitlines()
-    radicals = next(line for line in lines if line.endswith("Radicals"))
-    assert radicals.split()[:3] == ["222", "0", "hidden"]
+    statuses = {line.split()[0]: line.split()[2] for line in lines[1:]}
+    assert statuses == {"111": "archived,hidden", "222": "hidden"}

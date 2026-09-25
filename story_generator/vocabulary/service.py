@@ -94,8 +94,7 @@ class VocabularyListService:
         missing = [list_id for list_id in skritter_list_ids if list_id not in found]
         if missing:
             raise SkritterListNotFoundError(missing[0])
-        for vocab_list in lists:
-            vocab_list.hidden = hidden
+        self.repository.set_hidden(skritter_list_ids, hidden)
         return lists
 
     def get(self, list_id: int) -> VocabularyListDetail:

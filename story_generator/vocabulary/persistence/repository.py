@@ -205,6 +205,13 @@ class VocabularyRepository:
             .all()
         )
 
+    def set_hidden(self, skritter_list_ids: list[str], hidden: bool) -> None:
+        self.session.execute(
+            update(VocabularyList)
+            .where(VocabularyList.skritter_list_id.in_(skritter_list_ids))
+            .values(hidden=hidden, updated_at=func.now())
+        )
+
     def get_lists_by_skritter_ids(
         self, skritter_list_ids: list[str]
     ) -> list[VocabularyList]:

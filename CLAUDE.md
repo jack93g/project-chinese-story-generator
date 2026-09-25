@@ -130,11 +130,10 @@ should be structured.
   removed from a list is unlinked (`list_vocabulary`), and a list missing from
   a full sync gets `archived_at` set. Archived lists are hidden from the API
   and can't be used for new stories.
-- `vocabulary/` — also owns `vocabulary_lists.hidden`, set only by
-  `cli/lists.py` (`manage-lists`). Hidden lists keep syncing but are treated
-  like archived ones (`VocabularyList.is_available` in Python, `_available_lists()`
-  in SQL).
-- `vocabulary/` — vocabulary parsing, services, persistence.
+- `vocabulary/` — vocabulary parsing, services, persistence. Also owns
+  `vocabulary_lists.hidden`, set only by `cli/lists.py` (`manage-lists`).
+  Hidden lists keep syncing but are treated like archived ones
+  (`VocabularyList.is_available` in Python, `_available_lists()` in SQL).
 - `stories/` — saved-story queries and persistence.
 - `generation/` — the story-generation workflow:
   - `providers/` — provider-neutral interface plus adapters (OpenAI-compatible
