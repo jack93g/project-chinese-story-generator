@@ -159,7 +159,8 @@ should be structured.
     requested vocabulary.
 - `database/` — shared SQLAlchemy engine/session setup (`base.py`,
   `session.py`).
-- `cli/` — `ingestion` (Skritter sync), `generation_worker`,
+- `cli/` — `ingestion` (Skritter sync), `generation_worker`, `users`
+  (`manage-users`), `lists` (`manage-lists`: hide/show vocabulary lists),
   `provider_comparison` (evaluate a provider against a fixed eval set before
   allowlisting it, without touching the application database).
 

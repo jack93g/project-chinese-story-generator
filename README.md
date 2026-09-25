@@ -10,8 +10,8 @@ durable background workflow.
 - Store vocabulary, list membership, sync-run history, and raw Skritter API
   payloads. Re-running an import is idempotent and does not duplicate
   vocabulary or list memberships. Words removed from a Skritter list are
-  unlinked from it, and lists deleted in Skritter are archived (hidden), not
-  deleted.
+  unlinked from it, and lists deleted in Skritter are archived (left out of
+  the app), not deleted. Lists can also be hidden by hand with `manage-lists`.
 - Serve a FastAPI for vocabulary, vocabulary lists, saved stories, sync
   status, and asynchronous story-generation requests.
 - Queue generation requests, select a random vocabulary sample,
@@ -100,8 +100,9 @@ API client → FastAPI routes → services → PostgreSQL
   vocabulary selection, versioned prompts, provider adapters, validation, and
   the durable worker.
 - `story_generator/database` contains shared SQLAlchemy setup.
-- `story_generator/cli` provides manual vocabulary sync, generation-worker,
-  and provider-comparison commands.
+- `story_generator/cli` provides the vocabulary sync, list hiding
+  (`manage-lists`), login accounts (`manage-users`), generation-worker, and
+  provider-comparison commands.
 - `scripts/` holds the production deploy, backup, and restore scripts that
   run on the Droplet.
 - `infra/terraform` defines the Droplet, firewall, SSH key, and DNS record.

@@ -447,7 +447,7 @@ the Droplet:
 ```bash
 tail -n 30 ~/sync.log
 dbsql -c "SELECT id, status, started_at, completed_at, left(error_message, 120) FROM sync_runs ORDER BY id DESC LIMIT 5;"
-dbsql -c "SELECT id, name, archived_at FROM vocabulary_lists WHERE archived_at IS NOT NULL;"
+dc run --rm api manage-lists list    # STATUS column shows archived and hidden lists
 ```
 
 **If it's failing:** an `HTTPStatusError` with 401 means the Skritter token
