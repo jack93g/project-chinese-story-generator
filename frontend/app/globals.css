@@ -24,6 +24,7 @@
     "PingFang SC", "Microsoft YaHei", "Noto Sans SC", "Noto Sans CJK SC",
     "Heiti SC", sans-serif;
   --font-zh-kai: "Kaiti SC", STKaiti, KaiTi, "AR PL UKai CN", var(--font-zh-serif);
+  --font-serif: Georgia, "Times New Roman", serif;
 
   --space-1: 0.25rem;
   --space-2: 0.5rem;
@@ -492,11 +493,42 @@ h2 {
 }
 
 .story-body {
-  white-space: pre-wrap;
   font-family: var(--font-zh-serif);
   font-size: 1.25rem;
   line-height: 2.2;
   letter-spacing: 0.04em;
+}
+
+/* Paragraphs, each optionally followed by its English (.story-translation):
+   the English sits close under its paragraph, with more room before the
+   next one. */
+.story-body > * + * {
+  margin-top: var(--space-4);
+}
+
+.story-body > .story-paragraph + .story-translation {
+  margin-top: var(--space-1);
+}
+
+.story-body > .story-translation + .story-paragraph {
+  margin-top: var(--space-5);
+}
+
+/* A paragraph's English, or (when it doesn't line up with the paragraphs)
+   the whole translation as one block after the story. */
+.story-translation {
+  padding-left: var(--space-3);
+  border-left: 2px solid var(--border-strong);
+  color: var(--muted-foreground);
+  font-family: var(--font-serif);
+  font-size: 1rem;
+  font-style: italic;
+  line-height: 1.6;
+  letter-spacing: 0;
+}
+
+.story-translation > p + p {
+  margin-top: var(--space-3);
 }
 
 /* Keep an annotated word on one line; split across lines, its pinyin
@@ -519,7 +551,7 @@ h2 {
 
 /* Entrance for a story that has just been generated: the text soaks in
    sentence by sentence like ink on rice paper, then the seal is stamped and
-   the glossary fades in. Timings match the constants in app/story/page.tsx.
+   the translation (if shown) and glossary fade in. Timings match the constants in app/story/page.tsx.
    Skipped entirely for readers who prefer reduced motion. */
 
 @media (prefers-reduced-motion: no-preference) {
@@ -536,6 +568,7 @@ h2 {
     animation-delay: var(--stamp-delay);
   }
 
+  .story-entrance .story-translation,
   .story-entrance .cloud-divider,
   .story-entrance .story-glossary {
     animation: fade-up 600ms ease-out both;

@@ -80,9 +80,10 @@ migrations, and provider configuration.
 - `app/stories/page.tsx` — saved-stories list, linking to each story's
   reader page, with a delete action that asks for inline confirmation and
   shows an error if the deletion fails.
-- `app/stories/[id]/page.tsx` — story reader: Chinese title and body with a
-  vocabulary glossary (pinyin and English definition), including a
-  not-found state for an unknown story ID.
+- `app/story/page.tsx` — story reader (`/story?id=<id>`): Chinese title and
+  body with a vocabulary glossary (pinyin and English definition), pinyin
+  and English-translation toggles (the English sits under each paragraph),
+  and a not-found state for an unknown story ID.
 - `app/components/` — shared UI, e.g. the top navigation.
 - `lib/api.ts` — typed fetch helpers for every backend endpoint the frontend
   calls (vocabulary lists, story generations, saved stories including

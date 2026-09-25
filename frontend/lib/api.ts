@@ -97,6 +97,9 @@ export type CurrentUser = {
 
 export type StoryDetail = StorySummary & {
   content: string;
+  // English, one string per paragraph of content (see lib/paragraphs.ts);
+  // null for stories written before translations existed.
+  translation_en?: string[] | null;
   selected_vocabulary: VocabularyGlossaryItem[];
   // What wrote the story. Null for stories with no generation request, and
   // missing from an API deployed before these fields existed.
