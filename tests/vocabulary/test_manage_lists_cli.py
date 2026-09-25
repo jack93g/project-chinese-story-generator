@@ -22,8 +22,9 @@ def test_hide_then_show(db_session, client, lists):
     basics, radicals = lists
 
     assert run(["hide", "222"], db_session) == "Hidden: 'Radicals'."
-    names = [item["name"] for item in client.get("/vocabulary-lists").json()["items"]]
-    assert names == ["Basics"]
+    body = client.get("/vocabulary-lists").json()
+    assert [item["name"] for item in body["items"]] == ["Basics"]
+    assert body["total"] == 1
     assert client.get(f"/vocabulary-lists/{radicals.id}").status_code == 404
 
     assert run(["show", "222"], db_session) == "Visible again: 'Radicals'."
