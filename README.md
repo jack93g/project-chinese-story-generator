@@ -56,9 +56,9 @@ two credentials:
 | `POST` | `/auth/login` | Checks `{"username", "password"}` and sets the session cookie. `401` for a wrong username or password; limited to 10 attempts a minute (`429`). |
 | `POST` | `/auth/logout` | Ends the current session and clears the cookie. Returns `204 No Content`. |
 | `GET` | `/auth/me` | Returns `{"username"}` for the logged-in session; `401` otherwise (including for API-key requests, which have no user). |
-| `GET` | `/vocabulary` | Returns paginated vocabulary items. |
-| `GET` | `/vocabulary-lists` | Returns paginated vocabulary-list summaries, including item counts. |
-| `GET` | `/vocabulary-lists/{list_id}` | Returns a vocabulary list and its items. |
+| `GET` | `/vocabulary` | Returns paginated vocabulary items, including words no longer in any list (they stay because saved stories refer to them). |
+| `GET` | `/vocabulary-lists` | Returns paginated vocabulary-list summaries, including item counts. Lists deleted in Skritter (archived) are left out. |
+| `GET` | `/vocabulary-lists/{list_id}` | Returns a vocabulary list and its items. `404` for an unknown or archived list. |
 | `GET` | `/stories` | Returns paginated saved-story summaries. |
 | `GET` | `/stories/{story_id}` | Returns a saved story and its selected vocabulary. |
 | `DELETE` | `/stories/{story_id}` | Permanently deletes a saved story and its vocabulary associations. Returns `204 No Content`. |

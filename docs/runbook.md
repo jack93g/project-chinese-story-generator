@@ -431,6 +431,11 @@ backup at 03:17):
 Cron doesn't read `~/.bashrc`, so these spell out what `dc` does. They run
 the image of the deployed commit, so a rollback also rolls back the sync code.
 
+**After a rollback** to a commit older than the scheduled sync (before
+`--refresh` existed), the Sunday line fails with an argparse error. Comment
+it out until you roll forward. The daily line still works, but on old code
+it re-fetches every word and keeps every raw payload.
+
 ### Checking the sync
 
 The Generate page shows when vocabulary was last synced under the list picker.
