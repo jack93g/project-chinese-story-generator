@@ -29,11 +29,14 @@ Future infrastructure (Airflow, BigQuery, etc.) is tracked on the
 
 ## Data flow
 
-1. `sync-skritter` requests vocabulary from the Skritter API and records a
-   `sync_run`; the raw response is kept as a `raw_skritter_payload` for
-   debugging/reprocessing.
+1. `sync-skritter` (run daily by cron on the Droplet) requests vocabulary
+   from the Skritter API and records a `sync_run`. Only words not already
+   stored are fetched unless `--refresh` is passed. Raw responses are kept as
+   `raw_skritter_payloads` for the most recent runs, for debugging.
 2. The `vocabulary` module normalises valid records into `vocabulary_items`
-   and their `vocabulary_lists`/`list_vocabulary` membership.
+   and their `vocabulary_lists`/`list_vocabulary` membership. Membership
+   mirrors Skritter: removed words are unlinked, and lists deleted in Skritter
+   are archived rather than deleted, because stories and requests refer to them.
 3. A story request is queued (`story_generation_requests`, status
    `queued`). The `generation` worker claims it, selects a random sample
    of known vocabulary, and calls the allowlisted provider.
@@ -75,7 +78,7 @@ flowchart TD
 | 2. FastAPI matches the URL | FastAPI matches `/vocabulary-lists/3` to `{list_id}`, converting `"3"` to the Python `int` `3`. `Depends(get_db)` opens a fresh DB session for this request. | `story_generator/api/dependencies.py` — `get_db()` |
 | 3. Router hands off to service | The router only translates HTTP ↔ Python, so it delegates immediately. | `get_vocabulary_list(list_id, db)` in the vocabulary router |
 | 4. Service asks repository for raw data | The service knows the business question ("find list 3, and I need it or a clear failure") but not SQL. | `VocabularyListService.get()` → `self.repository.get_list_by_id(list_id)` |
-| 5. Repository talks to the database | The only layer allowed to speak SQL. | `VocabularyRepository.get_list_by_id()` → `self.session.get(VocabularyList, list_id)` → `SELECT * FROM vocabulary_lists WHERE id = 3` |
+| 5. Repository talks to the database | The only layer allowed to speak SQL. It treats an archived list (deleted in Skritter) as missing. | `VocabularyRepository.get_list_by_id()` → `self.session.get(VocabularyList, list_id)` → `SELECT * FROM vocabulary_lists WHERE id = 3`, then `None` if `archived_at` is set |
 | 6. Service repackages the result | Raises a domain error (not found) or builds the public `VocabularyListDetail` schema. Accessing `vocab_list.items` here triggers a *second*, lazy-loaded query for the list's items. | `VocabularyListService.get()` |
 | 7. Router turns the result into HTTP | A schema is auto-serialized to JSON (`response_model=VocabularyListDetail`); a caught `VocabularyListNotFoundError` becomes `HTTPException(404, ...)`. | vocabulary router |
 | 8. Client receives JSON | The list + items as JSON, or a `404` with an error `detail`. | — |

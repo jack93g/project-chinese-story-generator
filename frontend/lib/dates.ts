@@ -29,3 +29,21 @@ export function formatEnglishDate(isoDate: string): string {
     day: "numeric",
   });
 }
+
+const RELATIVE_UNITS: [Intl.RelativeTimeFormatUnit, number][] = [
+  ["day", 24 * 60 * 60 * 1000],
+  ["hour", 60 * 60 * 1000],
+  ["minute", 60 * 1000],
+];
+
+/** "3 hours ago", "yesterday", "this minute": the largest whole unit that fits. */
+export function formatTimeAgo(isoDate: string, now: Date = new Date()): string {
+  const elapsed = Math.max(0, now.getTime() - new Date(isoDate).getTime());
+  const format = new Intl.RelativeTimeFormat("en", { numeric: "auto" });
+  for (const [unit, ms] of RELATIVE_UNITS) {
+    if (elapsed >= ms) {
+      return format.format(-Math.floor(elapsed / ms), unit);
+    }
+  }
+  return format.format(0, "minute");
+}

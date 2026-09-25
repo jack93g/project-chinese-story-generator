@@ -81,6 +81,9 @@ describe("learner journey (real API client, fake HTTP + navigation)", () => {
       async (url: string, init?: RequestInit): Promise<Response> => {
         const method = init?.method ?? "GET";
 
+        if (url === "http://localhost:8000/sync-status") {
+          return jsonResponse({ latest_run: null });
+        }
         if (url.startsWith("http://localhost:8000/vocabulary-lists")) {
           return jsonResponse({
             items: [LIST],
@@ -171,6 +174,9 @@ describe("learner journey (real API client, fake HTTP + navigation)", () => {
       async (url: string, init?: RequestInit): Promise<Response> => {
         const method = init?.method ?? "GET";
 
+        if (url === "http://localhost:8000/sync-status") {
+          return jsonResponse({ latest_run: null });
+        }
         if (url.startsWith("http://localhost:8000/vocabulary-lists")) {
           return jsonResponse({
             items: [LIST],

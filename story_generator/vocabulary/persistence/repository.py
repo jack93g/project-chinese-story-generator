@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from sqlalchemy import func
+from sqlalchemy import delete, func, update
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.orm import Session
 
@@ -90,9 +90,22 @@ class VocabularyRepository:
             set_={
                 "name": insert_stmt.excluded.name,
                 "updated_at": func.now(),
+                # The list is in Skritter again, so un-archive it.
+                "archived_at": None,
             },
         ).returning(VocabularyList.id)
         return self.session.execute(stmt).scalar_one()
+
+    def get_ids_by_skritter_vocab_ids(
+        self, skritter_vocab_ids: list[str]
+    ) -> dict[str, int]:
+        """Map the Skritter IDs already stored to their database IDs."""
+        if not skritter_vocab_ids:
+            return {}
+        rows = self.session.query(
+            VocabularyItem.skritter_vocab_id, VocabularyItem.id
+        ).filter(VocabularyItem.skritter_vocab_id.in_(skritter_vocab_ids))
+        return dict(rows.all())
 
     def ensure_vocab(self, vocab: SkritterVocabularyRecord) -> tuple[int, bool]:
         existing_id = (
@@ -128,12 +141,46 @@ class VocabularyRepository:
         )
         self.session.execute(stmt)
 
+    def count_list_items(self, list_id: int) -> int:
+        return (
+            self.session.query(list_vocabulary)
+            .filter(list_vocabulary.c.list_id == list_id)
+            .count()
+        )
+
+    def unlink_vocab_not_in(self, list_id: int, keep_vocabulary_ids: set[int]) -> int:
+        """Remove the list's links to words outside `keep_vocabulary_ids`.
+
+        The words themselves stay: saved stories still refer to them.
+        """
+        result = self.session.execute(
+            delete(list_vocabulary).where(
+                list_vocabulary.c.list_id == list_id,
+                list_vocabulary.c.vocabulary_id.not_in(keep_vocabulary_ids),
+            )
+        )
+        return result.rowcount
+
+    def archive_lists_not_in(self, skritter_list_ids: set[str]) -> list[str]:
+        """Archive active lists whose Skritter ID isn't given; returns names."""
+        result = self.session.execute(
+            update(VocabularyList)
+            .where(
+                VocabularyList.archived_at.is_(None),
+                VocabularyList.skritter_list_id.not_in(skritter_list_ids),
+            )
+            .values(archived_at=func.now(), updated_at=func.now())
+            .returning(VocabularyList.name)
+        )
+        return list(result.scalars())
+
     def list_lists(self, limit: int, offset: int) -> list[tuple[VocabularyList, int]]:
         return (
             self.session.query(
                 VocabularyList, func.count(list_vocabulary.c.vocabulary_id)
             )
             .outerjoin(list_vocabulary, list_vocabulary.c.list_id == VocabularyList.id)
+            .filter(VocabularyList.archived_at.is_(None))
             .group_by(VocabularyList.id)
             .order_by(VocabularyList.id.asc())
             .limit(limit)
@@ -142,7 +189,15 @@ class VocabularyRepository:
         )
 
     def count_lists(self) -> int:
-        return self.session.query(VocabularyList).count()
+        return (
+            self.session.query(VocabularyList)
+            .filter(VocabularyList.archived_at.is_(None))
+            .count()
+        )
 
     def get_list_by_id(self, list_id: int) -> VocabularyList | None:
-        return self.session.get(VocabularyList, list_id)
+        """An active (not archived) list, or None."""
+        vocab_list = self.session.get(VocabularyList, list_id)
+        if vocab_list is None or vocab_list.archived_at is not None:
+            return None
+        return vocab_list

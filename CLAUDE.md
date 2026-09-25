@@ -26,6 +26,7 @@ python3.12 -m venv .venv
 
 .venv/bin/sync-skritter --list-id YOUR_LIST_ID   # import one vocabulary list
 .venv/bin/sync-skritter --all                    # import every list
+.venv/bin/sync-skritter --all --refresh          # also re-fetch words already stored
 
 .venv/bin/manage-users create USERNAME           # create a frontend login (prompts for password)
 .venv/bin/manage-users set-password USERNAME     # change it; revokes that user's sessions
@@ -118,8 +119,14 @@ should be structured.
   revocation. Accounts are created by `cli/users.py` (`manage-users`); there is
   no sign-up endpoint. Every account sees the same data (a login gate, not
   multi-tenancy).
-- `ingestion/` — Skritter client and sync orchestration; retains raw
-  API payloads for reprocessing/debugging. Sync is idempotent.
+- `ingestion/` — Skritter client and sync orchestration. Sync is
+  idempotent and fetches only words not yet stored (`--refresh` re-fetches
+  all). A PostgreSQL advisory lock (`SyncLock`) lets one sync run at a time.
+  Raw API payloads are kept for the last 10 runs. Cron on the Droplet runs it
+  daily (see the runbook). Deletions in Skritter never delete rows: a word
+  removed from a list is unlinked (`list_vocabulary`), and a list missing from
+  a full sync gets `archived_at` set. Archived lists are hidden from the API
+  and can't be used for new stories.
 - `vocabulary/` — vocabulary parsing, services, persistence.
 - `stories/` — saved-story queries and persistence.
 - `generation/` — the story-generation workflow:

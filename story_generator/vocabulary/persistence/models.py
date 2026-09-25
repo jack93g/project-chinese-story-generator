@@ -42,6 +42,10 @@ class VocabularyList(Base):
     updated_at = Column(
         DateTime(timezone=True), nullable=False, server_default=func.now()
     )
+    # Set when a full sync no longer finds the list in Skritter. Archived lists
+    # are hidden and can't be used for new stories, but the row stays so past
+    # generation requests keep pointing at it. Cleared if the list comes back.
+    archived_at = Column(DateTime(timezone=True), nullable=True)
 
     items = relationship(
         "VocabularyItem",

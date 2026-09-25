@@ -12,6 +12,7 @@ import {
   type VocabularyListSummary,
 } from "@/lib/api";
 import { BrushLoader } from "../components/brush-loader";
+import { SyncStatusNote } from "../components/sync-status-note";
 
 const HSK_LEVELS = [1, 2, 3, 4, 5, 6];
 const DEFAULT_TARGET_WORD_COUNT = 150;
@@ -511,6 +512,7 @@ export default function GeneratePage() {
               This list has no vocabulary items yet — choose another list.
             </p>
           )}
+          <SyncStatusNote />
         </div>
 
         <div className="form-field">

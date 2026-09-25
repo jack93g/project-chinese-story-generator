@@ -6,6 +6,21 @@ from story_generator.vocabulary.parser import parse_vocab
 
 logger = logging.getLogger(__name__)
 
+# Raw Skritter responses are kept for debugging recent runs only: pruning
+# happens as a sync starts, so the newest RAW_PAYLOAD_RUNS_KEPT earlier runs
+# keep theirs, plus the run in progress. Older runs keep their sync_runs row
+# (status, summary, error) but lose their payloads.
+RAW_PAYLOAD_RUNS_KEPT = 10
+
+INTERRUPTED_RUN_MESSAGE = "Interrupted: the sync process stopped before finishing."
+
+
+class SyncAlreadyRunningError(Exception):
+    """Raised when another sync holds the sync lock."""
+
+    def __init__(self):
+        super().__init__("Another Skritter sync is already running.")
+
 
 class SyncPartialFailureError(Exception):
     """Raised when a batch sync completes but one or more lists failed."""
@@ -24,29 +39,53 @@ class IngestionService:
         vocabulary_session,
         sync_run_repository,
         tracking_session,
+        *,
+        sync_lock,
+        refresh: bool = False,
     ):
         self.client = client
         self.vocabulary_repository = vocabulary_repository
         self.vocabulary_session = vocabulary_session
         self.sync_run_repository = sync_run_repository
         self.tracking_session = tracking_session
+        self.sync_lock = sync_lock
+        # False: only fetch words that aren't in the database yet (the words
+        # already there are still linked to the list). True: re-fetch every
+        # word, which picks up definition/reading edits made in Skritter.
+        self.refresh = refresh
 
     def import_list(self, list_id: str) -> dict:
         list_data = self.client.get_list(list_id)
         imported = 0
-        skipped = 0
+        existing = 0
         try:
             list_db_id = self.vocabulary_repository.ensure_list(
                 list_data["id"],
                 list_data["name"],
             )
-            total = len(list_data["vocab_ids"])
-            logger.info(
-                "Importing list '%s' (%d vocabulary items)", list_data["name"], total
+            # A word can appear in more than one section of a list.
+            vocab_ids = list(dict.fromkeys(list_data["vocab_ids"]))
+            known = (
+                {}
+                if self.refresh
+                else self.vocabulary_repository.get_ids_by_skritter_vocab_ids(vocab_ids)
             )
-            for i, vocab_id in enumerate(list_data["vocab_ids"], start=1):
+            to_fetch = [vocab_id for vocab_id in vocab_ids if vocab_id not in known]
+            logger.info(
+                "Importing list '%s' (%d vocabulary items, %d to fetch)",
+                list_data["name"],
+                len(vocab_ids),
+                len(to_fetch),
+            )
+            in_list = set(known.values())
+            for vocab_db_id in in_list:
+                self.vocabulary_repository.link_vocab_to_list(list_db_id, vocab_db_id)
+            existing += len(known)
+
+            total = len(to_fetch)
+            for i, vocab_id in enumerate(to_fetch, start=1):
                 if i % 25 == 0 or i == total:
-                    logger.info("Import progress: %d/%d", i, total)
+                    logger.info("Fetch progress: %d/%d", i, total)
                 vocab_response = self.client.get_vocab(vocab_id)
                 vocab = parse_vocab(vocab_response)
                 vocab_db_id, inserted = self.vocabulary_repository.ensure_vocab(vocab)
@@ -54,10 +93,12 @@ class IngestionService:
                     list_db_id,
                     vocab_db_id,
                 )
+                in_list.add(vocab_db_id)
                 if inserted:
                     imported += 1
                 else:
-                    skipped += 1
+                    existing += 1
+            unlinked = self._unlink_removed_vocab(list_db_id, list_data, in_list)
             self.vocabulary_session.commit()
         except Exception:
             self.vocabulary_session.rollback()
@@ -65,11 +106,36 @@ class IngestionService:
         logger.info("Finished '%s'", list_data["name"])
         return {
             "lists_processed": 1,
-            "vocab_processed": imported + skipped,
+            "vocab_processed": imported + existing,
             "vocab_imported": imported,
-            "vocab_skipped": skipped,
+            "vocab_skipped": existing,
+            "vocab_fetched": len(to_fetch),
+            "vocab_unlinked": unlinked,
             "failures": [],
         }
+
+    def _unlink_removed_vocab(
+        self, list_db_id: int, list_data: dict, in_list: set[int]
+    ) -> int:
+        """Drop the list's links to words no longer in it in Skritter."""
+        if not in_list:
+            # More likely a bad response than a list emptied on purpose, so
+            # keep what's there rather than wiping the list.
+            stored = self.vocabulary_repository.count_list_items(list_db_id)
+            if stored:
+                logger.warning(
+                    "Skritter returned no words for list '%s', which has %d; "
+                    "keeping them",
+                    list_data["name"],
+                    stored,
+                )
+            return 0
+        unlinked = self.vocabulary_repository.unlink_vocab_not_in(list_db_id, in_list)
+        if unlinked:
+            logger.info(
+                "Removed %d word(s) no longer in '%s'", unlinked, list_data["name"]
+            )
+        return unlinked
 
     def import_all_lists(self) -> dict:
         lists = self.client.get_lists()
@@ -78,6 +144,8 @@ class IngestionService:
         lists_processed = 0
         vocab_imported = 0
         vocab_skipped = 0
+        vocab_fetched = 0
+        vocab_unlinked = 0
         failures = []
 
         for i, vocab_list in enumerate(lists, start=1):
@@ -87,6 +155,8 @@ class IngestionService:
                 lists_processed += 1
                 vocab_imported += result["vocab_imported"]
                 vocab_skipped += result["vocab_skipped"]
+                vocab_fetched += result["vocab_fetched"]
+                vocab_unlinked += result["vocab_unlinked"]
             except Exception as exc:
                 logger.exception(
                     "Failed to import list '%s' (%s)",
@@ -107,13 +177,40 @@ class IngestionService:
         if failures:
             logger.error("%d list(s) failed during import", len(failures))
 
+        lists_archived = self._archive_removed_lists(lists)
+
         return {
             "lists_processed": lists_processed,
             "vocab_processed": vocab_imported + vocab_skipped,
             "vocab_imported": vocab_imported,
             "vocab_skipped": vocab_skipped,
+            "vocab_fetched": vocab_fetched,
+            "vocab_unlinked": vocab_unlinked,
+            "lists_archived": lists_archived,
             "failures": failures,
         }
+
+    def _archive_removed_lists(self, lists: list[dict]) -> int:
+        """Archive stored lists that Skritter no longer returns.
+
+        Only a full sync can do this: it's the only time we see every list.
+        """
+        if not lists:
+            # As with an empty list: keep everything rather than trust it.
+            if self.vocabulary_repository.count_lists():
+                logger.warning("Skritter returned no lists; archiving none")
+            return 0
+        try:
+            archived = self.vocabulary_repository.archive_lists_not_in(
+                {vocab_list["id"] for vocab_list in lists}
+            )
+            self.vocabulary_session.commit()
+        except Exception:
+            self.vocabulary_session.rollback()
+            raise
+        for name in archived:
+            logger.info("Archived list '%s': no longer in Skritter", name)
+        return len(archived)
 
     # --- Sync run tracking (separate session, commits independently) ----
 
@@ -126,6 +223,22 @@ class IngestionService:
         return self._with_sync_tracking(lambda: self.import_list(list_id))
 
     def _with_sync_tracking(self, fn) -> dict:
+        if not self.sync_lock.try_acquire():
+            raise SyncAlreadyRunningError()
+        try:
+            return self._run_tracked(fn)
+        finally:
+            self.sync_lock.release()
+
+    def _run_tracked(self, fn) -> dict:
+        # Holding the lock proves no other sync is running, so any run still
+        # marked "running" belongs to a process that died mid-sync.
+        interrupted = self.sync_run_repository.fail_interrupted_runs(
+            INTERRUPTED_RUN_MESSAGE
+        )
+        if interrupted:
+            logger.warning("Marked %d interrupted sync run(s) as failed", interrupted)
+        self.sync_run_repository.prune_raw_payloads(keep_runs=RAW_PAYLOAD_RUNS_KEPT)
         sync_run = self.sync_run_repository.create_sync_run()
         self.tracking_session.commit()
         self.client.on_response = self._make_payload_recorder(sync_run.id)

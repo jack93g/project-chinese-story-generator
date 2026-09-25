@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { formatChineseDate, formatEnglishDate } from "./dates";
+import { formatChineseDate, formatEnglishDate, formatTimeAgo } from "./dates";
 
 describe("formatChineseDate", () => {
   // Midday local time, so the date is the same in every time zone the
@@ -21,5 +21,21 @@ describe("formatEnglishDate", () => {
     expect(formatEnglishDate("2026-09-24T12:00:00")).toBe(
       "September 24, 2026",
     );
+  });
+});
+
+describe("formatTimeAgo", () => {
+  const now = new Date("2026-09-24T12:00:00Z");
+
+  it.each([
+    ["2026-09-24T11:59:30Z", "this minute"],
+    ["2026-09-24T11:55:00Z", "5 minutes ago"],
+    ["2026-09-24T09:00:00Z", "3 hours ago"],
+    ["2026-09-23T10:00:00Z", "yesterday"],
+    ["2026-09-14T12:00:00Z", "10 days ago"],
+    // A clock slightly ahead of the viewer's never reads as "in 1 minute".
+    ["2026-09-24T12:01:00Z", "this minute"],
+  ])("formats %s as %s", (iso, expected) => {
+    expect(formatTimeAgo(iso, now)).toBe(expected);
   });
 });

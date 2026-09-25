@@ -9,7 +9,9 @@ durable background workflow.
 - Synchronise one or all Skritter vocabulary lists into PostgreSQL.
 - Store vocabulary, list membership, sync-run history, and raw Skritter API
   payloads. Re-running an import is idempotent and does not duplicate
-  vocabulary or list memberships.
+  vocabulary or list memberships. Words removed from a Skritter list are
+  unlinked from it, and lists deleted in Skritter are archived (hidden), not
+  deleted.
 - Serve a FastAPI for vocabulary, vocabulary lists, saved stories, sync
   status, and asynchronous story-generation requests.
 - Queue generation requests, select a random vocabulary sample,
@@ -54,9 +56,9 @@ two credentials:
 | `POST` | `/auth/login` | Checks `{"username", "password"}` and sets the session cookie. `401` for a wrong username or password; limited to 10 attempts a minute (`429`). |
 | `POST` | `/auth/logout` | Ends the current session and clears the cookie. Returns `204 No Content`. |
 | `GET` | `/auth/me` | Returns `{"username"}` for the logged-in session; `401` otherwise (including for API-key requests, which have no user). |
-| `GET` | `/vocabulary` | Returns paginated vocabulary items. |
-| `GET` | `/vocabulary-lists` | Returns paginated vocabulary-list summaries, including item counts. |
-| `GET` | `/vocabulary-lists/{list_id}` | Returns a vocabulary list and its items. |
+| `GET` | `/vocabulary` | Returns paginated vocabulary items, including words no longer in any list (they stay because saved stories refer to them). |
+| `GET` | `/vocabulary-lists` | Returns paginated vocabulary-list summaries, including item counts. Lists deleted in Skritter (archived) are left out. |
+| `GET` | `/vocabulary-lists/{list_id}` | Returns a vocabulary list and its items. `404` for an unknown or archived list. |
 | `GET` | `/stories` | Returns paginated saved-story summaries. |
 | `GET` | `/stories/{story_id}` | Returns a saved story and its selected vocabulary. |
 | `DELETE` | `/stories/{story_id}` | Permanently deletes a saved story and its vocabulary associations. Returns `204 No Content`. |
@@ -375,6 +377,7 @@ to the configured Skritter account:
 # Installed command
 .venv/bin/sync-skritter --list-id YOUR_LIST_ID
 .venv/bin/sync-skritter --all
+.venv/bin/sync-skritter --all --refresh   # also re-fetch words already stored
 
 # Equivalent module invocation
 .venv/bin/python -m story_generator.cli.ingestion --list-id YOUR_LIST_ID
@@ -383,8 +386,12 @@ to the configured Skritter account:
 
 Each invocation creates a sync-run audit record. A full sync continues after
 an individual list fails, records the failure, and exits with a non-zero
-status if any list failed. Raw Skritter responses are retained with the run
-for debugging and are deliberately excluded from `/sync-status` responses.
+status if any list failed. Words already in the database aren't fetched
+again unless you pass `--refresh`. Only one sync runs at a time; a second
+one logs that it's skipping and exits 0. Raw Skritter responses are kept for
+the 10 most recent runs, for debugging, and are deliberately excluded from
+`/sync-status` responses. In production, cron runs the sync daily (see
+[docs/runbook.md](docs/runbook.md#scheduled-skritter-sync)).
 
 ## Run tests
 

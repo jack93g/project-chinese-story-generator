@@ -185,6 +185,8 @@ where it runs. Expect about an hour.
    Droplet that had data, restore the newest backup
    (runbook → [Restore from a backup](runbook.md#restore-from-a-backup)).
    Otherwise, import vocabulary: `dc run --rm api sync-skritter --all`.
+   Either way, schedule the vocabulary sync (runbook →
+   [Scheduled Skritter sync → Cron setup](runbook.md#cron-setup)).
 
 10. **Frontend.** Nothing to do unless the API's URL changed; the site is
     built with `api.huaben.app` baked in. A restored backup brings its login

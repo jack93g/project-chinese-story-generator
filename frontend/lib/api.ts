@@ -81,6 +81,16 @@ export type StoriesResponse = {
   offset: number;
 };
 
+export type SyncRun = {
+  status: "running" | "succeeded" | "failed";
+  started_at: string;
+  completed_at: string | null;
+};
+
+export type SyncStatus = {
+  latest_run: SyncRun | null;
+};
+
 export type CurrentUser = {
   username: string;
 };
@@ -247,6 +257,10 @@ export function retryStoryGeneration(id: number): Promise<GenerationStatus> {
   return requestJson<GenerationStatus>(`/story-generations/${id}/retry`, {
     method: "POST",
   });
+}
+
+export function fetchSyncStatus(): Promise<SyncStatus> {
+  return requestJson<SyncStatus>("/sync-status");
 }
 
 // The auth calls answer 401 as part of their normal job (not logged in yet,
