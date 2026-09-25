@@ -51,7 +51,9 @@ class VocabularyList(Base):
     # Set by hand (`manage-lists hide`) for lists the learner doesn't want to
     # use. Hidden lists keep syncing but, like archived ones, are left out of
     # the API and can't be used for new stories. Sync never changes it.
-    hidden = Column(Boolean, nullable=False, server_default=text("false"))
+    hidden = Column(
+        Boolean, nullable=False, default=False, server_default=text("false")
+    )
 
     items = relationship(
         "VocabularyItem",
