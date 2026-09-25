@@ -102,6 +102,10 @@ class SyncLock:
     transaction-scoped and the session never commits, so it is released by
     `release()` (a rollback) or, if the process dies, when its connection
     closes. It can't leak into a pooled connection.
+
+    The transaction sits idle for the whole sync (up to ~15 minutes with
+    --refresh). If PostgreSQL's idle_in_transaction_session_timeout is ever
+    set lower than that, the server ends it and drops the lock mid-sync.
     """
 
     def __init__(self, session: Session):
