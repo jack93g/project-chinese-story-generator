@@ -29,9 +29,10 @@ Future infrastructure (Airflow, BigQuery, etc.) is tracked on the
 
 ## Data flow
 
-1. `sync-skritter` requests vocabulary from the Skritter API and records a
-   `sync_run`; the raw response is kept as a `raw_skritter_payload` for
-   debugging/reprocessing.
+1. `sync-skritter` (run daily by cron on the Droplet) requests vocabulary
+   from the Skritter API and records a `sync_run`. Only words not already
+   stored are fetched unless `--refresh` is passed. Raw responses are kept as
+   `raw_skritter_payloads` for the most recent runs, for debugging.
 2. The `vocabulary` module normalises valid records into `vocabulary_items`
    and their `vocabulary_lists`/`list_vocabulary` membership.
 3. A story request is queued (`story_generation_requests`, status

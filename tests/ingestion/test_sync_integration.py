@@ -1,13 +1,21 @@
 import httpx
 import pytest
 import respx
+from sqlalchemy.orm import sessionmaker
 
 from story_generator.ingestion.persistence.models import (
     RawSkritterPayload,
     SyncRun,
 )
-from story_generator.ingestion.persistence.repository import SyncRunRepository
-from story_generator.ingestion.service import IngestionService
+from story_generator.ingestion.persistence.repository import (
+    SyncLock,
+    SyncRunRepository,
+)
+from story_generator.ingestion.service import (
+    INTERRUPTED_RUN_MESSAGE,
+    IngestionService,
+    SyncAlreadyRunningError,
+)
 from story_generator.ingestion.skritter_client import SkritterClient
 from story_generator.vocabulary.persistence.models import (
     VocabularyItem,
@@ -17,6 +25,27 @@ from story_generator.vocabulary.persistence.repository import VocabularyReposito
 
 LIST_URL = "https://legacy.skritter.com/api/v0/vocablists/123"
 VOCAB_URL = "https://legacy.skritter.com/api/v0/vocabs"
+
+
+@pytest.fixture
+def lock_sessionmaker(engine):
+    """Sessions for SyncLock, closed before two_sessions truncates."""
+    sessions = []
+
+    def make():
+        session = sessionmaker(bind=engine)()
+        sessions.append(session)
+        return session
+
+    yield make
+    for session in sessions:
+        session.close()
+
+
+@pytest.fixture
+def sync_lock(two_sessions, lock_sessionmaker):
+    # Depends on two_sessions so it is torn down first.
+    return SyncLock(lock_sessionmaker())
 
 
 def _mock_successful_list(vocab_ids=("zh-你好-0",)):
@@ -55,7 +84,7 @@ def _mock_vocab(vocab_id, writing, reading, definition):
 
 @pytest.mark.db
 @respx.mock
-def test_successful_sync_creates_succeeded_run_with_payloads(two_sessions):
+def test_successful_sync_creates_succeeded_run_with_payloads(two_sessions, sync_lock):
     session, tracking_session = two_sessions
 
     _mock_successful_list(["zh-你好-0"])
@@ -65,7 +94,12 @@ def test_successful_sync_creates_succeeded_run_with_payloads(two_sessions):
     vocabulary_repository = VocabularyRepository(session)
     sync_run_repository = SyncRunRepository(tracking_session)
     service = IngestionService(
-        client, vocabulary_repository, session, sync_run_repository, tracking_session
+        client,
+        vocabulary_repository,
+        session,
+        sync_run_repository,
+        tracking_session,
+        sync_lock=sync_lock,
     )
 
     result = service.run_single_list("123")
@@ -93,7 +127,7 @@ def test_successful_sync_creates_succeeded_run_with_payloads(two_sessions):
 
 @pytest.mark.db
 @respx.mock
-def test_failed_sync_marks_run_failed_and_rolls_back_vocab(two_sessions):
+def test_failed_sync_marks_run_failed_and_rolls_back_vocab(two_sessions, sync_lock):
     session, tracking_session = two_sessions
 
     # list fetch succeeds, but the vocab fetch blows up mid-import
@@ -107,7 +141,12 @@ def test_failed_sync_marks_run_failed_and_rolls_back_vocab(two_sessions):
     vocabulary_repository = VocabularyRepository(session)
     sync_run_repository = SyncRunRepository(tracking_session)
     service = IngestionService(
-        client, vocabulary_repository, session, sync_run_repository, tracking_session
+        client,
+        vocabulary_repository,
+        session,
+        sync_run_repository,
+        tracking_session,
+        sync_lock=sync_lock,
     )
 
     with pytest.raises(httpx.HTTPStatusError):
@@ -141,7 +180,9 @@ def test_failed_sync_marks_run_failed_and_rolls_back_vocab(two_sessions):
 
 @pytest.mark.db
 @respx.mock
-def test_reimporting_same_list_is_idempotent_and_creates_second_sync_run(two_sessions):
+def test_reimporting_same_list_is_idempotent_and_creates_second_sync_run(
+    two_sessions, sync_lock
+):
     session, tracking_session = two_sessions
 
     _mock_successful_list(["zh-你好-0"])
@@ -151,7 +192,12 @@ def test_reimporting_same_list_is_idempotent_and_creates_second_sync_run(two_ses
     vocabulary_repository = VocabularyRepository(session)
     sync_run_repository = SyncRunRepository(tracking_session)
     service = IngestionService(
-        client, vocabulary_repository, session, sync_run_repository, tracking_session
+        client,
+        vocabulary_repository,
+        session,
+        sync_run_repository,
+        tracking_session,
+        sync_lock=sync_lock,
     )
 
     first = service.run_single_list("123")
@@ -171,3 +217,125 @@ def test_reimporting_same_list_is_idempotent_and_creates_second_sync_run(two_ses
     sync_runs = tracking_session.query(SyncRun).all()
     assert len(sync_runs) == 2
     assert all(r.status == "succeeded" for r in sync_runs)
+
+
+@pytest.mark.db
+@respx.mock
+def test_resync_does_not_refetch_known_vocab_unless_refreshing(two_sessions, sync_lock):
+    session, tracking_session = two_sessions
+
+    _mock_successful_list(["zh-你好-0"])
+    vocab_route = respx.get(VOCAB_URL, params={"ids": "zh-你好-0"}).mock(
+        return_value=httpx.Response(
+            200,
+            json={
+                "Vocabs": [
+                    {
+                        "id": "zh-你好-0",
+                        "language": "zh",
+                        "writing": "你好",
+                        "reading": "ni3 hao3",
+                        "definitions": {"en": "hello"},
+                    }
+                ]
+            },
+        )
+    )
+
+    def make_service(refresh):
+        return IngestionService(
+            SkritterClient("fake-token"),
+            VocabularyRepository(session),
+            session,
+            SyncRunRepository(tracking_session),
+            tracking_session,
+            sync_lock=sync_lock,
+            refresh=refresh,
+        )
+
+    make_service(refresh=False).run_single_list("123")
+    second = make_service(refresh=False).run_single_list("123")
+    assert vocab_route.call_count == 1
+    assert second["vocab_fetched"] == 0
+
+    third = make_service(refresh=True).run_single_list("123")
+    assert vocab_route.call_count == 2
+    assert third["vocab_fetched"] == 1
+    assert third["vocab_skipped"] == 1
+
+
+@pytest.mark.db
+@respx.mock
+def test_sync_is_refused_while_another_holds_the_lock(
+    two_sessions, sync_lock, lock_sessionmaker
+):
+    session, tracking_session = two_sessions
+    other_sync = SyncLock(lock_sessionmaker())
+    assert other_sync.try_acquire()
+
+    service = IngestionService(
+        SkritterClient("fake-token"),
+        VocabularyRepository(session),
+        session,
+        SyncRunRepository(tracking_session),
+        tracking_session,
+        sync_lock=sync_lock,
+    )
+    with pytest.raises(SyncAlreadyRunningError):
+        service.run_single_list("123")
+    assert tracking_session.query(SyncRun).count() == 0
+
+    other_sync.release()
+    _mock_successful_list([])
+    service.run_single_list("123")
+    assert tracking_session.query(SyncRun).one().status == "succeeded"
+
+
+@pytest.mark.db
+@respx.mock
+def test_sync_marks_interrupted_runs_failed(two_sessions, sync_lock):
+    session, tracking_session = two_sessions
+    stale = SyncRun(status="running")
+    tracking_session.add(stale)
+    tracking_session.commit()
+
+    _mock_successful_list([])
+    IngestionService(
+        SkritterClient("fake-token"),
+        VocabularyRepository(session),
+        session,
+        SyncRunRepository(tracking_session),
+        tracking_session,
+        sync_lock=sync_lock,
+    ).run_single_list("123")
+
+    tracking_session.refresh(stale)
+    assert stale.status == "failed"
+    assert stale.error_message == INTERRUPTED_RUN_MESSAGE
+    assert stale.completed_at is not None
+
+
+@pytest.mark.db
+@respx.mock
+def test_sync_keeps_payloads_for_recent_runs_only(two_sessions, sync_lock, monkeypatch):
+    session, tracking_session = two_sessions
+    monkeypatch.setattr("story_generator.ingestion.service.RAW_PAYLOAD_RUNS_KEPT", 2)
+    _mock_successful_list([])
+    service = IngestionService(
+        SkritterClient("fake-token"),
+        VocabularyRepository(session),
+        session,
+        SyncRunRepository(tracking_session),
+        tracking_session,
+        sync_lock=sync_lock,
+    )
+
+    for _ in range(4):
+        service.run_single_list("123")
+
+    runs_with_payloads = {
+        p.sync_run_id for p in tracking_session.query(RawSkritterPayload).all()
+    }
+    # the 2 newest runs before the last one started, plus the last one
+    assert runs_with_payloads == {2, 3, 4}
+    assert tracking_session.query(SyncRun).count() == 4

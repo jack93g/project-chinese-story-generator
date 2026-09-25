@@ -94,6 +94,17 @@ class VocabularyRepository:
         ).returning(VocabularyList.id)
         return self.session.execute(stmt).scalar_one()
 
+    def get_ids_by_skritter_vocab_ids(
+        self, skritter_vocab_ids: list[str]
+    ) -> dict[str, int]:
+        """Map the Skritter IDs already stored to their database IDs."""
+        if not skritter_vocab_ids:
+            return {}
+        rows = self.session.query(
+            VocabularyItem.skritter_vocab_id, VocabularyItem.id
+        ).filter(VocabularyItem.skritter_vocab_id.in_(skritter_vocab_ids))
+        return dict(rows.all())
+
     def ensure_vocab(self, vocab: SkritterVocabularyRecord) -> tuple[int, bool]:
         existing_id = (
             self.session.query(VocabularyItem.id)

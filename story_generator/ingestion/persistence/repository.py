@@ -1,6 +1,6 @@
 from typing import Any
 
-from sqlalchemy import func
+from sqlalchemy import delete, func, select, update
 from sqlalchemy.orm import Session
 
 from story_generator.ingestion.persistence.models import RawSkritterPayload, SyncRun
@@ -55,6 +55,33 @@ class SyncRunRepository:
         if summary is not None:
             sync_run.summary = summary
 
+    def fail_interrupted_runs(self, error_message: str) -> int:
+        """Mark every run still in "running" as failed; returns how many.
+
+        Only call this while holding the sync lock, when no run can
+        legitimately be in progress.
+        """
+        result = self.session.execute(
+            update(SyncRun)
+            .where(SyncRun.status == "running")
+            .values(
+                status="failed",
+                completed_at=func.now(),
+                error_message=error_message,
+            )
+        )
+        return result.rowcount
+
+    def prune_raw_payloads(self, keep_runs: int) -> int:
+        """Delete raw payloads of all but the newest `keep_runs` runs."""
+        newest_runs = select(SyncRun.id).order_by(SyncRun.id.desc()).limit(keep_runs)
+        result = self.session.execute(
+            delete(RawSkritterPayload).where(
+                RawSkritterPayload.sync_run_id.not_in(newest_runs)
+            )
+        )
+        return result.rowcount
+
     def get_latest(self) -> SyncRun | None:
         return (
             self.session.query(SyncRun)
@@ -62,3 +89,28 @@ class SyncRunRepository:
             .limit(1)
             .one_or_none()
         )
+
+
+# Arbitrary, but fixed: every sync process must use the same key.
+SYNC_LOCK_KEY = 7_302_418
+
+
+class SyncLock:
+    """A PostgreSQL advisory lock that lets only one sync run at a time.
+
+    Give it a session of its own that nothing else uses. The lock is
+    transaction-scoped and the session never commits, so it is released by
+    `release()` (a rollback) or, if the process dies, when its connection
+    closes. It can't leak into a pooled connection.
+    """
+
+    def __init__(self, session: Session):
+        self.session = session
+
+    def try_acquire(self) -> bool:
+        return self.session.execute(
+            select(func.pg_try_advisory_xact_lock(SYNC_LOCK_KEY))
+        ).scalar_one()
+
+    def release(self) -> None:
+        self.session.rollback()

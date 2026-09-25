@@ -18,6 +18,7 @@ guess.
 - [Roll back application code](#roll-back-application-code)
 - [Restart the worker](#restart-the-worker)
 - [Inspect and retry a failed generation request](#inspect-and-retry-a-failed-generation-request)
+- [Scheduled Skritter sync](#scheduled-skritter-sync)
 - [Backups](#backups)
 - [Restore from a backup](#restore-from-a-backup)
 - [Rotate a secret](#rotate-a-secret)
@@ -380,6 +381,57 @@ Retry only accepts `failed` requests with `attempt_count < 3` (409
 otherwise). It also respects the 3-active-requests cap (429). A request
 that's used all 3 attempts can't be retried. Start a new one with the same
 settings from the frontend instead.
+
+## Scheduled Skritter sync
+
+**What:** cron on the Droplet runs `sync-skritter --all` every morning, so
+words added in Skritter reach the app without anyone remembering to sync.
+
+- **Daily (Mon–Sat):** fetches only words not already in the database. The
+  words already there are just linked to their lists. It usually makes a
+  handful of requests and takes seconds.
+- **Weekly (Sun, `--refresh`):** re-fetches every word, one request per word
+  (about 15 minutes for ~2,000 words), to pick up definition or reading edits
+  made in Skritter.
+
+**Safe to overlap:** a PostgreSQL advisory lock allows one sync at a time.
+A sync that starts while another is running logs "Another Skritter sync is
+already running. Skipping this run." and exits 0. That covers a manual
+`dc run --rm api sync-skritter ...` too. If a sync dies mid-run (container
+killed, Droplet rebooted), its run stays `running` until the next sync,
+which marks it `failed` with "Interrupted".
+
+**Raw payloads:** raw Skritter responses are kept for the 10 most recent
+runs only (plus the one in progress). Older runs keep their `sync_runs` row.
+
+### Cron setup
+
+On the Droplet, `crontab -e` and add (times are UTC, after the Sunday
+backup at 03:17):
+
+```
+23 4 * * 1-6 cd /home/deploy/app && IMAGE_TAG=$(git rev-parse HEAD) docker compose -f docker-compose.yml -f docker-compose.prod.yml run --rm api sync-skritter --all >> /home/deploy/sync.log 2>&1
+23 4 * * 0 cd /home/deploy/app && IMAGE_TAG=$(git rev-parse HEAD) docker compose -f docker-compose.yml -f docker-compose.prod.yml run --rm api sync-skritter --all --refresh >> /home/deploy/sync.log 2>&1
+```
+
+Cron doesn't read `~/.bashrc`, so these spell out what `dc` does. They run
+the image of the deployed commit, so a rollback also rolls back the sync code.
+
+### Checking the sync
+
+The Generate page shows when vocabulary was last synced under the list picker.
+It turns red when the last sync failed or is more than two days old. From
+the Droplet:
+
+```bash
+tail -n 30 ~/sync.log
+dbsql -c "SELECT id, status, started_at, completed_at, left(error_message, 120) FROM sync_runs ORDER BY id DESC LIMIT 5;"
+```
+
+**If it's failing:** an `HTTPStatusError` with 401 means the Skritter token
+expired or was revoked. Replace it ([Rotate a secret](#rotate-a-secret)).
+A failure naming one list is a partial failure: the other lists synced, so
+read that list's error in `~/sync.log`.
 
 ## Backups
 
