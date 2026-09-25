@@ -17,10 +17,13 @@ import math
 
 from story_generator.generation.providers.types import GenerationRequestInput
 
-# story-v4/v5 are registered for evaluation but not current: across 5
-# samples each on the dense_vocabulary fixture, neither was clearly better
-# than v3 (2026-09-24T18* reports).
-CURRENT_PROMPT_VERSION = "story-v3"
+# story-v6 is v3 plus an English translation. On Kimi K2 it matched v3 on
+# coverage and length, and every translation lined up with its paragraphs;
+# it takes about twice as long (~11s vs ~5s) for ~2.4x the output tokens
+# (2026-09-25T14* reports). story-v4/v5 are registered for evaluation but
+# not current: across 5 samples each on the dense_vocabulary fixture,
+# neither was clearly better than v3 (2026-09-24T18* reports).
+CURRENT_PROMPT_VERSION = "story-v6"
 
 
 def build_story_v1_prompt(request: GenerationRequestInput) -> str:

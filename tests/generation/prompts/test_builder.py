@@ -99,8 +99,8 @@ def test_prompt_requests_structured_json_output():
     assert '"body"' in prompt
 
 
-def test_current_prompt_version_is_v3():
-    assert CURRENT_PROMPT_VERSION == "story-v3"
+def test_current_prompt_version_is_v6():
+    assert CURRENT_PROMPT_VERSION == "story-v6"
 
 
 def test_v3_prompt_states_a_length_band_and_paragraph_plan():
