@@ -1,5 +1,6 @@
 from sqlalchemy import (
     BigInteger,
+    Boolean,
     Column,
     DateTime,
     ForeignKey,
@@ -7,6 +8,7 @@ from sqlalchemy import (
     Table,
     Text,
     func,
+    text,
 )
 from sqlalchemy.orm import relationship
 
@@ -46,12 +48,21 @@ class VocabularyList(Base):
     # are hidden and can't be used for new stories, but the row stays so past
     # generation requests keep pointing at it. Cleared if the list comes back.
     archived_at = Column(DateTime(timezone=True), nullable=True)
+    # Set by hand (`manage-lists hide`) for lists the learner doesn't want to
+    # use. Hidden lists keep syncing but, like archived ones, are left out of
+    # the API and can't be used for new stories. Sync never changes it.
+    hidden = Column(Boolean, nullable=False, server_default=text("false"))
 
     items = relationship(
         "VocabularyItem",
         secondary=list_vocabulary,
         back_populates="lists",
     )
+
+    @property
+    def is_available(self) -> bool:
+        """Whether the list can be shown and used for new stories."""
+        return self.archived_at is None and not self.hidden
 
 
 class VocabularyItem(Base):

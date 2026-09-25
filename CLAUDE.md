@@ -30,6 +30,9 @@ python3.12 -m venv .venv
 
 .venv/bin/manage-users create USERNAME           # create a frontend login (prompts for password)
 .venv/bin/manage-users set-password USERNAME     # change it; revokes that user's sessions
+
+.venv/bin/manage-lists list                      # every vocabulary list, by Skritter ID
+.venv/bin/manage-lists hide SKRITTER_LIST_ID...  # hide lists from the app (show ... undoes it)
 ```
 
 Tests:
@@ -127,6 +130,10 @@ should be structured.
   removed from a list is unlinked (`list_vocabulary`), and a list missing from
   a full sync gets `archived_at` set. Archived lists are hidden from the API
   and can't be used for new stories.
+- `vocabulary/` — also owns `vocabulary_lists.hidden`, set only by
+  `cli/lists.py` (`manage-lists`). Hidden lists keep syncing but are treated
+  like archived ones (`VocabularyList.is_available` in Python, `_available_lists()`
+  in SQL).
 - `vocabulary/` — vocabulary parsing, services, persistence.
 - `stories/` — saved-story queries and persistence.
 - `generation/` — the story-generation workflow:

@@ -459,3 +459,22 @@ def test_create_with_archived_list_returns_404(client, db_session):
         },
     )
     assert response.status_code == 404
+
+
+def test_create_with_hidden_list_returns_404(client, db_session):
+    vocab_list = _make_list_with_items(
+        db_session, skritter_list_id="hidden-1", n_items=3
+    )
+    vocab_list.hidden = True
+    db_session.flush()
+
+    response = client.post(
+        "/story-generations",
+        json={
+            "vocabulary_list_id": vocab_list.id,
+            "target_hsk_level": 2,
+            "target_word_count": 150,
+            "target_vocabulary_count": 2,
+        },
+    )
+    assert response.status_code == 404

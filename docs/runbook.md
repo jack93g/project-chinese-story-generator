@@ -22,6 +22,7 @@ guess.
 - [Backups](#backups)
 - [Restore from a backup](#restore-from-a-backup)
 - [Rotate a secret](#rotate-a-secret)
+- [Hide vocabulary lists](#hide-vocabulary-lists)
 - [Login accounts](#login-accounts)
 - [Abuse response](#abuse-response)
 - [Patching](#patching)
@@ -669,6 +670,22 @@ aged out (90 days).
 **Cloud provider tokens** (`DIGITALOCEAN_TOKEN`, `CLOUDFLARE_API_TOKEN`) only
 ever live in your shell for a Terraform run. Rotate them in each dashboard;
 nothing on the Droplet uses them.
+
+## Hide vocabulary lists
+
+Hiding a list keeps it out of the Generate page and the API, and stops new
+stories using it. It keeps syncing, and past stories are unaffected. Lists
+are named by their Skritter list ID:
+
+```bash
+dc run --rm api manage-lists list                      # Skritter ID, words, status, name
+dc run --rm api manage-lists hide <skritter-id> [...]  # hide one or more
+dc run --rm api manage-lists show <skritter-id> [...]  # undo
+```
+
+Status `archived` means the list was deleted in Skritter
+([Scheduled Skritter sync](#scheduled-skritter-sync)). Hiding and archiving
+are independent: an archived list you had hidden stays hidden if it comes back.
 
 ## Login accounts
 

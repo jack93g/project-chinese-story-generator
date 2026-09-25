@@ -29,6 +29,7 @@ dev = [
 [project.scripts]
 sync-skritter = "story_generator.cli.ingestion:main"
 manage-users = "story_generator.cli.users:main"
+manage-lists = "story_generator.cli.lists:main"
 
 [tool.setuptools.packages.find]
 include = ["story_generator*"]
