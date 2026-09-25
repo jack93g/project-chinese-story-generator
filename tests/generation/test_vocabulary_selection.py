@@ -57,16 +57,24 @@ def test_select_vocabulary_caps_oversized_list_to_target_count(db_session):
     assert len(result) == 5
 
 
-def test_select_vocabulary_is_deterministic_ordered_by_id(db_session):
+def test_select_vocabulary_samples_randomly_from_the_list(db_session):
     vocab_list = _make_list_with_items(
-        db_session, skritter_list_id="deterministic", n_items=5
+        db_session, skritter_list_id="random", n_items=20
     )
+    list_ids = {item.id for item in vocab_list.items}
 
-    first = select_vocabulary(db_session, vocab_list, target_vocabulary_count=3)
-    second = select_vocabulary(db_session, vocab_list, target_vocabulary_count=3)
+    selections = [
+        select_vocabulary(db_session, vocab_list, target_vocabulary_count=5)
+        for _ in range(10)
+    ]
 
-    assert first == second
-    assert [item["id"] for item in first] == sorted(item["id"] for item in first)
+    for selection in selections:
+        ids = [item["id"] for item in selection]
+        assert len(set(ids)) == 5
+        assert set(ids) <= list_ids
+    # 20 choose 5 = 15,504 possible sets: ten identical draws would mean
+    # the list isn't being sampled.
+    assert len({frozenset(item["id"] for item in s) for s in selections}) > 1
 
 
 def test_select_vocabulary_preserves_reading_and_definition(db_session):

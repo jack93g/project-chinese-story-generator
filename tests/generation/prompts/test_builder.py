@@ -2,6 +2,9 @@ from story_generator.generation.prompts.builder import (
     CURRENT_PROMPT_VERSION,
     build_prompt,
     build_story_v1_prompt,
+    build_story_v3_prompt,
+    build_story_v4_prompt,
+    build_story_v5_prompt,
 )
 from story_generator.generation.providers.types import GenerationRequestInput
 
@@ -93,3 +96,80 @@ def test_prompt_requests_structured_json_output():
 
     assert '"title"' in prompt
     assert '"body"' in prompt
+
+
+def test_current_prompt_version_is_v3():
+    assert CURRENT_PROMPT_VERSION == "story-v3"
+
+
+def test_v3_prompt_states_a_length_band_and_paragraph_plan():
+    request = _make_request(prompt_version="story-v3", target_word_count=300)
+
+    prompt = build_story_v3_prompt(request)
+
+    assert "at least 270 Chinese characters long and at most 360" in prompt
+    assert "aim for about 300" in prompt
+    assert "3 paragraphs of about 100 characters each" in prompt
+    # repeated in the JSON shape
+    assert '"body": "<Chinese story body, 270-360 characters>"' in prompt
+
+
+def test_v3_prompt_plans_one_paragraph_for_a_short_target():
+    request = _make_request(prompt_version="story-v3", target_word_count=60)
+
+    prompt = build_story_v3_prompt(request)
+
+    assert "one paragraph of about 60 characters" in prompt
+
+
+def test_v3_prompt_keeps_vocabulary_and_glossary_request():
+    request = _make_request(
+        prompt_version="story-v3",
+        vocabulary_snapshot=[
+            {
+                "id": 1,
+                "writing": "你好",
+                "reading": "ni3 hao3",
+                "definition_en": "hello",
+            },
+            {"id": 2, "writing": "饭馆", "reading": None, "definition_en": None},
+        ],
+    )
+
+    prompt = build_prompt(request)
+
+    assert "- 你好 (ni3 hao3): hello" in prompt
+    assert "- 饭馆\n" in prompt
+    assert "glossary entry for each of these words: 饭馆" in prompt
+    assert '"glossary"' in prompt
+
+
+def test_v4_prompt_adds_consistency_and_collocation_guidance_to_v3():
+    request = _make_request(prompt_version="story-v4", target_word_count=300)
+
+    v3 = build_story_v3_prompt(request)
+    v4 = build_story_v4_prompt(request)
+
+    assert "plausible and consistent" in v4
+    assert "natural collocation" in v4
+    assert "not into a closing summary or moral" in v4
+    assert "plausible and consistent" not in v3
+    # the guidance sits between the vocabulary and the length section,
+    # and v4 is otherwise v3
+    guidance_start = v4.index("Keep the story plausible")
+    assert guidance_start < v4.index("Length:")
+    assert v4.replace(v4[guidance_start : v4.index("Length:")], "") == v3
+
+
+def test_v5_prompt_adds_setting_guidance_before_v4_guidance():
+    request = _make_request(prompt_version="story-v5", target_word_count=300)
+
+    v4 = build_story_v4_prompt(request)
+    v5 = build_story_v5_prompt(request)
+
+    assert "Choose a setting where every word fits naturally" not in v4
+    setting_start = v5.index("Choose a setting where every word fits naturally")
+    assert setting_start < v5.index("Keep the story plausible")
+    assert (
+        v5.replace(v5[setting_start : v5.index("Keep the story plausible")], "") == v4
+    )

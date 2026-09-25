@@ -159,7 +159,7 @@ describe("GeneratePage", () => {
       expect(screen.getByRole("button", { name: "Generate" })).toBeEnabled();
 
       fireEvent.change(
-        screen.getByLabelText("Target word count (optional)"),
+        screen.getByLabelText("Story length in characters (optional)"),
         { target: { value: invalidValue } },
       );
 
@@ -168,7 +168,7 @@ describe("GeneratePage", () => {
         "Enter a whole number from 1 to 1000",
       );
       expect(
-        screen.getByLabelText("Target word count (optional)"),
+        screen.getByLabelText("Story length in characters (optional)"),
       ).toHaveAttribute("aria-invalid", "true");
     },
   );
@@ -183,9 +183,10 @@ describe("GeneratePage", () => {
     fireEvent.change(screen.getByLabelText("Target HSK level"), {
       target: { value: "2" },
     });
-    fireEvent.change(screen.getByLabelText("Target word count (optional)"), {
-      target: { value: "" },
-    });
+    fireEvent.change(
+      screen.getByLabelText("Story length in characters (optional)"),
+      { target: { value: "" } },
+    );
 
     expect(screen.getByRole("button", { name: "Generate" })).toBeEnabled();
     fireEvent.click(screen.getByRole("button", { name: "Generate" }));
@@ -210,9 +211,10 @@ describe("GeneratePage", () => {
     fireEvent.change(screen.getByLabelText("Topic (optional)"), {
       target: { value: "a trip to the market" },
     });
-    fireEvent.change(screen.getByLabelText("Target word count (optional)"), {
-      target: { value: "200" },
-    });
+    fireEvent.change(
+      screen.getByLabelText("Story length in characters (optional)"),
+      { target: { value: "200" } },
+    );
 
     fireEvent.click(screen.getByRole("button", { name: "Generate" }));
 
@@ -221,7 +223,8 @@ describe("GeneratePage", () => {
         vocabulary_list_id: 1,
         target_hsk_level: 3,
         target_word_count: 200,
-        target_vocabulary_count: 10,
+        // suggested for 200 characters: one word per 25
+        target_vocabulary_count: 8,
         topic: "a trip to the market",
       });
     });
@@ -302,9 +305,258 @@ describe("GeneratePage", () => {
         expect.objectContaining({
           vocabulary_list_id: 1,
           custom_words: ["菜单", "饭馆"],
-          target_vocabulary_count: 10,
+          target_vocabulary_count: 6,
         }),
       );
+    });
+  });
+
+  describe("vocabulary words to use", () => {
+    async function renderWithList(lists = LISTS, listId = "1") {
+      fetchAllVocabularyLists.mockResolvedValueOnce(lists);
+      render(<GeneratePage />);
+      await screen.findByLabelText("Vocabulary list");
+      fireEvent.change(screen.getByLabelText("Vocabulary list"), {
+        target: { value: listId },
+      });
+      fireEvent.change(screen.getByLabelText("Target HSK level"), {
+        target: { value: "2" },
+      });
+    }
+
+    function setLength(value: string) {
+      fireEvent.change(
+        screen.getByLabelText("Story length in characters (optional)"),
+        { target: { value } },
+      );
+    }
+
+    function countField() {
+      return screen.getByLabelText("Vocabulary words to use");
+    }
+
+    it("is only shown once a list is chosen", async () => {
+      await renderReady();
+      expect(
+        screen.queryByLabelText("Vocabulary words to use"),
+      ).not.toBeInTheDocument();
+
+      fireEvent.change(screen.getByLabelText("Vocabulary list"), {
+        target: { value: "1" },
+      });
+      expect(countField()).toBeInTheDocument();
+    });
+
+    it.each([
+      ["150", "6"],
+      ["300", "12"],
+      ["1000", "30"],
+      ["20", "1"],
+    ])(
+      "suggests one word per 25 characters, from 1 to 30 (%s characters -> %s)",
+      async (length, expected) => {
+        await renderWithList(
+          [{ id: 5, name: "Huge list", item_count: 696 }],
+          "5",
+        );
+        setLength(length);
+        expect(countField()).toHaveValue(Number(expected));
+      },
+    );
+
+    it("bases the suggestion on story length, not list size", async () => {
+      createStoryGeneration.mockResolvedValueOnce({ id: 20, status: "queued" });
+      await renderWithList(
+        [{ id: 5, name: "Huge list", item_count: 696 }],
+        "5",
+      );
+
+      expect(countField()).toHaveValue(6);
+      fireEvent.click(screen.getByRole("button", { name: "Generate" }));
+
+      await waitFor(() => {
+        expect(createStoryGeneration).toHaveBeenCalledWith(
+          expect.objectContaining({ target_vocabulary_count: 6 }),
+        );
+      });
+    });
+
+    it("keeps a number the user typed when the length changes", async () => {
+      createStoryGeneration.mockResolvedValueOnce({ id: 21, status: "queued" });
+      await renderWithList();
+
+      fireEvent.change(countField(), { target: { value: "3" } });
+      setLength("600");
+      expect(countField()).toHaveValue(3);
+
+      fireEvent.click(screen.getByRole("button", { name: "Generate" }));
+      await waitFor(() => {
+        expect(createStoryGeneration).toHaveBeenCalledWith(
+          expect.objectContaining({
+            target_word_count: 600,
+            target_vocabulary_count: 3,
+          }),
+        );
+      });
+    });
+
+    it("uses the suggestion when the field is cleared", async () => {
+      createStoryGeneration.mockResolvedValueOnce({ id: 22, status: "queued" });
+      await renderWithList();
+
+      fireEvent.change(countField(), { target: { value: "" } });
+      setLength("300");
+      fireEvent.click(screen.getByRole("button", { name: "Generate" }));
+
+      await waitFor(() => {
+        expect(createStoryGeneration).toHaveBeenCalledWith(
+          expect.objectContaining({ target_vocabulary_count: 12 }),
+        );
+      });
+    });
+
+    it.each(["0", "31", "2.5"])(
+      "shows an error and disables Generate for an invalid count (%s)",
+      async (value) => {
+        await renderWithList();
+
+        fireEvent.change(countField(), { target: { value } });
+
+        expect(screen.getByRole("button", { name: "Generate" })).toBeDisabled();
+        expect(screen.getByRole("alert")).toHaveTextContent(
+          "Enter a whole number from 1 to 30",
+        );
+        expect(countField()).toHaveAttribute("aria-invalid", "true");
+      },
+    );
+
+    it("allows more than 15 words from a large enough list", async () => {
+      createStoryGeneration.mockResolvedValueOnce({ id: 24, status: "queued" });
+      await renderWithList(
+        [{ id: 6, name: "Society, Skills & Values", item_count: 28 }],
+        "6",
+      );
+      setLength("300");
+
+      fireEvent.change(countField(), { target: { value: "20" } });
+
+      expect(screen.queryByRole("alert")).not.toBeInTheDocument();
+      fireEvent.click(screen.getByRole("button", { name: "Generate" }));
+      await waitFor(() => {
+        expect(createStoryGeneration).toHaveBeenCalledWith(
+          expect.objectContaining({ target_vocabulary_count: 20 }),
+        );
+      });
+    });
+
+    it("warns, without blocking, when words are packed densely", async () => {
+      await renderWithList(
+        [{ id: 6, name: "Society, Skills & Values", item_count: 28 }],
+        "6",
+      );
+      setLength("300");
+
+      fireEvent.change(countField(), { target: { value: "20" } });
+      expect(screen.queryByText(/is dense/)).not.toBeInTheDocument();
+
+      fireEvent.change(countField(), { target: { value: "21" } });
+      expect(
+        screen.getByText(/21 words in 300 characters is dense/),
+      ).toBeInTheDocument();
+      expect(screen.getByRole("button", { name: "Generate" })).toBeEnabled();
+    });
+
+    it("says when custom words fill every slot", async () => {
+      await renderWithList();
+      fireEvent.change(screen.getByLabelText("Custom words (optional)"), {
+        target: { value: "菜单 饭馆 点菜" },
+      });
+
+      fireEvent.change(countField(), { target: { value: "3" } });
+
+      expect(
+        screen.getByText(/fill every slot, so none come from the list/),
+      ).toBeInTheDocument();
+      expect(
+        screen.queryByText(/the list fills the rest/),
+      ).not.toBeInTheDocument();
+    });
+
+    it("won't go below the number of custom words", async () => {
+      await renderWithList();
+      fireEvent.change(screen.getByLabelText("Custom words (optional)"), {
+        target: { value: "菜单 饭馆 点菜" },
+      });
+
+      fireEvent.change(countField(), { target: { value: "2" } });
+
+      expect(screen.getByRole("button", { name: "Generate" })).toBeDisabled();
+      expect(screen.getByRole("alert")).toHaveTextContent("at least 3");
+    });
+
+    it("rises to fit custom words beyond the suggestion", async () => {
+      createStoryGeneration.mockResolvedValueOnce({ id: 23, status: "queued" });
+      await renderWithList();
+
+      setLength("100"); // suggests 4
+      fireEvent.change(screen.getByLabelText("Custom words (optional)"), {
+        target: { value: "一 二 三 四 五" },
+      });
+      expect(countField()).toHaveValue(5);
+
+      fireEvent.click(screen.getByRole("button", { name: "Generate" }));
+      await waitFor(() => {
+        expect(createStoryGeneration).toHaveBeenCalledWith(
+          expect.objectContaining({ target_vocabulary_count: 5 }),
+        );
+      });
+    });
+
+    it("says when a small list can't fill the requested count", async () => {
+      await renderWithList(
+        [{ id: 3, name: "Small list", item_count: 4 }],
+        "3",
+      );
+
+      expect(countField()).toHaveValue(4);
+      expect(
+        screen.getByText(
+          "This list has only 4 words, so the story will use 4.",
+        ),
+      ).toBeInTheDocument();
+    });
+
+    it("updates when a different list is chosen", async () => {
+      await renderWithList(
+        [
+          { id: 3, name: "Small list", item_count: 4 },
+          { id: 5, name: "Huge list", item_count: 696 },
+        ],
+        "3",
+      );
+      expect(countField()).toHaveValue(4);
+
+      fireEvent.change(screen.getByLabelText("Vocabulary list"), {
+        target: { value: "5" },
+      });
+      expect(countField()).toHaveValue(6);
+      expect(
+        screen.getByText("Suggested for a 150-character story: 6."),
+      ).toBeInTheDocument();
+    });
+
+    it("goes back to the suggestion when a different list is chosen", async () => {
+      await renderWithList();
+      fireEvent.change(countField(), { target: { value: "3" } });
+
+      fireEvent.change(screen.getByLabelText("Vocabulary list"), {
+        target: { value: "2" },
+      });
+      fireEvent.change(screen.getByLabelText("Vocabulary list"), {
+        target: { value: "1" },
+      });
+
+      expect(countField()).toHaveValue(6);
     });
   });
 

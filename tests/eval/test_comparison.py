@@ -4,6 +4,8 @@ are both plain Python, so this whole module runs under
 `pytest -m "not db"` (or with no DB configured at all).
 """
 
+import json
+
 from story_generator.eval.comparison import (
     ProviderSpec,
     compute_coverage,
@@ -14,6 +16,7 @@ from story_generator.eval.comparison import (
     to_markdown,
 )
 from story_generator.eval.fixtures import EVAL_FIXTURES, EvalFixture
+from story_generator.generation.prompts.builder import CURRENT_PROMPT_VERSION
 from story_generator.generation.providers.fake import FakeStoryGenerationProvider
 from story_generator.generation.providers.types import GenerationResult, UsageMetadata
 
@@ -84,6 +87,62 @@ def test_run_single_success_records_coverage_and_latency():
     )  # FakeStoryGenerationProvider's default body contains 菜单
     assert outcome.meets_coverage_threshold is True
     assert outcome.title and outcome.body
+
+
+def test_run_single_records_prompt_version_and_length():
+    snapshot = [
+        {"id": 1, "writing": "菜单", "reading": "càidān", "definition_en": "menu"}
+    ]
+    body = "菜单" * 40  # 80 characters
+    fixture = _fixture(snapshot, target_word_count=200, prompt_version="story-v2")
+    provider = FakeStoryGenerationProvider(
+        raw_response=f'{{"title": "故事", "body": "{body}"}}'
+    )
+    spec = ProviderSpec(
+        label="fake",
+        provider=provider,
+        model="fake-model",
+        base_url="https://fake.test",
+    )
+
+    outcome = run_single(fixture, spec)
+
+    assert provider.calls[0].prompt_version == "story-v2"
+    assert outcome.prompt_version == "story-v2"
+    assert outcome.length_ratio == 0.4
+    assert outcome.meets_length_threshold is False
+    markdown = to_markdown([outcome])
+    assert "80/200 (40%) | ❌" in markdown
+
+
+def test_eval_fixtures_default_to_current_prompt_version():
+    assert {f.prompt_version for f in EVAL_FIXTURES} == {CURRENT_PROMPT_VERSION}
+
+
+def test_load_outcomes_accepts_reports_without_newer_fields(tmp_path):
+    fixture = _fixture(
+        [{"id": 1, "writing": "菜单", "reading": "càidān", "definition_en": "menu"}]
+    )
+    spec = ProviderSpec(
+        label="fake",
+        provider=FakeStoryGenerationProvider(),
+        model="fake-model",
+        base_url="https://fake.test",
+    )
+    old = json.loads(to_json([run_single(fixture, spec)]))
+    for item in old:
+        del item["prompt_version"]
+        del item["meets_length_threshold"]
+        del item["sample"]
+    path = tmp_path / "old.json"
+    path.write_text(json.dumps(old), encoding="utf-8")
+
+    (outcome,) = load_outcomes(path)
+
+    assert outcome.prompt_version is None
+    assert outcome.meets_length_threshold is None
+    assert outcome.sample == 1
+    assert "| — |" in to_markdown([outcome])
 
 
 def test_run_single_provider_error_recorded_not_raised():
@@ -300,3 +359,41 @@ def test_render_workflow_end_to_end(tmp_path):
     markdown = to_markdown(reloaded)
 
     assert "Human reviewed this after the fact." in markdown
+
+
+def test_run_comparison_repeats_each_pair_and_numbers_the_samples():
+    fixture = _fixture(
+        [{"id": 1, "writing": "菜单", "reading": "càidān", "definition_en": "menu"}],
+        name="f1",
+    )
+    spec = ProviderSpec(
+        label="fake",
+        provider=FakeStoryGenerationProvider(),
+        model="fake-model",
+        base_url="https://fake.test",
+    )
+
+    outcomes = run_comparison([fixture], [spec], repeat=3)
+
+    assert [o.sample for o in outcomes] == [1, 2, 3]
+    markdown = to_markdown(outcomes)
+    assert "| f1 #1 |" in markdown
+    assert "### f1 #3 — fake" in markdown
+
+
+def test_to_markdown_omits_sample_numbers_for_a_single_run():
+    fixture = _fixture(
+        [{"id": 1, "writing": "菜单", "reading": "càidān", "definition_en": "menu"}],
+        name="f1",
+    )
+    spec = ProviderSpec(
+        label="fake",
+        provider=FakeStoryGenerationProvider(),
+        model="fake-model",
+        base_url="https://fake.test",
+    )
+
+    markdown = to_markdown(run_comparison([fixture], [spec]))
+
+    assert "| f1 |" in markdown
+    assert "#1" not in markdown

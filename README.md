@@ -12,7 +12,7 @@ durable background workflow.
   vocabulary or list memberships.
 - Serve a FastAPI for vocabulary, vocabulary lists, saved stories, sync
   status, and asynchronous story-generation requests.
-- Queue generation requests, select a deterministic vocabulary sample,
+- Queue generation requests, select a random vocabulary sample,
   generate a structured story through an OpenAI-compatible provider, validate
   vocabulary coverage, and persist the completed story and its vocabulary
   usage.
@@ -70,7 +70,7 @@ The collection endpoints accept `limit` (1–100, default `50`) and `offset`
 return `404`.
 
 To queue a story, submit a vocabulary list ID, target HSK level (1–6), target
-word count (1–1000), requested vocabulary count (1–15), and optionally a
+word count (1–1000), requested vocabulary count (1–30), and optionally a
 topic. The API returns immediately; a separate worker performs the provider
 call. A request moves through `queued` → `running` → `succeeded` or `failed`.
 Only failed requests may be retried, and no request may be attempted more than
@@ -322,6 +322,16 @@ the report again, and then add the reviewed report to the allowlist:
 .venv/bin/python -m story_generator.cli.provider_comparison render \
   --input reports/provider-comparisons/TIMESTAMP.json
 ```
+
+The harness sends the prompt version production currently uses. When changing
+the prompt, add `--prompt-version story-v2` (or whichever version it replaces)
+to measure a baseline on the same day. The summary flags any story shorter
+than 80% of its target length; if a model is routinely short, fix the prompt
+before approving it.
+
+One sample per fixture is enough for length and coverage but too noisy to
+judge a prompt on writing quality. For that, generate one fixture several
+times per prompt, e.g. `--fixture dense_vocabulary --repeat 5`.
 
 The comparison command does not write to the application database. For local
 OpenAI-compatible servers that do not require a key, the final part of the

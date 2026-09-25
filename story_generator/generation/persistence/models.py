@@ -16,6 +16,7 @@ import story_generator.vocabulary.persistence.models  # noqa: F401
 from story_generator.database.base import Base
 
 MAX_TARGET_WORD_COUNT = 1000
+MAX_TARGET_VOCABULARY_COUNT = 30
 
 
 class StoryGenerationRequest(Base):
@@ -86,7 +87,7 @@ class StoryGenerationRequest(Base):
             name="story_generation_requests_word_count_check",
         ),
         CheckConstraint(
-            "target_vocabulary_count BETWEEN 1 AND 15",
+            f"target_vocabulary_count BETWEEN 1 AND {MAX_TARGET_VOCABULARY_COUNT}",
             name="story_generation_requests_vocabulary_count_check",
         ),
         CheckConstraint(

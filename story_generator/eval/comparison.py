@@ -15,9 +15,9 @@ by hand does not persist anything and will be overwritten on the next
 render.
 
 Deliberately standalone: no database, no persistence.* imports beyond
-the one constant reused from generation.validation. This harness is
-meant to be run offline/locally before a provider or model is ever
-wired into the live pipeline.
+the thresholds and length_ratio() reused from generation.validation.
+This harness is meant to be run offline/locally before a provider or
+model is ever wired into the live pipeline.
 """
 
 import dataclasses
@@ -32,7 +32,12 @@ from story_generator.generation.providers.types import (
     GenerationRequestInput,
     GenerationResult,
 )
-from story_generator.generation.validation import VOCABULARY_COVERAGE_THRESHOLD
+from story_generator.generation.validation import (
+    MIN_LENGTH_RATIO,
+    VOCABULARY_COVERAGE_THRESHOLD,
+    length_ratio,
+    word_appears,
+)
 
 
 @dataclasses.dataclass(frozen=True)
@@ -75,21 +80,25 @@ class EvalOutcome:
     title: str | None
     body: str | None
     manual_quality_notes: str = ""
+    # Defaulted so reports written before these fields existed still load.
+    prompt_version: str | None = None
+    meets_length_threshold: bool | None = None
+    # 1-based; >1 only when a run repeats each fixture (--repeat).
+    sample: int = 1
 
 
 def compute_coverage(vocabulary_snapshot: list[dict], result: GenerationResult) -> dict:
     """
-    Deliberately duplicates the coverage math in
-    story_generator.generation.validation.validate_story(). That
-    function takes a StoryGenerationRequest ORM instance, which this
-    harness intentionally avoids depending on (no DB needed to run an
-    eval). If validate_story()'s algorithm changes, update this too —
-    worth extracting a shared pure function if the two drift further.
+    Mirrors the coverage math in
+    story_generator.generation.validation.validate_story(), sharing its
+    word_appears() matcher. validate_story() itself takes a
+    StoryGenerationRequest ORM instance, which this harness
+    intentionally avoids depending on (no DB needed to run an eval).
     """
-    combined_text = f"{result.title}{result.body}"
+    combined_text = f"{result.title}\n{result.body}"
     missing = []
     for item in vocabulary_snapshot:
-        if item["writing"] not in combined_text:
+        if not word_appears(item["writing"], combined_text):
             missing.append({"id": item["id"], "writing": item["writing"]})
 
     requested = len(vocabulary_snapshot)
@@ -137,10 +146,11 @@ def run_single(fixture: EvalFixture, provider_spec: ProviderSpec) -> EvalOutcome
             latency_ms=None,
             title=None,
             body=None,
+            prompt_version=fixture.prompt_version,
         )
 
     coverage_info = compute_coverage(fixture.vocabulary_snapshot, result)
-    actual_chars = len(result.body)
+    ratio = length_ratio(result.body, fixture.target_word_count)
 
     return EvalOutcome(
         fixture_name=fixture.name,
@@ -158,23 +168,38 @@ def run_single(fixture: EvalFixture, provider_spec: ProviderSpec) -> EvalOutcome
         >= VOCABULARY_COVERAGE_THRESHOLD,
         missing_vocabulary=coverage_info["missing_vocabulary"],
         target_word_count=fixture.target_word_count,
-        actual_character_count=actual_chars,
-        length_ratio=(actual_chars / fixture.target_word_count)
-        if fixture.target_word_count
-        else None,
+        actual_character_count=len(result.body),
+        length_ratio=ratio,
         latency_ms=result.usage.latency_ms,
         title=result.title,
         body=result.body,
+        prompt_version=fixture.prompt_version,
+        meets_length_threshold=ratio >= MIN_LENGTH_RATIO,
     )
 
 
 def run_comparison(
-    fixtures: list[EvalFixture], provider_specs: list[ProviderSpec]
+    fixtures: list[EvalFixture],
+    provider_specs: list[ProviderSpec],
+    repeat: int = 1,
 ) -> list[EvalOutcome]:
-    return [
-        run_single(fixture, provider_spec)
-        for fixture, provider_spec in itertools.product(fixtures, provider_specs)
-    ]
+    """Every fixture against every provider, `repeat` times each: a single
+    sample is too noisy to judge a prompt change on quality."""
+    outcomes = []
+    for fixture, provider_spec in itertools.product(fixtures, provider_specs):
+        for sample in range(1, repeat + 1):
+            outcome = run_single(fixture, provider_spec)
+            outcome.sample = sample
+            outcomes.append(outcome)
+    return outcomes
+
+
+def _fixture_label(outcome: EvalOutcome, repeated: bool) -> str:
+    return (
+        f"{outcome.fixture_name} #{outcome.sample}"
+        if repeated
+        else outcome.fixture_name
+    )
 
 
 def to_json(outcomes: list[EvalOutcome]) -> str:
@@ -218,10 +243,15 @@ def to_markdown(outcomes: list[EvalOutcome]) -> str:
         "",
         "## Summary",
         "",
-        "| Fixture | Category | Provider | Model | Base URL | Schema valid | Coverage | Meets threshold | Chars (actual/target) | Latency (ms) | Error | Manual quality notes |",
-        "|---|---|---|---|---|---|---|---|---|---|---|---|",
+        f"Length is flagged when the body is under {MIN_LENGTH_RATIO:.0%} of the "
+        "target. It doesn't fail a generation in production, but a model that is "
+        "routinely short needs a prompt fix before it's approved.",
+        "",
+        "| Fixture | Category | Provider | Model | Base URL | Prompt | Schema valid | Coverage | Meets threshold | Chars (actual/target) | Meets length | Latency (ms) | Error | Manual quality notes |",
+        "|---|---|---|---|---|---|---|---|---|---|---|---|---|---|",
     ]
 
+    repeated = any(o.sample > 1 for o in outcomes)
     for o in outcomes:
         coverage_str = f"{o.coverage:.0%}" if o.coverage is not None else "—"
         meets_str = (
@@ -230,9 +260,14 @@ def to_markdown(outcomes: list[EvalOutcome]) -> str:
             else ("❌" if o.meets_coverage_threshold is not None else "—")
         )
         chars_str = (
-            f"{o.actual_character_count}/{o.target_word_count}"
+            f"{o.actual_character_count}/{o.target_word_count} ({o.length_ratio:.0%})"
             if o.actual_character_count is not None
             else f"—/{o.target_word_count}"
+        )
+        length_str = (
+            "—"
+            if o.meets_length_threshold is None
+            else ("✅" if o.meets_length_threshold else "❌")
         )
         latency_str = str(o.latency_ms) if o.latency_ms is not None else "—"
         error_str = o.error_code or "—"
@@ -242,9 +277,10 @@ def to_markdown(outcomes: list[EvalOutcome]) -> str:
             else "_(fill in)_"
         )
         lines.append(
-            f"| {o.fixture_name} | {o.category} | {o.provider_label} | {o.model} | `{o.base_url}` | "
+            f"| {_fixture_label(o, repeated)} | {o.category} | {o.provider_label} | {o.model} | `{o.base_url}` | "
+            f"{o.prompt_version or '—'} | "
             f"{'✅' if o.schema_valid else '❌'} | {coverage_str} | {meets_str} | "
-            f"{chars_str} | {latency_str} | {error_str} | {notes_str} |"
+            f"{chars_str} | {length_str} | {latency_str} | {error_str} | {notes_str} |"
         )
 
     lines += [
@@ -267,7 +303,8 @@ def to_markdown(outcomes: list[EvalOutcome]) -> str:
     lines += ["## Transcripts", ""]
     for o in outcomes:
         lines.append(
-            f"### {o.fixture_name} — {o.provider_label} ({o.model} @ {o.base_url})"
+            f"### {_fixture_label(o, repeated)} — {o.provider_label} "
+            f"({o.model} @ {o.base_url})"
         )
         lines.append("")
         if not o.schema_valid:

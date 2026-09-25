@@ -1,6 +1,8 @@
+import pytest
+
 from story_generator.generation.persistence.models import StoryGenerationRequest
 from story_generator.generation.providers.types import GenerationResult, UsageMetadata
-from story_generator.generation.validation import validate_story
+from story_generator.generation.validation import validate_story, word_appears
 
 
 def _make_request(snapshot):
@@ -94,3 +96,80 @@ def test_validate_story_fails_threshold_when_too_many_words_missing():
 
     assert report["coverage"] == 0.6
     assert report["meets_coverage_threshold"] is False
+
+
+def test_validate_story_records_length_against_target():
+    request = _make_request(
+        [{"id": 1, "writing": "你好", "reading": "", "definition_en": ""}]
+    )
+    result = _make_result("故事", "你好" * 45)  # 90 characters, target 100
+
+    report, _ = validate_story(request, result)
+
+    assert report["actual_character_count"] == 90
+    assert report["length_ratio"] == 0.9
+    assert report["meets_length_threshold"] is True
+
+
+def test_validate_story_flags_short_story_without_failing_coverage():
+    request = _make_request(
+        [{"id": 1, "writing": "你好", "reading": "", "definition_en": ""}]
+    )
+    result = _make_result("故事", "你好" * 25)  # 50 characters, target 100
+
+    report, _ = validate_story(request, result)
+
+    assert report["length_ratio"] == 0.5
+    assert report["meets_length_threshold"] is False
+    # length is recorded, not enforced: the story is still acceptable
+    assert report["meets_coverage_threshold"] is True
+
+
+@pytest.mark.parametrize(
+    ("writing", "text"),
+    [
+        ("菜单", "请给我菜单。"),
+        # spaces as word breaks, from Skritter
+        ("口语 能力", "马克的口语能力还不够好。"),
+        # spaces as gaps
+        ("一旦 就", "一旦下雨，我们就回家。"),
+        # grammar patterns, in any ellipsis style
+        ("虽然 ... 但是...", "虽然很累，但是他很开心。"),
+        ("先 ... 再...", "先吃饭再说。"),
+        ("从...开始", "从明天开始学习。"),
+        ("既然。。。干脆", "既然没用，干脆躺平。"),
+        ("先…再", "先吃饭再说。"),
+        # trailing punctuation differs from the entry's
+        ("你在吗？", "“你在吗？”她问。"),
+        ("别 卖关子 了！", "他说：“别卖关子了。”"),
+    ],
+)
+def test_word_appears_matches(writing, text):
+    assert word_appears(writing, text)
+
+
+@pytest.mark.parametrize(
+    ("writing", "text"),
+    [
+        ("菜单", "请给我水。"),
+        # parts out of order
+        ("虽然 ... 但是...", "但是他来了，虽然很晚。"),
+        # parts in different sentences
+        ("先 ... 再...", "他先走了。我们再见吧。"),
+        ("口语 能力", "口语很好。能力一般。"),
+    ],
+)
+def test_word_appears_rejects(writing, text):
+    assert not word_appears(writing, text)
+
+
+def test_validate_story_counts_a_spaced_skritter_entry_as_used():
+    request = _make_request(
+        [{"id": 691, "writing": "口语 能力", "reading": "", "definition_en": ""}]
+    )
+    result = _make_result("柏林墙边的表情包", "马克的口语能力还不够好。")
+
+    report, used_map = validate_story(request, result)
+
+    assert used_map == {691: True}
+    assert report["missing_vocabulary"] == []

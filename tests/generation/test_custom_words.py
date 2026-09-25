@@ -61,11 +61,11 @@ def test_schema_rejects_more_custom_words_than_target_count():
         )
 
 
-def test_schema_rejects_more_than_fifteen_custom_words():
-    words = [f"词{chr(0x4E00 + i)}" for i in range(16)]
+def test_schema_rejects_more_than_thirty_custom_words():
+    words = [f"词{chr(0x4E00 + i)}" for i in range(31)]
     with pytest.raises(ValidationError):
         CreateGenerationRequestSchema(
-            custom_words=words, **{**BASE, "target_vocabulary_count": 15}
+            custom_words=words, **{**BASE, "target_vocabulary_count": 30}
         )
 
 
@@ -78,18 +78,26 @@ def test_schema_dedupes_before_applying_the_count_limit():
 # ---- prompt v2 (no database) ----
 
 
-def _prompt_request(snapshot):
+def _prompt_request(snapshot, prompt_version="story-v2"):
     return GenerationRequestInput(
         target_hsk_level=2,
         target_word_count=150,
         target_vocabulary_count=len(snapshot),
         vocabulary_snapshot=snapshot,
-        prompt_version="story-v2",
+        prompt_version=prompt_version,
     )
 
 
-def test_current_prompt_version_is_v2():
-    assert CURRENT_PROMPT_VERSION == "story-v2"
+def test_current_prompt_version_asks_for_a_glossary_of_custom_words():
+    prompt = build_prompt(
+        _prompt_request(
+            [{"id": 2, "writing": "饭馆", "reading": None, "definition_en": None}],
+            prompt_version=CURRENT_PROMPT_VERSION,
+        )
+    )
+
+    assert '"glossary"' in prompt
+    assert "glossary entry for each of these words: 饭馆" in prompt
 
 
 def test_v2_prompt_omits_missing_reading_and_definition():
@@ -176,9 +184,14 @@ def test_select_puts_custom_first_and_fills_from_list_without_duplicates(db_sess
     )
     custom = VocabularyRepository(db_session).get_or_create_custom_items(["丙", "新词"])
 
-    result = select_vocabulary(db_session, vocab_list, 4, custom)
+    result = [
+        e["writing"] for e in select_vocabulary(db_session, vocab_list, 4, custom)
+    ]
 
-    assert [e["writing"] for e in result] == ["丙", "新词", "甲", "乙"]
+    assert result[:2] == ["丙", "新词"]
+    # two of the list's other words, in random order; 丙 isn't repeated
+    assert len(set(result[2:])) == 2
+    assert set(result[2:]) <= {"甲", "乙", "丁"}
 
 
 @pytest.mark.db
@@ -213,7 +226,7 @@ def test_post_custom_words_only_end_to_end(client, db_session):
 
     request = db_session.get(StoryGenerationRequest, request_id)
     assert request.vocabulary_list_id is None
-    assert request.prompt_version == "story-v2"
+    assert request.prompt_version == CURRENT_PROMPT_VERSION
     assert [e["writing"] for e in request.selected_vocabulary_snapshot] == [
         "菜单",
         "饭馆",
@@ -249,11 +262,10 @@ def test_post_list_plus_custom_words(client, db_session):
 
     assert response.status_code == 202
     request = db_session.get(StoryGenerationRequest, response.json()["id"])
-    assert [e["writing"] for e in request.selected_vocabulary_snapshot] == [
-        "新词",
-        "甲",
-        "乙",
-    ]
+    writings = [e["writing"] for e in request.selected_vocabulary_snapshot]
+    assert writings[0] == "新词"
+    assert len(set(writings[1:])) == 2
+    assert set(writings[1:]) <= {"甲", "乙", "丙"}
 
 
 @pytest.mark.db

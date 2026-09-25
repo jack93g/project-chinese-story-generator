@@ -2,6 +2,7 @@ import pytest
 from pydantic import ValidationError
 
 from story_generator.generation.schemas import (
+    MAX_TARGET_VOCABULARY_COUNT,
     MAX_TARGET_WORD_COUNT,
     MAX_TOPIC_LENGTH,
     CreateGenerationRequestSchema,
@@ -58,7 +59,18 @@ def test_accepts_word_count_at_maximum():
     assert schema.target_word_count == MAX_TARGET_WORD_COUNT
 
 
-@pytest.mark.parametrize("vocab_count", [0, 16, -1])
+def test_accepts_vocabulary_count_at_maximum():
+    schema = CreateGenerationRequestSchema(
+        vocabulary_list_id=1,
+        target_hsk_level=1,
+        target_word_count=100,
+        target_vocabulary_count=MAX_TARGET_VOCABULARY_COUNT,
+    )
+
+    assert schema.target_vocabulary_count == 30
+
+
+@pytest.mark.parametrize("vocab_count", [0, 31, -1])
 def test_rejects_invalid_vocabulary_count(vocab_count):
     with pytest.raises(ValidationError):
         CreateGenerationRequestSchema(

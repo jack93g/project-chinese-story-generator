@@ -35,8 +35,8 @@ Future infrastructure (Airflow, BigQuery, etc.) is tracked on the
 2. The `vocabulary` module normalises valid records into `vocabulary_items`
    and their `vocabulary_lists`/`list_vocabulary` membership.
 3. A story request is queued (`story_generation_requests`, status
-   `queued`). The `generation` worker claims it, selects known vocabulary
-   deterministically, and calls the allowlisted provider.
+   `queued`). The `generation` worker claims it, selects a random sample
+   of known vocabulary, and calls the allowlisted provider.
 4. The worker moves the request through `queued → running →
    succeeded|failed` (up to 3 attempts), persisting the generated story and
    its `story_vocabulary_items`, with provider payloads redacted before

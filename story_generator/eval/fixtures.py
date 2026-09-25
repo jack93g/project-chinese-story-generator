@@ -29,9 +29,13 @@ Categories (per M3-7 acceptance criteria):
   - "stress_length" — a large vocabulary list near
     MAX_TARGET_WORD_COUNT, to see how latency and length-adherence
     hold up under load
+  - "stress_density" — many words in a short story, to see whether
+    the story stays plausible and its collocations natural
 """
 
 from dataclasses import dataclass
+
+from story_generator.generation.prompts.builder import CURRENT_PROMPT_VERSION
 
 
 @dataclass(frozen=True)
@@ -44,7 +48,8 @@ class EvalFixture:
     target_vocabulary_count: int
     vocabulary_snapshot: list[dict]
     topic: str | None = None
-    prompt_version: str = "story-v1"
+    # The prompt production sends, so a report measures what users get.
+    prompt_version: str = CURRENT_PROMPT_VERSION
 
 
 EVAL_FIXTURES: list[EvalFixture] = [
@@ -348,5 +353,143 @@ EVAL_FIXTURES: list[EvalFixture] = [
             },
         ],
         topic="a delayed flight during a family trip",
+    ),
+    EvalFixture(
+        name="dense_vocabulary",
+        category="stress_density",
+        description=(
+            "20 mostly abstract HSK5 words in 350 characters, from a real "
+            "request whose story bent itself to fit them (an East German who "
+            "couldn't speak German well, to use 口语能力). Shows whether a "
+            "prompt keeps the story plausible and the collocations natural "
+            "under dense vocabulary. 口语 能力 keeps Skritter's space, to "
+            "exercise the coverage matcher."
+        ),
+        target_hsk_level=5,
+        target_word_count=350,
+        target_vocabulary_count=20,
+        topic="德国的社会",
+        vocabulary_snapshot=[
+            {
+                "id": 9070,
+                "writing": "实践",
+                "reading": "shi2jian4",
+                "definition_en": "to put into practice; practice",
+            },
+            {
+                "id": 9071,
+                "writing": "理由",
+                "reading": "li3you2",
+                "definition_en": "reason; grounds",
+            },
+            {
+                "id": 9072,
+                "writing": "监狱",
+                "reading": "jian1yu4",
+                "definition_en": "prison",
+            },
+            {
+                "id": 9073,
+                "writing": "反抗",
+                "reading": "fan3kang4",
+                "definition_en": "to resist; to rebel",
+            },
+            {
+                "id": 9074,
+                "writing": "怼",
+                "reading": "dui4",
+                "definition_en": "(slang) to talk back to; to call out",
+            },
+            {
+                "id": 9075,
+                "writing": "移民",
+                "reading": "yi2min2",
+                "definition_en": "to emigrate; immigrant",
+            },
+            {
+                "id": 9076,
+                "writing": "特意",
+                "reading": "te4yi4",
+                "definition_en": "specially; on purpose",
+            },
+            {
+                "id": 9077,
+                "writing": "暴力",
+                "reading": "bao4li4",
+                "definition_en": "violence",
+            },
+            {
+                "id": 9078,
+                "writing": "表情包",
+                "reading": "biao3qing2bao1",
+                "definition_en": "meme image; sticker",
+            },
+            {
+                "id": 9079,
+                "writing": "带来",
+                "reading": "dai4lai2",
+                "definition_en": "to bring; to bring about",
+            },
+            {
+                "id": 9080,
+                "writing": "地位",
+                "reading": "di4wei4",
+                "definition_en": "position; status",
+            },
+            {
+                "id": 9081,
+                "writing": "身边",
+                "reading": "shen1bian1",
+                "definition_en": "at one's side; around one",
+            },
+            {
+                "id": 9082,
+                "writing": "干脆",
+                "reading": "gan1cui4",
+                "definition_en": "simply; might as well; straightforward",
+            },
+            {
+                "id": 9083,
+                "writing": "理论",
+                "reading": "li3lun4",
+                "definition_en": "theory",
+            },
+            {
+                "id": 9084,
+                "writing": "污染",
+                "reading": "wu1ran3",
+                "definition_en": "pollution; to pollute",
+            },
+            {
+                "id": 9085,
+                "writing": "难看",
+                "reading": "nan2kan4",
+                "definition_en": "ugly; unsightly",
+            },
+            {
+                "id": 9086,
+                "writing": "阅读能力",
+                "reading": "yue4du2neng2li4",
+                "definition_en": "reading ability",
+            },
+            {
+                "id": 9087,
+                "writing": "口语 能力",
+                "reading": "kou3yu3 neng2li4",
+                "definition_en": "speaking ability",
+            },
+            {
+                "id": 9088,
+                "writing": "洋气",
+                "reading": "yang2qi4",
+                "definition_en": "stylish; Western in style",
+            },
+            {
+                "id": 9089,
+                "writing": "个人主义",
+                "reading": "ge4ren2 zhu3yi4",
+                "definition_en": "individualism",
+            },
+        ],
     ),
 ]
