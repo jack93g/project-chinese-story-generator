@@ -22,8 +22,9 @@ const MAX_VOCABULARY_COUNT = 30;
 // depends only on story length, never on list size (lists can hold
 // hundreds of words; a story still uses at most MAX_VOCABULARY_COUNT).
 const CHARACTERS_PER_VOCABULARY_WORD = 25;
-// Denser than this (one word per 15 characters, e.g. 10 in 150) is past
-// what stories have been seen to handle, so the form warns, but allows it.
+// Stories have handled up to one word per this many characters (10 words
+// in 150 worked 11 of 11 times). Anything denser gets a warning, but is
+// still allowed.
 const MIN_CHARACTERS_PER_VOCABULARY_WORD = 15;
 const MAX_CUSTOM_WORD_LENGTH = 20;
 const CUSTOM_WORD_PATTERN = /^[\u3400-\u4dbf\u4e00-\u9fff]+$/;
@@ -387,10 +388,13 @@ export default function GeneratePage() {
       hint = `This list has only ${selectedList.item_count} word${selectedList.item_count === 1 ? "" : "s"}, so the story will use ${vocabularyCount}.`;
     } else {
       const lengthNote = `Suggested for a ${storyLength}-character story: ${suggestedCount}.`;
+      const plural = customWords.length === 1 ? "" : "s";
       hint =
-        customWords.length > 0
-          ? `${lengthNote} Includes your ${customWords.length} custom word${customWords.length === 1 ? "" : "s"}; the list fills the rest.`
-          : lengthNote;
+        customWords.length === 0
+          ? lengthNote
+          : listSlots > 0
+            ? `${lengthNote} Includes your ${customWords.length} custom word${plural}; the list fills the rest.`
+            : `${lengthNote} Your ${customWords.length} custom word${plural} fill every slot, so none come from the list.`;
     }
     return densityWarning ? `${hint} ${densityWarning}` : hint;
   }

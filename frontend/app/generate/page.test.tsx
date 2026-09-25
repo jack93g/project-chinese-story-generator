@@ -466,6 +466,22 @@ describe("GeneratePage", () => {
       expect(screen.getByRole("button", { name: "Generate" })).toBeEnabled();
     });
 
+    it("says when custom words fill every slot", async () => {
+      await renderWithList();
+      fireEvent.change(screen.getByLabelText("Custom words (optional)"), {
+        target: { value: "菜单 饭馆 点菜" },
+      });
+
+      fireEvent.change(countField(), { target: { value: "3" } });
+
+      expect(
+        screen.getByText(/fill every slot, so none come from the list/),
+      ).toBeInTheDocument();
+      expect(
+        screen.queryByText(/the list fills the rest/),
+      ).not.toBeInTheDocument();
+    });
+
     it("won't go below the number of custom words", async () => {
       await renderWithList();
       fireEvent.change(screen.getByLabelText("Custom words (optional)"), {
