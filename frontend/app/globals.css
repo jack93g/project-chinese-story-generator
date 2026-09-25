@@ -517,16 +517,6 @@ h2 {
   visibility: hidden;
 }
 
-/* Traditional layout: columns top to bottom, read right to left. The body
-   scrolls sideways and starts at the right-hand edge. */
-.story-body-vertical {
-  writing-mode: vertical-rl;
-  height: min(70vh, 32rem);
-  overflow-x: auto;
-  overflow-y: hidden;
-  padding: var(--space-2) 0;
-}
-
 /* Entrance for a story that has just been generated: the text soaks in
    sentence by sentence like ink on rice paper, then the seal is stamped and
    the glossary fades in. Timings match the constants in app/story/page.tsx.

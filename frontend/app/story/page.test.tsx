@@ -127,34 +127,24 @@ describe("StoryPage", () => {
     expect(rubies[0].querySelector("rt")?.textContent).toBe("tiānqì");
   });
 
-  it("toggles pinyin and vertical layout, and remembers the choice", async () => {
+  it("toggles pinyin and remembers the choice", async () => {
     useSearchParams.mockReturnValue(new URLSearchParams("id=5"));
     fetchStory.mockResolvedValue(STORY);
     const { container, unmount } = render(<StoryPage />);
 
     const pinyin = await screen.findByRole("button", { name: "拼音 Pinyin" });
-    const vertical = screen.getByRole("button", { name: "竖排 Vertical" });
     const body = container.querySelector(".story-body")!;
     expect(pinyin).toHaveAttribute("aria-pressed", "true");
-    expect(vertical).toHaveAttribute("aria-pressed", "false");
 
     fireEvent.click(pinyin);
-    fireEvent.click(vertical);
     expect(pinyin).toHaveAttribute("aria-pressed", "false");
-    expect(body).toHaveClass("hide-pinyin", "story-body-vertical");
-    expect(
-      screen.getByRole("region", { name: "Story text" }),
-    ).toHaveAttribute("tabindex", "0");
+    expect(body).toHaveClass("hide-pinyin");
 
     unmount();
     render(<StoryPage />);
     expect(
-      await screen.findByRole("button", { name: "竖排 Vertical" }),
-    ).toHaveAttribute("aria-pressed", "true");
-    expect(screen.getByRole("button", { name: "拼音 Pinyin" })).toHaveAttribute(
-      "aria-pressed",
-      "false",
-    );
+      await screen.findByRole("button", { name: "拼音 Pinyin" }),
+    ).toHaveAttribute("aria-pressed", "false");
   });
 
   it("credits the model that wrote the story", async () => {

@@ -23,7 +23,6 @@ type StoryState =
   | { status: "ready"; story: StoryDetail };
 
 const PINYIN_KEY = "story-reader:show-pinyin";
-const VERTICAL_KEY = "story-reader:vertical";
 
 // Reading options are a per-browser convenience; if storage is unavailable
 // (private window, blocked site data) the reader just uses the defaults.
@@ -168,9 +167,6 @@ function StoryReader({
   const [showPinyin, setShowPinyin] = useState(() =>
     readPreference(PINYIN_KEY, true),
   );
-  const [vertical, setVertical] = useState(() =>
-    readPreference(VERTICAL_KEY, false),
-  );
   const writtenBy = describeModel(story.provider, story.model);
   const sentences = useMemo(
     () =>
@@ -194,8 +190,8 @@ function StoryReader({
     }
     // Drop ?fresh=1 so reloading or sharing the page doesn't replay it.
     window.history.replaceState(null, "", `/story?id=${story.id}`);
-    // Afterwards, remove the animation classes so that toggling the layout
-    // doesn't restart them.
+    // Afterwards, remove the animation classes so that toggling a reading
+    // option doesn't restart them.
     const timer = setTimeout(
       () => setEntrance(false),
       stampDelay + STAMP_AND_GLOSSARY,
@@ -208,17 +204,9 @@ function StoryReader({
     writePreference(PINYIN_KEY, !showPinyin);
   }
 
-  function toggleVertical() {
-    setVertical(!vertical);
-    writePreference(VERTICAL_KEY, !vertical);
-  }
-
   const bodyClasses = ["story-body"];
   if (!showPinyin) {
     bodyClasses.push("hide-pinyin");
-  }
-  if (vertical) {
-    bodyClasses.push("story-body-vertical");
   }
 
   return (
@@ -246,28 +234,10 @@ function StoryReader({
           >
             <span lang="zh">拼音</span> Pinyin
           </button>
-          <button
-            type="button"
-            className="toggle"
-            aria-pressed={vertical}
-            onClick={toggleVertical}
-          >
-            <span lang="zh">竖排</span> Vertical
-          </button>
         </div>
       </header>
 
-      {/* In vertical mode the body scrolls sideways, so it becomes a named,
-          focusable region to let keyboard users scroll it. */}
-      <p
-        lang="zh"
-        className={bodyClasses.join(" ")}
-        {...(vertical && {
-          tabIndex: 0,
-          role: "region",
-          "aria-label": "Story text",
-        })}
-      >
+      <p lang="zh" className={bodyClasses.join(" ")}>
         {sentences.map((sentence, sentenceIndex) => (
           <span
             key={sentenceIndex}
