@@ -303,9 +303,10 @@ below).
   won't pick the change up.
 - On SIGTERM (any stop, restart or deploy) the worker finishes the request
   it's working on, then exits. `stop_grace_period: 90s` in
-  `docker-compose.yml` outlasts the longest a provider call can take (75s;
-  a slower call fails with `ProviderTimeoutError` and is retried), so a stop
-  normally leaves nothing behind. A restart can take up to 90 seconds
+  `docker-compose.yml` outlasts the longest a provider call can take (about
+  85s: 10s to connect, then 75s for the answer; a slower call fails with
+  `ProviderTimeoutError` and is retried), so a stop normally leaves nothing
+  behind. A restart can take up to 90 seconds
   if a generation is mid-call.
 - If a worker dies anyway (OOM kill, host crash, `docker kill`), its request
   is left `running`. Any worker requeues `running` requests that started more

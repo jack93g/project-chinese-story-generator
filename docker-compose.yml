@@ -50,9 +50,9 @@ services:
       - .env
     command: python -m story_generator.cli.generation_worker
     # On SIGTERM the worker finishes its current request before exiting.
-    # Longer than a provider call can take (75s; see OpenAIStoryGenerationProvider),
-    # so a stop or deploy doesn't kill a generation mid-call and leave it stuck
-    # "running".
+    # Longer than a provider call can take (~85s: 10s to connect, 75s for the
+    # answer; see OpenAIStoryGenerationProvider), so a stop or deploy doesn't
+    # kill a generation mid-call and leave it stuck "running".
     stop_grace_period: 90s
     environment:
       DATABASE_URL: postgresql+psycopg://${POSTGRES_USER:?POSTGRES_USER must be set in .env}:${POSTGRES_PASSWORD:?POSTGRES_PASSWORD must be set in .env}@db:5432/${POSTGRES_DB:?POSTGRES_DB must be set in .env}

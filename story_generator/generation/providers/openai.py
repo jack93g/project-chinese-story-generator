@@ -86,15 +86,16 @@ class OpenAIStoryGenerationProvider:
         api_key: str,
         model: str,
         base_url: str = _DEFAULT_CHAT_COMPLETIONS_URL,
-        # `timeout` is for connecting and sending. `total_timeout` bounds the
-        # whole call, and must stay under the worker's stop_grace_period (90s
+        # `timeout` is for connecting and sending; `total_timeout` bounds the
+        # wait for the answer. A call can take at most about their sum (85s by
+        # default), which must stay under the worker's stop_grace_period (90s
         # in docker-compose.yml): a stopping worker finishes its current
         # request, and Compose kills it after that. httpx only has per-read
         # timeouts, so two cases need covering: a server that sends nothing
         # until the answer is ready (e.g. Groq) hits the read timeout, set to
         # total_timeout; OpenRouter, which sends a keep-alive every ~3s and so
         # never trips a read timeout, hits the deadline checked per chunk in
-        # _post. Only a server going silent partway through a body could run
+        # _post. Only a server going silent partway through a body could take
         # longer.
         timeout: float = 10.0,
         total_timeout: float = 75.0,
