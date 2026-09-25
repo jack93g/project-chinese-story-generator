@@ -15,12 +15,14 @@ const {
   createStoryGeneration,
   fetchGenerationStatus,
   retryStoryGeneration,
+  fetchSyncStatus,
   routerPush,
 } = vi.hoisted(() => ({
   fetchAllVocabularyLists: vi.fn(),
   createStoryGeneration: vi.fn(),
   fetchGenerationStatus: vi.fn(),
   retryStoryGeneration: vi.fn(),
+  fetchSyncStatus: vi.fn().mockResolvedValue({ latest_run: null }),
   routerPush: vi.fn(),
 }));
 
@@ -34,6 +36,7 @@ vi.mock("@/lib/api", async () => {
     createStoryGeneration,
     fetchGenerationStatus,
     retryStoryGeneration,
+    fetchSyncStatus,
   };
 });
 
