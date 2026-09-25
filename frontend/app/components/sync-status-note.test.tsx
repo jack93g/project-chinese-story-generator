@@ -79,6 +79,22 @@ describe("SyncStatusNote", () => {
     ).toBeInTheDocument();
   });
 
+  it("warns when a sync has been running for over an hour", async () => {
+    fetchSyncStatus.mockResolvedValueOnce({
+      latest_run: {
+        status: "running",
+        started_at: "2026-09-21T12:00:00Z",
+        completed_at: null,
+      },
+    });
+    render(<SyncStatusNote />);
+    expect(
+      await screen.findByText(
+        /A Skritter sync started 3 days ago and hasn't finished/,
+      ),
+    ).toHaveClass("field-error");
+  });
+
   it("warns when there has never been a sync", async () => {
     fetchSyncStatus.mockResolvedValueOnce({ latest_run: null });
     render(<SyncStatusNote />);

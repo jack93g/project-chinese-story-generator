@@ -439,7 +439,8 @@ it re-fetches every word and keeps every raw payload.
 ### Checking the sync
 
 The Generate page shows when vocabulary was last synced under the list picker.
-It turns red when the last sync failed or is more than two days old. From
+It turns red when the last sync failed, is more than two days old, or has
+been running for over an hour (the process died). From
 the Droplet:
 
 ```bash

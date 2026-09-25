@@ -7,6 +7,9 @@ import { formatTimeAgo } from "@/lib/dates";
 // The Droplet syncs daily, so a sync older than this means the schedule has
 // stopped.
 const STALE_AFTER_MS = 2 * 24 * 60 * 60 * 1000;
+// A full --refresh sync takes about 15 minutes, so one "running" for longer
+// than this has almost certainly died.
+const STUCK_AFTER_MS = 60 * 60 * 1000;
 
 type Note = { text: string; warning: boolean };
 
@@ -18,6 +21,12 @@ function describe(run: SyncRun | null, now: Date): Note {
     };
   }
   if (run.status === "running") {
+    if (now.getTime() - new Date(run.started_at).getTime() > STUCK_AFTER_MS) {
+      return {
+        text: `A Skritter sync started ${formatTimeAgo(run.started_at, now)} and hasn't finished, so recently added words may be missing.`,
+        warning: true,
+      };
+    }
     return {
       text: `Syncing vocabulary from Skritter now (started ${formatTimeAgo(run.started_at, now)}).`,
       warning: false,

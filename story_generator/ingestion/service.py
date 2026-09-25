@@ -6,8 +6,10 @@ from story_generator.vocabulary.parser import parse_vocab
 
 logger = logging.getLogger(__name__)
 
-# Raw Skritter responses are kept for debugging recent runs only. Older runs
-# keep their sync_runs row (status, summary, error) but lose their payloads.
+# Raw Skritter responses are kept for debugging recent runs only: pruning
+# happens as a sync starts, so the newest RAW_PAYLOAD_RUNS_KEPT earlier runs
+# keep theirs, plus the run in progress. Older runs keep their sync_runs row
+# (status, summary, error) but lose their payloads.
 RAW_PAYLOAD_RUNS_KEPT = 10
 
 INTERRUPTED_RUN_MESSAGE = "Interrupted: the sync process stopped before finishing."
