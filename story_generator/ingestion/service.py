@@ -75,7 +75,8 @@ class IngestionService:
                 len(vocab_ids),
                 len(to_fetch),
             )
-            for vocab_db_id in known.values():
+            in_list = set(known.values())
+            for vocab_db_id in in_list:
                 self.vocabulary_repository.link_vocab_to_list(list_db_id, vocab_db_id)
             existing += len(known)
 
@@ -90,10 +91,12 @@ class IngestionService:
                     list_db_id,
                     vocab_db_id,
                 )
+                in_list.add(vocab_db_id)
                 if inserted:
                     imported += 1
                 else:
                     existing += 1
+            unlinked = self._unlink_removed_vocab(list_db_id, list_data, in_list)
             self.vocabulary_session.commit()
         except Exception:
             self.vocabulary_session.rollback()
@@ -105,8 +108,32 @@ class IngestionService:
             "vocab_imported": imported,
             "vocab_skipped": existing,
             "vocab_fetched": len(to_fetch),
+            "vocab_unlinked": unlinked,
             "failures": [],
         }
+
+    def _unlink_removed_vocab(
+        self, list_db_id: int, list_data: dict, in_list: set[int]
+    ) -> int:
+        """Drop the list's links to words no longer in it in Skritter."""
+        if not in_list:
+            # More likely a bad response than a list emptied on purpose, so
+            # keep what's there rather than wiping the list.
+            stored = self.vocabulary_repository.count_list_items(list_db_id)
+            if stored:
+                logger.warning(
+                    "Skritter returned no words for list '%s', which has %d; "
+                    "keeping them",
+                    list_data["name"],
+                    stored,
+                )
+            return 0
+        unlinked = self.vocabulary_repository.unlink_vocab_not_in(list_db_id, in_list)
+        if unlinked:
+            logger.info(
+                "Removed %d word(s) no longer in '%s'", unlinked, list_data["name"]
+            )
+        return unlinked
 
     def import_all_lists(self) -> dict:
         lists = self.client.get_lists()
@@ -116,6 +143,7 @@ class IngestionService:
         vocab_imported = 0
         vocab_skipped = 0
         vocab_fetched = 0
+        vocab_unlinked = 0
         failures = []
 
         for i, vocab_list in enumerate(lists, start=1):
@@ -126,6 +154,7 @@ class IngestionService:
                 vocab_imported += result["vocab_imported"]
                 vocab_skipped += result["vocab_skipped"]
                 vocab_fetched += result["vocab_fetched"]
+                vocab_unlinked += result["vocab_unlinked"]
             except Exception as exc:
                 logger.exception(
                     "Failed to import list '%s' (%s)",
@@ -146,14 +175,40 @@ class IngestionService:
         if failures:
             logger.error("%d list(s) failed during import", len(failures))
 
+        lists_archived = self._archive_removed_lists(lists)
+
         return {
             "lists_processed": lists_processed,
             "vocab_processed": vocab_imported + vocab_skipped,
             "vocab_imported": vocab_imported,
             "vocab_skipped": vocab_skipped,
             "vocab_fetched": vocab_fetched,
+            "vocab_unlinked": vocab_unlinked,
+            "lists_archived": lists_archived,
             "failures": failures,
         }
+
+    def _archive_removed_lists(self, lists: list[dict]) -> int:
+        """Archive stored lists that Skritter no longer returns.
+
+        Only a full sync can do this: it's the only time we see every list.
+        """
+        if not lists:
+            # As with an empty list: keep everything rather than trust it.
+            if self.vocabulary_repository.count_lists():
+                logger.warning("Skritter returned no lists; archiving none")
+            return 0
+        try:
+            archived = self.vocabulary_repository.archive_lists_not_in(
+                {vocab_list["id"] for vocab_list in lists}
+            )
+            self.vocabulary_session.commit()
+        except Exception:
+            self.vocabulary_session.rollback()
+            raise
+        for name in archived:
+            logger.info("Archived list '%s': no longer in Skritter", name)
+        return len(archived)
 
     # --- Sync run tracking (separate session, commits independently) ----
 

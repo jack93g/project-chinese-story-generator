@@ -123,7 +123,10 @@ should be structured.
   idempotent and fetches only words not yet stored (`--refresh` re-fetches
   all). A PostgreSQL advisory lock (`SyncLock`) lets one sync run at a time.
   Raw API payloads are kept for the last 10 runs. Cron on the Droplet runs it
-  daily (see the runbook).
+  daily (see the runbook). Deletions in Skritter never delete rows: a word
+  removed from a list is unlinked (`list_vocabulary`), and a list missing from
+  a full sync gets `archived_at` set. Archived lists are hidden from the API
+  and can't be used for new stories.
 - `vocabulary/` — vocabulary parsing, services, persistence.
 - `stories/` — saved-story queries and persistence.
 - `generation/` — the story-generation workflow:

@@ -1,3 +1,5 @@
+from datetime import UTC, datetime
+
 import pytest
 
 from story_generator.vocabulary.persistence.models import VocabularyItem, VocabularyList
@@ -295,3 +297,19 @@ def test_get_vocabulary_list_returns_404_for_unknown_id(client):
 
     assert response.status_code == 404
     assert response.json() == {"detail": "Vocabulary list 999999 not found"}
+
+
+def test_archived_lists_are_hidden(client, db_session):
+    active = VocabularyList(skritter_list_id="active", name="Active")
+    archived = VocabularyList(
+        skritter_list_id="gone", name="Gone", archived_at=datetime.now(UTC)
+    )
+    db_session.add_all([active, archived])
+    db_session.flush()
+
+    body = client.get("/vocabulary-lists").json()
+    assert [item["name"] for item in body["items"]] == ["Active"]
+    assert body["total"] == 1
+
+    assert client.get(f"/vocabulary-lists/{archived.id}").status_code == 404
+    assert client.get(f"/vocabulary-lists/{active.id}").status_code == 200

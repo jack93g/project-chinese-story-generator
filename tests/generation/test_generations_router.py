@@ -1,3 +1,5 @@
+from datetime import UTC, datetime
+
 import pytest
 
 from story_generator.generation.providers.fake import FakeStoryGenerationProvider
@@ -438,3 +440,22 @@ def test_only_queued_and_running_requests_count_toward_the_cap(db_session):
     db_session.flush()
 
     assert GenerationRequestRepository(db_session).count_active() == 2
+
+
+def test_create_with_archived_list_returns_404(client, db_session):
+    vocab_list = _make_list_with_items(
+        db_session, skritter_list_id="archived-1", n_items=3
+    )
+    vocab_list.archived_at = datetime.now(UTC)
+    db_session.flush()
+
+    response = client.post(
+        "/story-generations",
+        json={
+            "vocabulary_list_id": vocab_list.id,
+            "target_hsk_level": 2,
+            "target_word_count": 150,
+            "target_vocabulary_count": 2,
+        },
+    )
+    assert response.status_code == 404

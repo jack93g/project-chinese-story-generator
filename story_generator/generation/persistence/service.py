@@ -78,7 +78,8 @@ class GenerationRequestService:
         vocabulary_list = None
         if payload.vocabulary_list_id is not None:
             vocabulary_list = db.get(VocabularyList, payload.vocabulary_list_id)
-            if vocabulary_list is None:
+            # An archived list was deleted in Skritter.
+            if vocabulary_list is None or vocabulary_list.archived_at is not None:
                 raise VocabularyListNotFoundError(payload.vocabulary_list_id)
 
         custom_items = VocabularyRepository(db).get_or_create_custom_items(

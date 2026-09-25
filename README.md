@@ -9,7 +9,9 @@ durable background workflow.
 - Synchronise one or all Skritter vocabulary lists into PostgreSQL.
 - Store vocabulary, list membership, sync-run history, and raw Skritter API
   payloads. Re-running an import is idempotent and does not duplicate
-  vocabulary or list memberships.
+  vocabulary or list memberships. Words removed from a Skritter list are
+  unlinked from it, and lists deleted in Skritter are archived (hidden), not
+  deleted.
 - Serve a FastAPI for vocabulary, vocabulary lists, saved stories, sync
   status, and asynchronous story-generation requests.
 - Queue generation requests, select a random vocabulary sample,

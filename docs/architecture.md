@@ -34,7 +34,9 @@ Future infrastructure (Airflow, BigQuery, etc.) is tracked on the
    stored are fetched unless `--refresh` is passed. Raw responses are kept as
    `raw_skritter_payloads` for the most recent runs, for debugging.
 2. The `vocabulary` module normalises valid records into `vocabulary_items`
-   and their `vocabulary_lists`/`list_vocabulary` membership.
+   and their `vocabulary_lists`/`list_vocabulary` membership. Membership
+   mirrors Skritter: removed words are unlinked, and lists deleted in Skritter
+   are archived rather than deleted, because stories and requests refer to them.
 3. A story request is queued (`story_generation_requests`, status
    `queued`). The `generation` worker claims it, selects a random sample
    of known vocabulary, and calls the allowlisted provider.

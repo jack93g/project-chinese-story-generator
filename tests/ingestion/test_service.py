@@ -1,4 +1,4 @@
-from unittest.mock import Mock
+from unittest.mock import Mock, patch
 
 import pytest
 
@@ -49,6 +49,7 @@ def test_import_list():
     ]
     repository.ensure_list.return_value = 1
     repository.get_ids_by_skritter_vocab_ids.return_value = {}
+    repository.unlink_vocab_not_in.return_value = 0
     repository.ensure_vocab.side_effect = [(10, True), (11, True)]
 
     service = IngestionService(
@@ -62,6 +63,7 @@ def test_import_list():
         "vocab_imported": 2,
         "vocab_skipped": 0,
         "vocab_fetched": 2,
+        "vocab_unlinked": 0,
         "failures": [],
     }
     repository.ensure_list.assert_called_once_with("123", "Test List")
@@ -107,6 +109,7 @@ def test_import_list_counts_skipped_vocab():
     ]
     repository.ensure_list.return_value = 1
     repository.get_ids_by_skritter_vocab_ids.return_value = {}
+    repository.unlink_vocab_not_in.return_value = 0
     # first vocab is new, second already existed (conflict -> not inserted)
     repository.ensure_vocab.side_effect = [(10, True), (11, False)]
 
@@ -121,6 +124,7 @@ def test_import_list_counts_skipped_vocab():
         "vocab_imported": 1,
         "vocab_skipped": 1,
         "vocab_fetched": 2,
+        "vocab_unlinked": 0,
         "failures": [],
     }
 
@@ -137,6 +141,7 @@ def test_import_list_rolls_back_on_failure():
     }
     client.get_vocab.side_effect = RuntimeError("Skritter API failed")
     repository.get_ids_by_skritter_vocab_ids.return_value = {}
+    repository.unlink_vocab_not_in.return_value = 0
 
     service = IngestionService(
         client, repository, session, Mock(), Mock(), sync_lock=Mock()
@@ -339,6 +344,7 @@ def test_import_list_links_known_vocab_without_fetching_it():
     }
     repository.ensure_list.return_value = 1
     repository.get_ids_by_skritter_vocab_ids.return_value = {"zh-你好-0": 10}
+    repository.unlink_vocab_not_in.return_value = 0
     repository.ensure_vocab.return_value = (11, True)
 
     service = IngestionService(
@@ -382,6 +388,7 @@ def test_import_list_with_refresh_fetches_every_word():
     }
     repository.ensure_list.return_value = 1
     repository.ensure_vocab.return_value = (10, False)
+    repository.unlink_vocab_not_in.return_value = 0
 
     service = IngestionService(
         client, repository, session, Mock(), Mock(), sync_lock=Mock(), refresh=True
@@ -444,3 +451,107 @@ def test_run_cleans_up_before_creating_the_new_run():
     tracking_repository.prune_raw_payloads.assert_called_once_with(
         keep_runs=RAW_PAYLOAD_RUNS_KEPT
     )
+
+
+def _list_import_service(vocab_ids, known, fetched_db_id=None):
+    client = Mock()
+    repository = Mock()
+    client.get_list.return_value = {
+        "id": "123",
+        "name": "Test List",
+        "vocab_ids": vocab_ids,
+    }
+    client.get_vocab.return_value = {
+        "Vocabs": [
+            {
+                "id": "zh-谢谢-0",
+                "language": "zh",
+                "writing": "谢谢",
+                "reading": "xie4 xie",
+                "definitions": {"en": "thanks"},
+            }
+        ]
+    }
+    repository.ensure_list.return_value = 1
+    repository.get_ids_by_skritter_vocab_ids.return_value = known
+    repository.ensure_vocab.return_value = (fetched_db_id, True)
+    session = Mock()
+    service = IngestionService(
+        client, repository, session, Mock(), Mock(), sync_lock=Mock()
+    )
+    return service, repository, session
+
+
+def test_import_list_unlinks_words_no_longer_in_the_list():
+    service, repository, session = _list_import_service(
+        ["zh-你好-0", "zh-谢谢-0"], known={"zh-你好-0": 10}, fetched_db_id=11
+    )
+    repository.unlink_vocab_not_in.return_value = 3
+
+    result = service.import_list("123")
+
+    repository.unlink_vocab_not_in.assert_called_once_with(1, {10, 11})
+    assert result["vocab_unlinked"] == 3
+    session.commit.assert_called_once()
+
+
+# Patch the logger rather than use caplog: Alembic's fileConfig, run by the
+# migration tests, disables loggers that already exist.
+def test_import_list_keeps_words_when_skritter_returns_an_empty_list():
+    service, repository, session = _list_import_service([], known={})
+    repository.count_list_items.return_value = 5
+
+    with patch("story_generator.ingestion.service.logger") as logger:
+        result = service.import_list("123")
+
+    repository.unlink_vocab_not_in.assert_not_called()
+    assert result["vocab_unlinked"] == 0
+    assert "keeping them" in logger.warning.call_args.args[0]
+    session.commit.assert_called_once()
+
+
+def _all_lists_service(lists):
+    client = Mock()
+    repository = Mock()
+    session = Mock()
+    client.get_lists.return_value = lists
+    service = IngestionService(
+        client, repository, session, Mock(), Mock(), sync_lock=Mock()
+    )
+    service.import_list = Mock(
+        return_value={
+            "lists_processed": 1,
+            "vocab_processed": 0,
+            "vocab_imported": 0,
+            "vocab_skipped": 0,
+            "vocab_fetched": 0,
+            "vocab_unlinked": 0,
+            "failures": [],
+        }
+    )
+    return service, repository, session
+
+
+def test_import_all_lists_archives_lists_skritter_no_longer_returns():
+    service, repository, session = _all_lists_service(
+        [{"id": "1", "name": "One"}, {"id": "2", "name": "Two"}]
+    )
+    repository.archive_lists_not_in.return_value = ["Old list"]
+
+    result = service.import_all_lists()
+
+    repository.archive_lists_not_in.assert_called_once_with({"1", "2"})
+    assert result["lists_archived"] == 1
+    session.commit.assert_called_once()
+
+
+def test_import_all_lists_archives_nothing_when_skritter_returns_no_lists():
+    service, repository, _ = _all_lists_service([])
+    repository.count_lists.return_value = 4
+
+    with patch("story_generator.ingestion.service.logger") as logger:
+        result = service.import_all_lists()
+
+    repository.archive_lists_not_in.assert_not_called()
+    assert result["lists_archived"] == 0
+    logger.warning.assert_called_once_with("Skritter returned no lists; archiving none")

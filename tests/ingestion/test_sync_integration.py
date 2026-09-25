@@ -339,3 +339,103 @@ def test_sync_keeps_payloads_for_recent_runs_only(two_sessions, sync_lock, monke
     # the 2 newest runs before the last one started, plus the last one
     assert runs_with_payloads == {2, 3, 4}
     assert tracking_session.query(SyncRun).count() == 4
+
+
+LISTS_URL = "https://legacy.skritter.com/api/v0/vocablists"
+
+
+def _service(session, tracking_session, sync_lock):
+    return IngestionService(
+        SkritterClient("fake-token"),
+        VocabularyRepository(session),
+        session,
+        SyncRunRepository(tracking_session),
+        tracking_session,
+        sync_lock=sync_lock,
+    )
+
+
+def _mock_list_index(*lists):
+    return respx.get(LISTS_URL).mock(
+        return_value=httpx.Response(
+            200,
+            json={"VocabLists": [{"id": i, "name": n} for i, n in lists]},
+        )
+    )
+
+
+@pytest.mark.db
+@respx.mock
+def test_word_removed_in_skritter_is_unlinked_but_kept(two_sessions, sync_lock):
+    session, tracking_session = two_sessions
+    _mock_vocab("zh-你好-0", "你好", "ni3 hao3", "hello")
+    _mock_vocab("zh-谢谢-0", "谢谢", "xie4 xie", "thanks")
+    list_route = respx.get(LIST_URL)
+    service = _service(session, tracking_session, sync_lock)
+
+    _mock_successful_list(["zh-你好-0", "zh-谢谢-0"])
+    service.run_single_list("123")
+
+    _mock_successful_list(["zh-你好-0"])
+    result = service.run_single_list("123")
+    assert list_route.call_count == 2
+    assert result["vocab_unlinked"] == 1
+
+    vocab_list = session.query(VocabularyList).one()
+    assert [item.writing for item in vocab_list.items] == ["你好"]
+    # the word itself stays, so saved stories keep their glossary
+    assert session.query(VocabularyItem).count() == 2
+
+
+@pytest.mark.db
+@respx.mock
+def test_empty_list_response_keeps_existing_words(two_sessions, sync_lock):
+    session, tracking_session = two_sessions
+    _mock_vocab("zh-你好-0", "你好", "ni3 hao3", "hello")
+    service = _service(session, tracking_session, sync_lock)
+
+    _mock_successful_list(["zh-你好-0"])
+    service.run_single_list("123")
+    _mock_successful_list([])
+    result = service.run_single_list("123")
+
+    assert result["vocab_unlinked"] == 0
+    assert len(session.query(VocabularyList).one().items) == 1
+
+
+@pytest.mark.db
+@respx.mock
+def test_full_sync_archives_missing_lists_and_restores_returning_ones(
+    two_sessions, sync_lock
+):
+    session, tracking_session = two_sessions
+    _mock_successful_list([])
+    respx.get(f"{LISTS_URL}/456").mock(
+        return_value=httpx.Response(
+            200,
+            json={"VocabList": {"id": "456", "name": "Other", "sections": []}},
+        )
+    )
+    service = _service(session, tracking_session, sync_lock)
+
+    _mock_list_index(("123", "Test List"), ("456", "Other"))
+    service.run_all_lists()
+
+    _mock_list_index(("123", "Test List"))
+    result = service.run_all_lists()
+    assert result["lists_archived"] == 1
+    other = session.query(VocabularyList).filter_by(skritter_list_id="456").one()
+    assert other.archived_at is not None
+    assert VocabularyRepository(session).count_lists() == 1
+
+    # a later sync that only covers one list never archives anything
+    _mock_list_index()
+    service.run_single_list("123")
+    session.refresh(other)
+    assert other.archived_at is not None
+
+    _mock_list_index(("123", "Test List"), ("456", "Other"))
+    result = service.run_all_lists()
+    assert result["lists_archived"] == 0
+    session.refresh(other)
+    assert other.archived_at is None

@@ -401,6 +401,20 @@ already running. Skipping this run." and exits 0. That covers a manual
 killed, Droplet rebooted), its run stays `running` until the next sync,
 which marks it `failed` with "Interrupted".
 
+**Deletions in Skritter:** nothing is deleted from the database, because
+saved stories and past generation requests still refer to the words and lists.
+
+- A word removed from a list is unlinked from that list at the next sync, so
+  new stories from that list stop using it. The word itself stays.
+- A list deleted in Skritter is archived (`vocabulary_lists.archived_at`) by
+  the next full (`--all`) sync. It disappears from the Generate page and the
+  API, and new stories can't use it. If it reappears in Skritter, the next
+  full sync un-archives it.
+- Safeguards: if Skritter returns a list with no words, or no lists at all,
+  the sync keeps what's stored and logs a warning. A bad response can't wipe
+  your vocabulary. If you really did empty a list, its old words stay linked
+  until you add one word back.
+
 **Raw payloads:** raw Skritter responses are kept for the 10 most recent
 runs only (plus the one in progress). Older runs keep their `sync_runs` row.
 
@@ -426,6 +440,7 @@ the Droplet:
 ```bash
 tail -n 30 ~/sync.log
 dbsql -c "SELECT id, status, started_at, completed_at, left(error_message, 120) FROM sync_runs ORDER BY id DESC LIMIT 5;"
+dbsql -c "SELECT id, name, archived_at FROM vocabulary_lists WHERE archived_at IS NOT NULL;"
 ```
 
 **If it's failing:** an `HTTPStatusError` with 401 means the Skritter token
