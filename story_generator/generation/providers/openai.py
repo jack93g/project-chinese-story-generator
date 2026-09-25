@@ -32,6 +32,7 @@ provider_registry.assert_current_provider_approved's docstring for
 why both are needed).
 """
 
+import json
 import time
 
 import httpx
@@ -62,11 +63,12 @@ from story_generator.generation.providers.types import (
 
 _DEFAULT_CHAT_COMPLETIONS_URL = "https://api.openai.com/v1/chat/completions"
 
+# Shared by every prompt version, so it doesn't spell out a JSON shape: each
+# version's user prompt gives its own (glossary, translation, ...).
 _SYSTEM_PROMPT = (
     "You are a Chinese-language story generator for language learners. "
-    "Respond with a single JSON object of the form "
-    '{"title": "<Chinese title>", "body": "<Chinese story body>"} '
-    "and nothing else — no markdown fences, no commentary."
+    "Respond with a single JSON object in the exact shape the user message "
+    "asks for, and nothing else — no markdown fences, no commentary."
 )
 
 
@@ -84,16 +86,26 @@ class OpenAIStoryGenerationProvider:
         api_key: str,
         model: str,
         base_url: str = _DEFAULT_CHAT_COMPLETIONS_URL,
-        # Keep well under the worker's stop_grace_period (90s in
-        # docker-compose.yml): a stopping worker finishes its current request,
-        # and Compose kills it if that takes longer than the grace period.
-        timeout: float = 60.0,
+        # `timeout` is for connecting and sending; `total_timeout` bounds the
+        # wait for the answer. A call can take at most about their sum (85s by
+        # default), which must stay under the worker's stop_grace_period (90s
+        # in docker-compose.yml): a stopping worker finishes its current
+        # request, and Compose kills it after that. httpx only has per-read
+        # timeouts, so two cases need covering: a server that sends nothing
+        # until the answer is ready (e.g. Groq) hits the read timeout, set to
+        # total_timeout; OpenRouter, which sends a keep-alive every ~3s and so
+        # never trips a read timeout, hits the deadline checked per chunk in
+        # _post. Only a server going silent partway through a body could take
+        # longer.
+        timeout: float = 10.0,
+        total_timeout: float = 75.0,
     ):
         self._client = client
         self._api_key = api_key
         self._model = model
         self._base_url = base_url
-        self._timeout = timeout
+        self._timeout = httpx.Timeout(timeout, read=total_timeout)
+        self._total_timeout = total_timeout
 
     def generate(
         self,
@@ -112,28 +124,29 @@ class OpenAIStoryGenerationProvider:
 
         start_time = time.monotonic()
         try:
-            response = self._client.post(
-                self._base_url,
-                headers={"Authorization": f"Bearer {self._api_key}"},
-                json=payload,
-                timeout=self._timeout,
+            status_code, content = self._post(
+                payload, deadline=start_time + self._total_timeout
             )
         except httpx.TimeoutException as exc:
             if on_raw_exchange is not None:
                 on_raw_exchange(payload, None, None)
             raise ProviderTimeoutError(str(exc)) from exc
+        except ProviderTimeoutError:
+            if on_raw_exchange is not None:
+                on_raw_exchange(payload, None, None)
+            raise
         except httpx.HTTPError as exc:
             if on_raw_exchange is not None:
                 on_raw_exchange(payload, None, None)
             raise ProviderAPIError(str(exc)) from exc
         latency_ms = int((time.monotonic() - start_time) * 1000)
 
-        response_body = self._try_parse_json_body(response)
+        response_body = self._try_parse_json_body(content)
 
         if on_raw_exchange is not None:
-            on_raw_exchange(payload, response.status_code, response_body)
+            on_raw_exchange(payload, status_code, response_body)
 
-        self._raise_for_status(response, response_body)
+        self._raise_for_status(status_code, content, response_body)
 
         if response_body is None:
             raise ProviderInvalidResponseError("Provider response was not valid JSON")
@@ -142,28 +155,52 @@ class OpenAIStoryGenerationProvider:
         usage = self._extract_usage(response_body, latency_ms)
         return parse_structured_result(raw_text, usage)
 
+    def _post(self, payload: dict, deadline: float) -> tuple[int, bytes]:
+        """POST and read the whole body, giving up once `deadline` passes.
+
+        Reads in chunks so the deadline is checked as each keep-alive or
+        piece of the answer arrives.
+        """
+        with self._client.stream(
+            "POST",
+            self._base_url,
+            headers={"Authorization": f"Bearer {self._api_key}"},
+            json=payload,
+            timeout=self._timeout,
+        ) as response:
+            chunks = []
+            for chunk in response.iter_bytes():
+                if time.monotonic() > deadline:
+                    raise ProviderTimeoutError(
+                        f"Provider did not respond within {self._total_timeout:g}s"
+                    )
+                chunks.append(chunk)
+            return response.status_code, b"".join(chunks)
+
     def _raise_for_status(
-        self, response: httpx.Response, response_body: dict | None
+        self, status_code: int, content: bytes, response_body: dict | None
     ) -> None:
-        if response.status_code < 400:
+        if status_code < 400:
             return
-        message = self._error_message(response, response_body)
-        if response.status_code in (401, 403):
+        message = self._error_message(status_code, content, response_body)
+        if status_code in (401, 403):
             raise ProviderAuthenticationError(message)
-        if response.status_code == 429:
+        if status_code == 429:
             raise ProviderRateLimitError(message)
-        raise ProviderAPIError(message, status_code=response.status_code)
+        raise ProviderAPIError(message, status_code=status_code)
 
     @staticmethod
-    def _error_message(response: httpx.Response, response_body: dict | None) -> str:
+    def _error_message(
+        status_code: int, content: bytes, response_body: dict | None
+    ) -> str:
         if response_body is not None:
             return str(response_body.get("error", {}).get("message", response_body))
-        return response.text or f"HTTP {response.status_code}"
+        return content.decode("utf-8", errors="replace") or f"HTTP {status_code}"
 
     @staticmethod
-    def _try_parse_json_body(response: httpx.Response) -> dict | None:
+    def _try_parse_json_body(content: bytes) -> dict | None:
         try:
-            return response.json()
+            return json.loads(content)
         except ValueError:
             return None
 

@@ -3,7 +3,8 @@ Parses a provider's raw structured-output text into a canonical
 GenerationResult.
 
 All providers are prompted to emit a single JSON object of the shape
-{"title": "<Chinese title>", "body": "<Chinese story body>"}. This
+{"title": "<Chinese title>", "body": "<Chinese story body>"}, plus an
+optional "glossary" (story-v2+) and "translation" (story-v6+). This
 module is the single place that turns that raw text (plus
 out-of-band usage metadata from the API response) into the canonical
 GenerationResult type — every provider adapter should route its
@@ -58,7 +59,19 @@ def parse_structured_result(raw_text: str, usage: UsageMetadata) -> GenerationRe
         body=body,
         usage=usage,
         glossary=_parse_glossary(data.get("glossary")),
+        translation=_parse_translation(data.get("translation")),
     )
+
+
+def _parse_translation(value) -> list[str] | None:
+    """Best-effort, like the glossary: anything but a non-empty list of
+    non-blank strings is dropped, never an error, so a bad translation
+    can't fail an otherwise good story."""
+    if not isinstance(value, list) or not value:
+        return None
+    if not all(isinstance(entry, str) and entry.strip() for entry in value):
+        return None
+    return [entry.strip() for entry in value]
 
 
 def _parse_glossary(value) -> list[dict]:

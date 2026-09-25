@@ -1,18 +1,18 @@
 :root {
-  --background: #f6f1e4;
-  --surface: #efe8d5;
-  --surface-hover: #e7dfc8;
-  --foreground: #171717;
-  --muted-foreground: #776f5e;
-  --border: #ddd2b6;
-  --border-strong: #c7b997;
-  --accent: #b0301f;
-  --accent-hover: #8f2416;
+  --background: #f7f8fb;
+  --surface: #eef1f7;
+  --surface-hover: #e3e8f2;
+  --foreground: #141a26;
+  --muted-foreground: #5b6477;
+  --border: #d8deea;
+  --border-strong: #b7c1d6;
+  --accent: #2f6b58;
+  --accent-hover: #245445;
   --accent-foreground: #ffffff;
   --danger: #c22c22;
   --danger-bg: #fbeae8;
   --danger-border: #f0c4bf;
-  --focus-ring: #b0301f;
+  --focus-ring: #2f6b58;
   --seal: #b8322a;
   --seal-foreground: #fdf8ec;
 
@@ -24,6 +24,7 @@
     "PingFang SC", "Microsoft YaHei", "Noto Sans SC", "Noto Sans CJK SC",
     "Heiti SC", sans-serif;
   --font-zh-kai: "Kaiti SC", STKaiti, KaiTi, "AR PL UKai CN", var(--font-zh-serif);
+  --font-serif: Georgia, "Times New Roman", serif;
 
   --space-1: 0.25rem;
   --space-2: 0.5rem;
@@ -37,20 +38,20 @@
 
 @media (prefers-color-scheme: dark) {
   :root {
-    --background: #12100e;
-    --surface: #1c1916;
-    --surface-hover: #25211d;
-    --foreground: #ebe4d6;
-    --muted-foreground: #a69c8a;
-    --border: #332d27;
-    --border-strong: #4a4239;
-    --accent: #e8735a;
-    --accent-hover: #f08a73;
-    --accent-foreground: #1a0c08;
+    --background: #0d1119;
+    --surface: #151b26;
+    --surface-hover: #1d2431;
+    --foreground: #e4e9f2;
+    --muted-foreground: #97a2b7;
+    --border: #262f3e;
+    --border-strong: #3a4558;
+    --accent: #72c2a5;
+    --accent-hover: #8fd1b8;
+    --accent-foreground: #08140f;
     --danger: #ff6b60;
     --danger-bg: #2c1614;
     --danger-border: #4a2420;
-    --focus-ring: #e8735a;
+    --focus-ring: #72c2a5;
   }
 }
 
@@ -492,11 +493,42 @@ h2 {
 }
 
 .story-body {
-  white-space: pre-wrap;
   font-family: var(--font-zh-serif);
   font-size: 1.25rem;
   line-height: 2.2;
   letter-spacing: 0.04em;
+}
+
+/* Paragraphs, each optionally followed by its English (.story-translation):
+   the English sits close under its paragraph, with more room before the
+   next one. */
+.story-body > * + * {
+  margin-top: var(--space-4);
+}
+
+.story-body > .story-paragraph + .story-translation {
+  margin-top: var(--space-1);
+}
+
+.story-body > .story-translation + .story-paragraph {
+  margin-top: var(--space-5);
+}
+
+/* A paragraph's English, or (when it doesn't line up with the paragraphs)
+   the whole translation as one block after the story. */
+.story-translation {
+  padding-left: var(--space-3);
+  border-left: 2px solid var(--border-strong);
+  color: var(--muted-foreground);
+  font-family: var(--font-serif);
+  font-size: 1rem;
+  font-style: italic;
+  line-height: 1.6;
+  letter-spacing: 0;
+}
+
+.story-translation > p + p {
+  margin-top: var(--space-3);
 }
 
 /* Keep an annotated word on one line; split across lines, its pinyin
@@ -517,19 +549,9 @@ h2 {
   visibility: hidden;
 }
 
-/* Traditional layout: columns top to bottom, read right to left. The body
-   scrolls sideways and starts at the right-hand edge. */
-.story-body-vertical {
-  writing-mode: vertical-rl;
-  height: min(70vh, 32rem);
-  overflow-x: auto;
-  overflow-y: hidden;
-  padding: var(--space-2) 0;
-}
-
 /* Entrance for a story that has just been generated: the text soaks in
    sentence by sentence like ink on rice paper, then the seal is stamped and
-   the glossary fades in. Timings match the constants in app/story/page.tsx.
+   the translation (if shown) and glossary fade in. Timings match the constants in app/story/page.tsx.
    Skipped entirely for readers who prefer reduced motion. */
 
 @media (prefers-reduced-motion: no-preference) {
@@ -546,6 +568,7 @@ h2 {
     animation-delay: var(--stamp-delay);
   }
 
+  .story-entrance .story-translation,
   .story-entrance .cloud-divider,
   .story-entrance .story-glossary {
     animation: fade-up 600ms ease-out both;

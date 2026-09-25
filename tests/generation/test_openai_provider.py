@@ -284,3 +284,59 @@ def test_generate_invokes_on_raw_exchange_with_no_response_on_timeout():
 
     assert captured["response_status"] is None
     assert captured["response_body"] is None
+
+
+class _FakeClock:
+    """Stands in for the adapter's `time` module: each reading is 50s later."""
+
+    def __init__(self):
+        self.now = 0.0
+
+    def monotonic(self) -> float:
+        self.now += 50.0
+        return self.now
+
+
+def _slow_body(*chunks: bytes) -> httpx.Response:
+    # A body that arrives in pieces, like OpenRouter's keep-alives then answer.
+    return httpx.Response(200, content=iter(chunks))
+
+
+@respx.mock
+def test_generate_times_out_when_the_whole_call_exceeds_total_timeout(monkeypatch):
+    from story_generator.generation.providers import openai as openai_module
+
+    body = json.dumps(_success_body('{"title": "标题", "body": "正文内容。"}'))
+    respx.post(_CHAT_COMPLETIONS_URL).mock(
+        return_value=_slow_body(b"\n  \n", b"\n  \n", body.encode())
+    )
+    monkeypatch.setattr(openai_module, "time", _FakeClock())
+    exchanges = []
+    provider = OpenAIStoryGenerationProvider(
+        client=httpx.Client(), api_key="sk-test", model="gpt-test", total_timeout=75
+    )
+
+    # start 50s, deadline 125s; chunks are checked at 100s (ok), then 150s
+    with pytest.raises(ProviderTimeoutError, match="75s"):
+        provider.generate(
+            SAMPLE_REQUEST, on_raw_exchange=lambda *a: exchanges.append(a)
+        )
+
+    assert exchanges[0][1:] == (None, None)
+
+
+@respx.mock
+def test_generate_reads_a_body_sent_in_pieces_before_the_deadline():
+    body = json.dumps(_success_body('{"title": "标题", "body": "正文内容。"}'))
+    route = respx.post(_CHAT_COMPLETIONS_URL).mock(
+        return_value=_slow_body(b"\n  \n", body[:40].encode(), body[40:].encode())
+    )
+
+    result = _make_provider().generate(SAMPLE_REQUEST)
+
+    assert result.title == "标题"
+    # A server that sends nothing until the answer is ready may take the whole
+    # budget before its first byte; connecting still fails fast.
+    timeout = route.calls.last.request.extensions["timeout"]
+    assert timeout["read"] == 75.0
+    assert timeout["connect"] == 10.0

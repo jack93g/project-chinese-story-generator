@@ -52,6 +52,7 @@ class StoryService:
             created_at=story.created_at,
             target_hsk=story.target_hsk,
             content=story.content,
+            translation_en=story.translation_en,
             selected_vocabulary=[
                 VocabularyResponse(
                     id=item.id,

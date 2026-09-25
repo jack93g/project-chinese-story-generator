@@ -8,6 +8,7 @@ from sqlalchemy import (
     Text,
     func,
 )
+from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.ext.associationproxy import association_proxy
 from sqlalchemy.orm import relationship
 
@@ -46,6 +47,10 @@ class Story(Base):
     )
     title = Column(Text, nullable=False)
     content = Column(Text, nullable=False)
+    # English, one string per paragraph of content (see
+    # generation.validation.split_paragraphs); null for stories generated
+    # before story-v6 or when the model gave no usable translation.
+    translation_en = Column(JSONB, nullable=True)
     target_hsk = Column(Integer, nullable=True)
     created_at = Column(
         DateTime(timezone=True), nullable=False, server_default=func.now()

@@ -92,20 +92,21 @@ describe("StoryPage", () => {
     expect(await screen.findByRole("alert")).toHaveTextContent("boom");
   });
 
-  it("renders the title, body with preserved line breaks, and glossary", async () => {
+  it("renders the title, a paragraph per line, and glossary", async () => {
     useSearchParams.mockReturnValue(new URLSearchParams("id=5"));
     fetchStory.mockResolvedValueOnce(STORY);
-    render(<StoryPage />);
+    const { container } = render(<StoryPage />);
 
     expect(
       await screen.findByRole("heading", { name: "天气小记" }),
     ).toBeInTheDocument();
     expect(screen.getByText("HSK 2", { exact: false })).toBeInTheDocument();
 
-    const body = screen.getByText((_, element) =>
-      element?.classList.contains("story-body") ?? false,
-    );
-    expect(body.textContent).toBe("第一行。\n第二行。");
+    const paragraphs = container.querySelectorAll(".story-body .story-paragraph");
+    expect([...paragraphs].map((p) => p.textContent)).toEqual([
+      "第一行。",
+      "第二行。",
+    ]);
 
     expect(screen.getByText("天气")).toBeInTheDocument();
     expect(screen.getByText("(tiānqì)")).toBeInTheDocument();
@@ -127,33 +128,92 @@ describe("StoryPage", () => {
     expect(rubies[0].querySelector("rt")?.textContent).toBe("tiānqì");
   });
 
-  it("toggles pinyin and vertical layout, and remembers the choice", async () => {
+  it("toggles pinyin and remembers the choice", async () => {
     useSearchParams.mockReturnValue(new URLSearchParams("id=5"));
     fetchStory.mockResolvedValue(STORY);
     const { container, unmount } = render(<StoryPage />);
 
     const pinyin = await screen.findByRole("button", { name: "拼音 Pinyin" });
-    const vertical = screen.getByRole("button", { name: "竖排 Vertical" });
     const body = container.querySelector(".story-body")!;
     expect(pinyin).toHaveAttribute("aria-pressed", "true");
-    expect(vertical).toHaveAttribute("aria-pressed", "false");
 
     fireEvent.click(pinyin);
-    fireEvent.click(vertical);
     expect(pinyin).toHaveAttribute("aria-pressed", "false");
-    expect(body).toHaveClass("hide-pinyin", "story-body-vertical");
-    expect(
-      screen.getByRole("region", { name: "Story text" }),
-    ).toHaveAttribute("tabindex", "0");
+    expect(body).toHaveClass("hide-pinyin");
 
     unmount();
     render(<StoryPage />);
     expect(
-      await screen.findByRole("button", { name: "竖排 Vertical" }),
+      await screen.findByRole("button", { name: "拼音 Pinyin" }),
+    ).toHaveAttribute("aria-pressed", "false");
+  });
+
+  it("has no translation toggle for a story without a translation", async () => {
+    useSearchParams.mockReturnValue(new URLSearchParams("id=5"));
+    fetchStory.mockResolvedValueOnce({ ...STORY, translation_en: null });
+    const { container } = render(<StoryPage />);
+
+    await screen.findByRole("button", { name: "拼音 Pinyin" });
+
+    expect(
+      screen.queryByRole("button", { name: "翻译 Translation" }),
+    ).not.toBeInTheDocument();
+    expect(container.querySelector(".story-translation")).toBeNull();
+  });
+
+  it("shows each paragraph's English under it when toggled on, and remembers the choice", async () => {
+    useSearchParams.mockReturnValue(new URLSearchParams("id=5"));
+    fetchStory.mockResolvedValue({
+      ...STORY,
+      content: "第一行。\n\n第二行。",
+      translation_en: ["The first line.", "The second line."],
+    });
+    const { container, unmount } = render(<StoryPage />);
+
+    const toggle = await screen.findByRole("button", {
+      name: "翻译 Translation",
+    });
+    expect(toggle).toHaveAttribute("aria-pressed", "false");
+    expect(container.querySelector(".story-translation")).toBeNull();
+
+    fireEvent.click(toggle);
+    expect(toggle).toHaveAttribute("aria-pressed", "true");
+    const body = container.querySelector(".story-body")!;
+    expect(
+      [...body.children].map((child) => [
+        child.className,
+        child.getAttribute("lang"),
+        child.textContent,
+      ]),
+    ).toEqual([
+      ["story-paragraph", "zh", "第一行。"],
+      ["story-translation", "en", "The first line."],
+      ["story-paragraph", "zh", "第二行。"],
+      ["story-translation", "en", "The second line."],
+    ]);
+
+    unmount();
+    render(<StoryPage />);
+    expect(
+      await screen.findByRole("button", { name: "翻译 Translation" }),
     ).toHaveAttribute("aria-pressed", "true");
-    expect(screen.getByRole("button", { name: "拼音 Pinyin" })).toHaveAttribute(
-      "aria-pressed",
-      "false",
+  });
+
+  it("shows a translation that doesn't match the paragraphs as one block", async () => {
+    useSearchParams.mockReturnValue(new URLSearchParams("id=5"));
+    fetchStory.mockResolvedValueOnce({
+      ...STORY,
+      translation_en: ["Both lines at once."],
+    });
+    const { container } = render(<StoryPage />);
+
+    fireEvent.click(
+      await screen.findByRole("button", { name: "翻译 Translation" }),
+    );
+
+    expect(container.querySelector(".story-body .story-translation")).toBeNull();
+    expect(screen.getByRole("region", { name: "Translation" })).toHaveTextContent(
+      "Both lines at once.",
     );
   });
 
@@ -193,8 +253,11 @@ describe("StoryPage", () => {
 
     expect(container.querySelector("article")).toHaveClass("story-entrance");
     expect(replaceState).toHaveBeenCalledWith(null, "", "/story?id=5");
-    // One animated span per sentence.
-    expect(container.querySelectorAll(".sentence")).toHaveLength(2);
+    // One animated span per sentence, delayed in turn across paragraphs.
+    const sentences = container.querySelectorAll<HTMLElement>(".sentence");
+    expect(sentences).toHaveLength(2);
+    expect(sentences[0].style.getPropertyValue("--ink-delay")).toBe("150ms");
+    expect(sentences[1].style.getPropertyValue("--ink-delay")).toBe("260ms");
     replaceState.mockRestore();
   });
 

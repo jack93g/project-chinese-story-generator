@@ -78,6 +78,7 @@ def test_run_once_persists_story_and_marks_request_succeeded_atomically(db_sessi
     story = db_session.query(Story).filter_by(generation_request_id=request.id).one()
     assert story.title == "问候"
     assert story.content == "小明说你好。"
+    assert story.translation_en is None
 
     associations = (
         db_session.query(StoryVocabularyItem).filter_by(story_id=story.id).all()
@@ -164,3 +165,23 @@ def test_run_once_marks_request_failed_and_does_not_create_story_on_provider_err
     )
     assert len(raw_payloads) == 1
     assert raw_payloads[0].response_status is None  # timeout: never got a response
+
+
+def test_run_once_stores_the_translation_with_the_story(db_session):
+    request = _make_queued_request(
+        db_session, skritter_list_id="worker-translation", writing="你好"
+    )
+    provider = FakeStoryGenerationProvider(
+        scenario="success",
+        raw_response=(
+            '{"title": "问候", "body": "小明说你好。\\n\\n小红笑了。", '
+            '"translation": ["Xiao Ming says hello.", "Xiao Hong smiles."]}'
+        ),
+    )
+
+    assert GenerationWorker(provider=provider).run_once(db_session) is True
+
+    story = db_session.query(Story).filter_by(generation_request_id=request.id).one()
+    assert story.translation_en == ["Xiao Ming says hello.", "Xiao Hong smiles."]
+    db_session.refresh(request)
+    assert request.validation_report["translation_aligned"] is True

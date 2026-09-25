@@ -73,3 +73,36 @@ def test_raises_when_body_has_no_chinese_characters():
         parse_structured_result(
             '{"title": "菜单的故事", "body": "Xiao Ming went to a restaurant."}', USAGE
         )
+
+
+def test_parses_a_translation_list():
+    raw = (
+        '{"title": "菜单的故事", "body": "小明去饭馆。\\n\\n他点了菜。", '
+        '"translation": [" Xiao Ming goes to a restaurant. ", "He orders."]}'
+    )
+
+    result = parse_structured_result(raw, USAGE)
+
+    assert result.translation == ["Xiao Ming goes to a restaurant.", "He orders."]
+
+
+def test_translation_is_none_when_absent():
+    raw = '{"title": "菜单的故事", "body": "小明去饭馆点了一份菜。"}'
+
+    assert parse_structured_result(raw, USAGE).translation is None
+
+
+@pytest.mark.parametrize(
+    "translation",
+    ['"Xiao Ming goes to a restaurant."', "[]", '["ok", ""]', '["ok", 3]', "null"],
+)
+def test_drops_a_malformed_translation_without_failing(translation):
+    raw = (
+        '{"title": "菜单的故事", "body": "小明去饭馆点了一份菜。", '
+        f'"translation": {translation}}}'
+    )
+
+    result = parse_structured_result(raw, USAGE)
+
+    assert result.body == "小明去饭馆点了一份菜。"
+    assert result.translation is None

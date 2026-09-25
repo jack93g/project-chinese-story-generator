@@ -1,6 +1,7 @@
 "use client";
 
 import {
+  Fragment,
   Suspense,
   useEffect,
   useMemo,
@@ -8,9 +9,14 @@ import {
   type CSSProperties,
 } from "react";
 import { useSearchParams } from "next/navigation";
-import { annotateVocabulary, groupSentences } from "@/lib/annotate";
+import {
+  annotateVocabulary,
+  groupSentences,
+  type TextSegment,
+} from "@/lib/annotate";
 import { ApiError, fetchStory, type StoryDetail } from "@/lib/api";
 import { describeModel } from "@/lib/model-label";
+import { splitParagraphs } from "@/lib/paragraphs";
 import { toToneMarks } from "@/lib/pinyin";
 import { CloudDivider } from "../components/cloud-divider";
 import { Seal } from "../components/seal";
@@ -23,7 +29,7 @@ type StoryState =
   | { status: "ready"; story: StoryDetail };
 
 const PINYIN_KEY = "story-reader:show-pinyin";
-const VERTICAL_KEY = "story-reader:vertical";
+const TRANSLATION_KEY = "story-reader:show-translation";
 
 // Reading options are a per-browser convenience; if storage is unavailable
 // (private window, blocked site data) the reader just uses the defaults.
@@ -46,7 +52,8 @@ function writePreference(key: string, value: boolean) {
 
 // Entrance for a story that has just been generated (timings in ms; the
 // animations themselves are in globals.css): the text soaks in sentence by
-// sentence, then the seal is stamped and the glossary fades in.
+// sentence, then the seal is stamped and the translation (if shown) and
+// glossary fade in.
 const INK_START = 150;
 const INK_STAGGER = 110;
 const INK_STAGGER_MAX_SENTENCES = 24;
@@ -168,24 +175,36 @@ function StoryReader({
   const [showPinyin, setShowPinyin] = useState(() =>
     readPreference(PINYIN_KEY, true),
   );
-  const [vertical, setVertical] = useState(() =>
-    readPreference(VERTICAL_KEY, false),
+  const [showTranslation, setShowTranslation] = useState(() =>
+    readPreference(TRANSLATION_KEY, false),
   );
   const writtenBy = describeModel(story.provider, story.model);
-  const sentences = useMemo(
-    () =>
-      groupSentences(
-        annotateVocabulary(story.content, story.selected_vocabulary),
-      ),
-    [story],
-  );
+  // Each paragraph's sentences, numbered across the whole story so the
+  // entrance soaks them in one after another.
+  const { paragraphs, sentenceCount } = useMemo(() => {
+    const result: { sentences: TextSegment[][]; firstSentence: number }[] = [];
+    let count = 0;
+    for (const paragraph of splitParagraphs(story.content)) {
+      const sentences = groupSentences(
+        annotateVocabulary(paragraph, story.selected_vocabulary),
+      );
+      result.push({ sentences, firstSentence: count });
+      count += sentences.length;
+    }
+    return { paragraphs: result, sentenceCount: count };
+  }, [story]);
+  const translation = story.translation_en ?? null;
+  // One English entry per paragraph goes under its paragraph; a list that
+  // doesn't line up is shown as one block after the story instead.
+  const translationAligned =
+    translation !== null && translation.length === paragraphs.length;
 
   // Captured once: `fresh` turns false when the URL is tidied below, but the
   // entrance should still finish.
   const [entrance, setEntrance] = useState(fresh);
   const stampDelay =
     INK_START +
-    Math.min(sentences.length - 1, INK_STAGGER_MAX_SENTENCES) * INK_STAGGER +
+    Math.min(sentenceCount - 1, INK_STAGGER_MAX_SENTENCES) * INK_STAGGER +
     INK_DURATION * 0.6;
 
   useEffect(() => {
@@ -194,8 +213,8 @@ function StoryReader({
     }
     // Drop ?fresh=1 so reloading or sharing the page doesn't replay it.
     window.history.replaceState(null, "", `/story?id=${story.id}`);
-    // Afterwards, remove the animation classes so that toggling the layout
-    // doesn't restart them.
+    // Afterwards, remove the animation classes so that toggling a reading
+    // option doesn't restart them.
     const timer = setTimeout(
       () => setEntrance(false),
       stampDelay + STAMP_AND_GLOSSARY,
@@ -208,17 +227,14 @@ function StoryReader({
     writePreference(PINYIN_KEY, !showPinyin);
   }
 
-  function toggleVertical() {
-    setVertical(!vertical);
-    writePreference(VERTICAL_KEY, !vertical);
+  function toggleTranslation() {
+    setShowTranslation(!showTranslation);
+    writePreference(TRANSLATION_KEY, !showTranslation);
   }
 
   const bodyClasses = ["story-body"];
   if (!showPinyin) {
     bodyClasses.push("hide-pinyin");
-  }
-  if (vertical) {
-    bodyClasses.push("story-body-vertical");
   }
 
   return (
@@ -246,55 +262,51 @@ function StoryReader({
           >
             <span lang="zh">拼音</span> Pinyin
           </button>
-          <button
-            type="button"
-            className="toggle"
-            aria-pressed={vertical}
-            onClick={toggleVertical}
-          >
-            <span lang="zh">竖排</span> Vertical
-          </button>
+          {translation !== null && (
+            <button
+              type="button"
+              className="toggle"
+              aria-pressed={showTranslation}
+              onClick={toggleTranslation}
+            >
+              <span lang="zh">翻译</span> Translation
+            </button>
+          )}
         </div>
       </header>
 
-      {/* In vertical mode the body scrolls sideways, so it becomes a named,
-          focusable region to let keyboard users scroll it. */}
-      <p
-        lang="zh"
-        className={bodyClasses.join(" ")}
-        {...(vertical && {
-          tabIndex: 0,
-          role: "region",
-          "aria-label": "Story text",
-        })}
-      >
-        {sentences.map((sentence, sentenceIndex) => (
-          <span
-            key={sentenceIndex}
-            className="sentence"
-            style={
-              {
-                "--ink-delay": `${
-                  INK_START +
-                  Math.min(sentenceIndex, INK_STAGGER_MAX_SENTENCES) *
-                    INK_STAGGER
-                }ms`,
-              } as CSSProperties
-            }
-          >
-            {sentence.map((segment, index) =>
-              segment.kind === "word" ? (
-                <ruby key={index}>
-                  {segment.text}
-                  <rt>{segment.reading}</rt>
-                </ruby>
-              ) : (
-                segment.text
-              ),
+      <div className={bodyClasses.join(" ")}>
+        {paragraphs.map(({ sentences, firstSentence }, paragraphIndex) => (
+          <Fragment key={paragraphIndex}>
+            <p lang="zh" className="story-paragraph">
+              {sentences.map((sentence, index) => (
+                <Sentence
+                  key={index}
+                  segments={sentence}
+                  index={firstSentence + index}
+                />
+              ))}
+            </p>
+            {showTranslation && translationAligned && (
+              <p lang="en" className="story-translation">
+                {translation[paragraphIndex]}
+              </p>
             )}
-          </span>
+          </Fragment>
         ))}
-      </p>
+      </div>
+
+      {showTranslation && translation !== null && !translationAligned && (
+        <section
+          aria-label="Translation"
+          lang="en"
+          className="story-translation"
+        >
+          {translation.map((paragraph, index) => (
+            <p key={index}>{paragraph}</p>
+          ))}
+        </section>
+      )}
 
       <Seal decorative className="seal-stamp" />
 
@@ -325,5 +337,38 @@ function StoryReader({
         </dl>
       </section>
     </article>
+  );
+}
+
+// One sentence of the story, soaked in at its turn during the entrance.
+function Sentence({
+  segments,
+  index,
+}: {
+  segments: TextSegment[];
+  index: number;
+}) {
+  return (
+    <span
+      className="sentence"
+      style={
+        {
+          "--ink-delay": `${
+            INK_START + Math.min(index, INK_STAGGER_MAX_SENTENCES) * INK_STAGGER
+          }ms`,
+        } as CSSProperties
+      }
+    >
+      {segments.map((segment, segmentIndex) =>
+        segment.kind === "word" ? (
+          <ruby key={segmentIndex}>
+            {segment.text}
+            <rt>{segment.reading}</rt>
+          </ruby>
+        ) : (
+          segment.text
+        ),
+      )}
+    </span>
   );
 }
