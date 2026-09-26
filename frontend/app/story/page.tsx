@@ -21,6 +21,7 @@ import { toToneMarks } from "@/lib/pinyin";
 import { CloudDivider } from "../components/cloud-divider";
 import { Seal } from "../components/seal";
 import { StoryDate } from "../components/story-date";
+import { StoryQuiz } from "../components/story-quiz";
 
 type StoryState =
   | { status: "loading" }
@@ -52,8 +53,8 @@ function writePreference(key: string, value: boolean) {
 
 // Entrance for a story that has just been generated (timings in ms; the
 // animations themselves are in globals.css): the text soaks in sentence by
-// sentence, then the seal is stamped and the translation (if shown) and
-// glossary fade in.
+// sentence, then the seal is stamped and the translation (if shown),
+// glossary and quiz fade in.
 const INK_START = 150;
 const INK_STAGGER = 110;
 const INK_STAGGER_MAX_SENTENCES = 24;
@@ -336,6 +337,13 @@ function StoryReader({
           ))}
         </dl>
       </section>
+
+      {story.questions && story.questions.length > 0 && (
+        <>
+          <CloudDivider />
+          <StoryQuiz storyId={story.id} questions={story.questions} />
+        </>
+      )}
     </article>
   );
 }

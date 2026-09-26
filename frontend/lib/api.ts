@@ -95,16 +95,43 @@ export type CurrentUser = {
   username: string;
 };
 
+// A comprehension question as the reader sees it: the answer only comes back
+// once an attempt is marked (see submitQuizAttempt).
+export type QuizQuestion = {
+  question: string;
+  options: string[];
+};
+
 export type StoryDetail = StorySummary & {
   content: string;
   // English, one string per paragraph of content (see lib/paragraphs.ts);
   // null for stories written before translations existed.
   translation_en?: string[] | null;
+  // Null for stories written before questions existed, and missing from an
+  // API deployed before this field existed.
+  questions?: QuizQuestion[] | null;
   selected_vocabulary: VocabularyGlossaryItem[];
   // What wrote the story. Null for stories with no generation request, and
   // missing from an API deployed before these fields existed.
   provider?: string | null;
   model?: string | null;
+};
+
+// Indexes into the question's options, in question order.
+export type QuizQuestionResult = {
+  selected: number;
+  answer: number;
+  correct: boolean;
+  // The sentence of the story that settles the answer; null for questions
+  // written before evidence existed, and missing from an older API.
+  evidence?: string | null;
+};
+
+export type QuizAttemptResult = {
+  id: number;
+  correct_count: number;
+  question_count: number;
+  results: QuizQuestionResult[];
 };
 
 async function parseErrorMessage(response: Response): Promise<string> {
@@ -240,6 +267,37 @@ export async function deleteStory(id: number | string): Promise<void> {
   if (!response.ok) {
     throw new ApiError(await parseErrorMessage(response), response.status);
   }
+}
+
+// Marks the chosen option index for each question (in order) and records
+// the attempt.
+export function submitQuizAttempt(
+  storyId: number | string,
+  answers: number[],
+): Promise<QuizAttemptResult> {
+  return requestJson<QuizAttemptResult>(
+    `/stories/${encodeURIComponent(storyId)}/quiz-attempts`,
+    {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ answers }),
+    },
+  );
+}
+
+// Reports that one of a story's questions seems wrong (by its index).
+export function flagQuestion(
+  storyId: number | string,
+  questionIndex: number,
+): Promise<{ id: number }> {
+  return requestJson<{ id: number }>(
+    `/stories/${encodeURIComponent(storyId)}/question-flags`,
+    {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ question_index: questionIndex }),
+    },
+  );
 }
 
 export function createStoryGeneration(

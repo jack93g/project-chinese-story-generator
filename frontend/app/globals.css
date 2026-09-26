@@ -551,7 +551,7 @@ h2 {
 
 /* Entrance for a story that has just been generated: the text soaks in
    sentence by sentence like ink on rice paper, then the seal is stamped and
-   the translation (if shown) and glossary fade in. Timings match the constants in app/story/page.tsx.
+   the translation (if shown), glossary and quiz fade in. Timings match the constants in app/story/page.tsx.
    Skipped entirely for readers who prefer reduced motion. */
 
 @media (prefers-reduced-motion: no-preference) {
@@ -570,7 +570,8 @@ h2 {
 
   .story-entrance .story-translation,
   .story-entrance .cloud-divider,
-  .story-entrance .story-glossary {
+  .story-entrance .story-glossary,
+  .story-entrance .story-quiz {
     animation: fade-up 600ms ease-out both;
     animation-delay: calc(var(--stamp-delay) + 300ms);
   }
@@ -677,6 +678,159 @@ h2 {
 .glossary-missing {
   font-style: italic;
   color: var(--muted-foreground);
+}
+
+/* Comprehension quiz, after the glossary. Marked options say so in words
+   as well as colour. */
+
+.quiz-questions {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-5);
+  margin-top: var(--space-3);
+  padding: 0;
+  list-style: none;
+}
+
+.quiz-question {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+
+.quiz-question legend {
+  margin-bottom: var(--space-2);
+  font-family: var(--font-zh-sans);
+  font-size: 1.1rem;
+  font-weight: 600;
+  line-height: 1.6;
+}
+
+.quiz-number {
+  font-family: var(--font-sans);
+  color: var(--muted-foreground);
+}
+
+.quiz-option {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--space-2) var(--space-3);
+  padding: var(--space-2) var(--space-3);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--surface);
+  font-family: var(--font-zh-sans);
+  cursor: pointer;
+  transition:
+    border-color 0.15s ease,
+    background-color 0.15s ease;
+}
+
+.quiz-option:hover {
+  border-color: var(--border-strong);
+  background: var(--surface-hover);
+}
+
+.quiz-option:has(input:checked) {
+  border-color: var(--accent);
+}
+
+.quiz-option input {
+  accent-color: var(--accent);
+}
+
+.quiz-question:disabled .quiz-option {
+  cursor: default;
+}
+
+.quiz-question:disabled .quiz-option:hover {
+  border-color: var(--border);
+  background: var(--surface);
+}
+
+.quiz-option-correct,
+.quiz-question:disabled .quiz-option-correct:hover {
+  border-color: var(--accent);
+  background: color-mix(in srgb, var(--accent) 12%, var(--surface));
+}
+
+.quiz-option-wrong,
+.quiz-question:disabled .quiz-option-wrong:hover {
+  border-color: var(--danger-border);
+  background: var(--danger-bg);
+}
+
+.quiz-mark {
+  margin-left: auto;
+  font-family: var(--font-sans);
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--accent);
+}
+
+.quiz-option-wrong .quiz-mark {
+  color: var(--danger);
+}
+
+.quiz-actions {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--space-3);
+  margin-top: var(--space-5);
+}
+
+.quiz-score {
+  font-weight: 600;
+}
+
+/* Under a marked question: the sentence that settles it, and a way to
+   report the question. */
+.quiz-feedback {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--space-1);
+  margin-top: var(--space-3);
+}
+
+.quiz-evidence {
+  padding-left: var(--space-3);
+  border-left: 2px solid var(--border-strong);
+  color: var(--muted-foreground);
+  font-size: 0.95rem;
+  line-height: 1.6;
+}
+
+.quiz-evidence span {
+  font-family: var(--font-zh-serif);
+  color: var(--foreground);
+}
+
+.quiz-flag {
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--muted-foreground);
+  font: inherit;
+  font-size: 0.85rem;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  cursor: pointer;
+}
+
+.quiz-flag:hover:not(:disabled) {
+  color: var(--foreground);
+}
+
+.quiz-flag:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
 }
 
 /* Saved stories list */
