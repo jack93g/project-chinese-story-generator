@@ -79,6 +79,8 @@ def test_purge_deletes_only_events_past_retention(db_session):
     kept = _event(db_session, "login_unknown_user", now - timedelta(days=1))
 
     message = run(["purge"], db_session)
+    # Undo anything left uncommitted: the deletion must have been committed.
+    db_session.rollback()
 
     assert message == "Deleted 1 auth events older than 90 days."
     assert [event.id for event in db_session.query(AuthEvent).all()] == [kept.id]

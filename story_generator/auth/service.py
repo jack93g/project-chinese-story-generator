@@ -43,6 +43,8 @@ def hash_session_token(token: str) -> str:
 
 
 class AuthEventType(StrEnum):
+    # Mirrored by auth_events_event_type_check (AuthEvent's model and its
+    # migration): a new member needs a migration widening that constraint.
     LOGIN_SUCCEEDED = "login_succeeded"
     LOGIN_WRONG_PASSWORD = "login_wrong_password"
     LOGIN_UNKNOWN_USER = "login_unknown_user"
