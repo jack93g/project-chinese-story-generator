@@ -23,6 +23,7 @@ guess.
 - [Restore from a backup](#restore-from-a-backup)
 - [Rotate a secret](#rotate-a-secret)
 - [Hide vocabulary lists](#hide-vocabulary-lists)
+- [Review flagged questions](#review-flagged-questions)
 - [Login accounts](#login-accounts)
 - [Abuse response](#abuse-response)
 - [Patching](#patching)
@@ -688,6 +689,25 @@ dc run --rm api manage-lists show <skritter-id> [...]  # undo
 Status `archived` means the list was deleted in Skritter
 ([Scheduled Skritter sync](#scheduled-skritter-sync)). Hiding and archiving
 are independent: an archived list you had hidden stays hidden if it comes back.
+
+## Review flagged questions
+
+Comprehension questions are written by the model, and readers can report one
+with "This question seems wrong" after checking their answers. Each report is
+a row in `question_flags`. To review them:
+
+```bash
+dc run --rm api manage-questions flagged          # most flagged first
+dc run --rm api manage-questions show <story-id>  # the story's text and all its questions
+```
+
+Questions are numbered from 1, as the reader shows them (`question_index`
+in the table is that number minus 1). Each shows its options with the answer
+key ticked, the sentence quoted as evidence (story-v9 on), and how many quiz
+attempts got it right: a flagged question most readers get wrong usually has
+a bad key. Nothing here changes data. A bad question is a prompt problem to
+fix in the next prompt version, not something to edit in the database:
+quiz attempts and flags refer to questions by position.
 
 ## Login accounts
 

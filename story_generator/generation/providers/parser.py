@@ -4,7 +4,8 @@ GenerationResult.
 
 All providers are prompted to emit a single JSON object of the shape
 {"title": "<Chinese title>", "body": "<Chinese story body>"}, plus an
-optional "glossary" (story-v2+) and "translation" (story-v6+). This
+optional "glossary" (story-v2+), "translation" (story-v6+) and
+"questions" (story-v7+, with "evidence" from story-v9). This
 module is the single place that turns that raw text (plus
 out-of-band usage metadata from the API response) into the canonical
 GenerationResult type — every provider adapter should route its
@@ -60,7 +61,66 @@ def parse_structured_result(raw_text: str, usage: UsageMetadata) -> GenerationRe
         usage=usage,
         glossary=_parse_glossary(data.get("glossary")),
         translation=_parse_translation(data.get("translation")),
+        questions=_parse_questions(data.get("questions"), body),
     )
+
+
+# Stripped from both ends of a question's evidence before looking for it in
+# the body: a model quoting a sentence often adds or drops its quotation
+# marks or final punctuation.
+_EVIDENCE_EDGES = "\"'“”‘’「」『』。！？!?.，,"
+_WHITESPACE = re.compile(r"\s+")
+
+
+def _evidence_in_body(evidence: str, body: str) -> bool:
+    """Whether evidence was copied from body, ignoring whitespace and the
+    punctuation or quotation marks at its ends."""
+    quote = _WHITESPACE.sub("", evidence).strip(_EVIDENCE_EDGES)
+    return bool(quote) and quote in _WHITESPACE.sub("", body)
+
+
+def _parse_questions(value, body: str) -> list[dict] | None:
+    """Best-effort, like the translation, but per question: a malformed one
+    is dropped and the rest kept, since each stands alone. A question needs
+    non-blank text, at least two distinct non-blank options, and an integer
+    answer that indexes one of them. None if no question survives.
+
+    "evidence" (story-v9+), the sentence that settles the answer, may be
+    left out, but a question that has one must have copied it from body:
+    a quote the story doesn't contain means the model made up support for
+    its answer, so the question is dropped."""
+    if not isinstance(value, list):
+        return None
+    questions = []
+    for entry in value:
+        if not isinstance(entry, dict):
+            continue
+        question = entry.get("question")
+        options = entry.get("options")
+        answer = entry.get("answer")
+        if not isinstance(question, str) or not question.strip():
+            continue
+        if not isinstance(options, list) or len(options) < 2:
+            continue
+        if not all(isinstance(option, str) and option.strip() for option in options):
+            continue
+        options = [option.strip() for option in options]
+        if len(set(options)) != len(options):
+            continue
+        # bool is an int subclass; true/false isn't an index.
+        if isinstance(answer, bool) or not isinstance(answer, int):
+            continue
+        if not 0 <= answer < len(options):
+            continue
+        parsed = {"question": question.strip(), "options": options, "answer": answer}
+        # Present but null counts as missing support, not as no evidence.
+        if "evidence" in entry:
+            evidence = entry["evidence"]
+            if not isinstance(evidence, str) or not _evidence_in_body(evidence, body):
+                continue
+            parsed["evidence"] = evidence.strip()
+        questions.append(parsed)
+    return questions or None
 
 
 def _parse_translation(value) -> list[str] | None:

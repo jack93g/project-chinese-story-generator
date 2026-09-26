@@ -22,8 +22,28 @@ from story_generator.generation.providers.types import GenerationRequestInput
 # it takes about twice as long (~11s vs ~5s) for ~2.4x the output tokens
 # (2026-09-25T14* reports). story-v4/v5 are registered for evaluation but
 # not current: across 5 samples each on the dense_vocabulary fixture,
-# neither was clearly better than v3 (2026-09-24T18* reports).
-CURRENT_PROMPT_VERSION = "story-v6"
+# neither was clearly better than v3 (2026-09-24T18* reports). story-v7 is
+# v6 plus comprehension questions. Over 3 samples of every fixture on Kimi
+# K2 it matched v6 on coverage, length and translation alignment, taking
+# ~12s (slowest 33s), and 78 of its 84 questions had a clear answer the
+# story settles; the other 6 were weak, mostly "why" questions the story
+# doesn't answer, but none had a wrong key (2026-09-25T181959Z report). It
+# put the answer second 49 times of 84, hence the worker's shuffle.
+# story-v8 (v7 with rules against those weak questions) halved them to 3
+# of 81 with no cost to the stories (2026-09-26T034648Z report). story-v9
+# (v8 plus a quoted sentence as evidence for each answer) matched v8 within
+# noise: 5 weak questions of 80, as the model always found a real sentence
+# to quote, but most quotes do settle their answer, which helps the reader
+# (2026-09-26T060123Z report). story-v10 is v9 written only in Chinese, as
+# v7 and v9 each left an English word in a story. It had no stray English
+# and 1 weak question of 79 (plus 2 borderline), and matched v9 on
+# coverage, translation alignment and speed (~12s), but 3 of 23 stories came
+# back under 80% of their length against v9's 1: possibly the model
+# juggling a prompt now ~550 words long, possibly chance
+# (2026-09-26T073113Z report). If real stories keep coming back short, try
+# a consolidated rewrite of the questions section, which has grown by
+# patching (v7 asks "why" questions, v8 limits them).
+CURRENT_PROMPT_VERSION = "story-v10"
 
 
 def build_story_v1_prompt(request: GenerationRequestInput) -> str:
@@ -194,6 +214,128 @@ def build_story_v6_prompt(request: GenerationRequestInput) -> str:
     return _length_band_prompt(request, translation=True)
 
 
+# v7's addition to v6: multiple-choice comprehension questions, one per
+# planned paragraph but at least V7_MIN_QUESTIONS and at most V7_MAX_QUESTIONS.
+V7_MIN_QUESTIONS = 3
+V7_MAX_QUESTIONS = 5
+
+
+def _v7_questions_guidance(question_count: int, rules: str = "") -> str:
+    """rules (story-v8+) goes right after "The story alone must settle every
+    answer." With none, this is v7's guidance exactly."""
+    return (
+        f"Questions: also write {question_count} multiple-choice questions "
+        'that check the learner understood the story, as the "questions" '
+        "list. Write each question and its options in Chinese at the same "
+        "HSK level as the story. Each question has exactly 4 options: one "
+        "that the story shows is correct, and three that are plausible but "
+        'wrong according to the story. "answer" is the index (0 to 3) of '
+        "the correct option. Ask about what happens and why (events, and "
+        "what characters do and why) rather than details a reader could "
+        "guess without reading the story, and make at least one question "
+        "depend on understanding one of the vocabulary words above. The "
+        f"story alone must settle every answer. {rules}The questions don't "
+        "count towards the story's length.\n\n"
+    )
+
+
+def build_story_v7_prompt(request: GenerationRequestInput) -> str:
+    """Like v6, plus multiple-choice comprehension questions (the questions
+    guidance after the translation guidance, and a "questions" field after
+    "translation" in the JSON shape)."""
+    return _length_band_prompt(request, translation=True, questions=True)
+
+
+# v8's addition to v7. In the 2026-09-25T181959Z report, 6 of v7's 84
+# questions were weak: mostly "why" questions the story never answers (a
+# family booked flights three months early "because Dad likes to plan",
+# which the story doesn't say), plus wrong options that were partly true
+# (a manager "enjoying the city view" when he was looking at it while
+# thinking) and one "the story doesn't say" answer.
+V8_QUESTION_RULES = (
+    "So only ask why something happened if the story says why. Each "
+    "correct option must be something the story states or plainly shows, "
+    "not a guess about motives or feelings. Each wrong option must be "
+    "clearly false according to the story, never partly true; don't use "
+    'options like "the story doesn\'t say". '
+)
+
+
+def build_story_v8_prompt(request: GenerationRequestInput) -> str:
+    """Like v7, with V8_QUESTION_RULES in the questions guidance: answers
+    the story actually states, and wrong options that are clearly wrong."""
+    return _length_band_prompt(
+        request, translation=True, questions=True, question_rules=V8_QUESTION_RULES
+    )
+
+
+# v9's addition to v8: each question quotes the sentence that settles its
+# answer. Writing it makes the model check the story really answers the
+# question; the parser drops a question whose quote isn't in the body; and
+# the reader shows the quote once the quiz is marked. The 3 weak questions
+# left in v8's 2026-09-26T034648Z report were an unstated reason, an
+# inferred purpose, and a wait the story gave two figures for.
+V9_EVIDENCE_RULE = (
+    'For each question, also give "evidence": the one sentence of the '
+    "story body that settles the answer, copied exactly, character for "
+    "character. If no single sentence settles it, ask a different "
+    "question. "
+)
+
+
+def build_story_v9_prompt(request: GenerationRequestInput) -> str:
+    """Like v8, plus V9_EVIDENCE_RULE and an "evidence" field on each
+    question in the JSON shape."""
+    return _length_band_prompt(
+        request,
+        translation=True,
+        questions=True,
+        question_rules=V8_QUESTION_RULES + V9_EVIDENCE_RULE,
+        evidence=True,
+    )
+
+
+# v10's addition to v9, after the length section. v7 and v9 each left an
+# English word in a story ("hurriedly", "walking"), apparently where the
+# model reached for a word it didn't produce in Chinese.
+V10_CHINESE_ONLY_RULE = (
+    "Language: write the title, the body, and the questions and their "
+    "options only in Chinese. Never switch to an English word, even where "
+    "you can't think of the Chinese one; rephrase instead. Abbreviations "
+    "Chinese writers use as they are, such as CEO or AI, are fine. Only "
+    "the translation is in English.\n\n"
+)
+
+
+def build_story_v10_prompt(request: GenerationRequestInput) -> str:
+    """Like v9, plus V10_CHINESE_ONLY_RULE between the length section and
+    the translation guidance."""
+    return _length_band_prompt(
+        request,
+        translation=True,
+        questions=True,
+        question_rules=V8_QUESTION_RULES + V9_EVIDENCE_RULE,
+        evidence=True,
+        language_rule=V10_CHINESE_ONLY_RULE,
+    )
+
+
+def _question_count(paragraphs: int) -> int:
+    return min(V7_MAX_QUESTIONS, max(V7_MIN_QUESTIONS, paragraphs))
+
+
+def _questions_field(evidence: bool) -> str:
+    """v7's "questions" JSON field; v9+ adds "evidence" to each question."""
+    evidence_field = (
+        ', "evidence": "<sentence copied exactly from the body>"' if evidence else ""
+    )
+    return (
+        ', "questions": [{"question": "<question in Chinese>", "options": '
+        '["<option>", "<option>", "<option>", "<option>"], '
+        f'"answer": <index of the correct option, 0-3>{evidence_field}}}]'
+    )
+
+
 def _translation_field(paragraphs: int) -> str:
     """v6's "translation" JSON field, with one example entry per planned
     paragraph (so a one-paragraph story isn't shown two)."""
@@ -211,10 +353,14 @@ def _length_band_prompt(
     request: GenerationRequestInput,
     craft_guidance: str = "",
     translation: bool = False,
+    questions: bool = False,
+    question_rules: str = "",
+    evidence: bool = False,
+    language_rule: str = "",
 ) -> str:
     """The v3 prompt; later versions add craft_guidance before the length
-    section, or a translation request after it. With neither, this must
-    keep producing v3 exactly."""
+    section, or translation and questions requests after it. With none of
+    them, this must keep producing v3 exactly."""
     target = request.target_word_count
     min_chars = math.ceil(target * V3_MIN_LENGTH_FRACTION)
     max_chars = math.floor(target * V3_MAX_LENGTH_FRACTION)
@@ -230,10 +376,13 @@ def _length_band_prompt(
         _v2_vocab_line(item) for item in request.vocabulary_snapshot
     )
     topic_line = f"Topic: {request.topic}\n" if request.topic else ""
+    extra_fields = _translation_field(paragraphs) if translation else ""
+    if questions:
+        extra_fields += _questions_field(evidence)
     shape, glossary_line = _glossary_parts(
         request,
         f"<Chinese story body, {min_chars}-{max_chars} characters>",
-        _translation_field(paragraphs) if translation else "",
+        extra_fields,
     )
 
     return (
@@ -255,7 +404,9 @@ def _length_band_prompt(
         "scenes, dialogue and detail — not with a list of unrelated "
         "sentences or repetition. Before answering, check the body is at "
         f"least {min_chars} characters; if it is shorter, keep writing.\n\n"
+        f"{language_rule}"
         f"{V6_TRANSLATION_GUIDANCE if translation else ''}"
+        f"{_v7_questions_guidance(_question_count(paragraphs), question_rules) if questions else ''}"
         f"Respond with a single JSON object of the exact shape {shape} "
         "and nothing else — no markdown, no commentary, no code fences."
     )
@@ -268,6 +419,10 @@ PROMPT_BUILDERS = {
     "story-v4": build_story_v4_prompt,
     "story-v5": build_story_v5_prompt,
     "story-v6": build_story_v6_prompt,
+    "story-v7": build_story_v7_prompt,
+    "story-v8": build_story_v8_prompt,
+    "story-v9": build_story_v9_prompt,
+    "story-v10": build_story_v10_prompt,
 }
 
 

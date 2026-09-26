@@ -1,6 +1,7 @@
 from datetime import datetime
+from typing import Annotated
 
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 from story_generator.vocabulary.schemas import VocabularyResponse
 
@@ -27,6 +28,14 @@ class PaginatedStoryResponse(BaseModel):
     offset: int
 
 
+class QuizQuestion(BaseModel):
+    """A comprehension question as the reader sees it: without its answer,
+    which the API gives back only once an attempt is marked."""
+
+    question: str
+    options: list[str]
+
+
 class StoryDetail(StorySummary):
     """
     A saved story for reading.
@@ -38,10 +47,59 @@ class StoryDetail(StorySummary):
     translation_en is the English, one string per paragraph of content
     (non-blank lines); None for older stories. It may not line up with
     the paragraphs, in which case the reader shows it as one block.
+
+    questions are the story's comprehension questions, answered through
+    POST /stories/{id}/quiz-attempts; None for stories from before
+    story-v7.
     """
 
     content: str
     translation_en: list[str] | None
+    questions: list[QuizQuestion] | None
     selected_vocabulary: list[VocabularyResponse]
     provider: str | None
     model: str | None
+
+
+# Well above any real quiz (story-v7 asks for at most 5 questions); it only
+# bounds the work of rejecting a nonsense request.
+MAX_QUIZ_ANSWERS = 50
+
+
+class SubmitQuizAttemptSchema(BaseModel):
+    """The chosen option index for each question, in question order. Every
+    question must be answered."""
+
+    answers: list[Annotated[int, Field(ge=0)]] = Field(
+        min_length=1, max_length=MAX_QUIZ_ANSWERS
+    )
+
+
+class QuizQuestionResult(BaseModel):
+    """evidence is the sentence of the story that settles the answer, for
+    questions from story-v9 on; None before that."""
+
+    selected: int
+    answer: int
+    correct: bool
+    evidence: str | None
+
+
+class QuizAttemptResponse(BaseModel):
+    """A marked attempt: the score, and each question's chosen and correct
+    options, in question order."""
+
+    id: int
+    correct_count: int
+    question_count: int
+    results: list[QuizQuestionResult]
+
+
+class FlagQuestionSchema(BaseModel):
+    """The question being reported, as its index in the story's questions."""
+
+    question_index: int = Field(ge=0)
+
+
+class QuestionFlagResponse(BaseModel):
+    id: int

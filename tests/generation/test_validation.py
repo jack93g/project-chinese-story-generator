@@ -4,6 +4,7 @@ from story_generator.generation.persistence.models import StoryGenerationRequest
 from story_generator.generation.providers.types import GenerationResult, UsageMetadata
 from story_generator.generation.validation import (
     split_paragraphs,
+    stray_english,
     validate_story,
     word_appears,
 )
@@ -22,11 +23,12 @@ def _make_request(snapshot):
     )
 
 
-def _make_result(title, body, translation=None):
+def _make_result(title, body, translation=None, questions=None):
     return GenerationResult(
         title=title,
         body=body,
         translation=translation,
+        questions=questions,
         usage=UsageMetadata(
             prompt_tokens=1, completion_tokens=1, total_tokens=2, latency_ms=10
         ),
@@ -202,3 +204,47 @@ def test_validate_story_records_whether_the_translation_lines_up():
     assert aligned["translation_aligned"] is True
     assert misaligned["translation_aligned"] is False
     assert "translation_aligned" not in untranslated
+
+
+def test_validate_story_records_how_many_questions_there_are():
+    request = _make_request(
+        [{"id": 1, "writing": "你好", "reading": "", "definition_en": ""}]
+    )
+    question = {"question": "谁说你好？", "options": ["小明", "小红"], "answer": 0}
+
+    with_questions, _ = validate_story(
+        request, _make_result("故事", "小明说你好。", questions=[question] * 2)
+    )
+    without_questions, _ = validate_story(request, _make_result("故事", "你好。"))
+
+    assert with_questions["question_count"] == 2
+    assert with_questions["meets_coverage_threshold"] is True
+    assert "question_count" not in without_questions
+
+
+def test_stray_english_finds_english_words_in_the_chinese_text():
+    result = _make_result(
+        "雨中 walking",
+        "我们 hurriedly 赶到机场。对方CEO和AI专家都 walking 来了。",
+        translation=["We hurried to the airport."],
+        questions=[
+            {"question": "他们怎么去？", "options": ["走路", "by bus"], "answer": 0}
+        ],
+    )
+
+    # Once each, in order; abbreviations and the English translation don't count.
+    assert stray_english(result) == ["walking", "hurriedly", "by", "bus"]
+
+
+def test_validate_story_records_stray_english():
+    request = _make_request(
+        [{"id": 1, "writing": "你好", "reading": "", "definition_en": ""}]
+    )
+
+    clean, _ = validate_story(request, _make_result("故事", "CEO说你好。"))
+    stray, _ = validate_story(request, _make_result("故事", "他 quickly 说你好。"))
+
+    assert clean["stray_english"] == []
+    assert stray["stray_english"] == ["quickly"]
+    # Recorded only: the story still passes.
+    assert stray["meets_coverage_threshold"] is True

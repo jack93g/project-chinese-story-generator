@@ -37,6 +37,7 @@ from story_generator.generation.validation import (
     VOCABULARY_COVERAGE_THRESHOLD,
     length_ratio,
     split_paragraphs,
+    stray_english,
     word_appears,
 )
 
@@ -90,6 +91,11 @@ class EvalOutcome:
     # per paragraph of body (None when the model gave no translation).
     translation: list[str] | None = None
     translation_aligned: bool | None = None
+    # story-v7+: the comprehension questions as the model wrote them (answer
+    # keys unshuffled, so a model that always puts the answer first shows).
+    questions: list[dict] | None = None
+    # English words left in the Chinese text (see validation.stray_english).
+    stray_english: list[str] = dataclasses.field(default_factory=list)
 
 
 def compute_coverage(vocabulary_snapshot: list[dict], result: GenerationResult) -> dict:
@@ -184,6 +190,8 @@ def run_single(fixture: EvalFixture, provider_spec: ProviderSpec) -> EvalOutcome
         translation_aligned=None
         if result.translation is None
         else len(result.translation) == len(split_paragraphs(result.body)),
+        questions=result.questions,
+        stray_english=stray_english(result),
     )
 
 
@@ -259,8 +267,17 @@ def to_markdown(outcomes: list[EvalOutcome]) -> str:
         "Translation (story-v6+) shows English entries/paragraphs; ❌ means they "
         "don't line up, so the reader shows the English as one block.",
         "",
-        "| Fixture | Category | Provider | Model | Base URL | Prompt | Schema valid | Coverage | Meets threshold | Chars (actual/target) | Meets length | Translation | Latency (ms) | Error | Manual quality notes |",
-        "|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|",
+        "Questions (story-v7+) counts the well-formed comprehension questions; "
+        "check each answer key against the story in the transcripts below. "
+        "From story-v9, a question whose evidence isn't a sentence of the story "
+        "is dropped, so a count below the one asked for can mean made-up "
+        "evidence.",
+        "",
+        "English lists English words left in the Chinese text (title, body, "
+        "questions); abbreviations like CEO don't count.",
+        "",
+        "| Fixture | Category | Provider | Model | Base URL | Prompt | Schema valid | Coverage | Meets threshold | Chars (actual/target) | Meets length | Translation | Questions | English | Latency (ms) | Error | Manual quality notes |",
+        "|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|",
     ]
 
     repeated = any(o.sample > 1 for o in outcomes)
@@ -287,6 +304,8 @@ def to_markdown(outcomes: list[EvalOutcome]) -> str:
             else f"{len(o.translation)}/{len(split_paragraphs(o.body or ''))} "
             f"{'✅' if o.translation_aligned else '❌'}"
         )
+        questions_str = "—" if o.questions is None else str(len(o.questions))
+        english_str = ", ".join(o.stray_english) or "—"
         latency_str = str(o.latency_ms) if o.latency_ms is not None else "—"
         error_str = o.error_code or "—"
         notes_str = (
@@ -298,7 +317,9 @@ def to_markdown(outcomes: list[EvalOutcome]) -> str:
             f"| {_fixture_label(o, repeated)} | {o.category} | {o.provider_label} | {o.model} | `{o.base_url}` | "
             f"{o.prompt_version or '—'} | "
             f"{'✅' if o.schema_valid else '❌'} | {coverage_str} | {meets_str} | "
-            f"{chars_str} | {length_str} | {translation_str} | {latency_str} | "
+            f"{chars_str} | {length_str} | {translation_str} | {questions_str} | "
+            f"{english_str} | "
+            f"{latency_str} | "
             f"{error_str} | {notes_str} |"
         )
 
@@ -341,6 +362,17 @@ def to_markdown(outcomes: list[EvalOutcome]) -> str:
         if o.translation is not None:
             translation = "\n\n".join(o.translation)
             lines.append(f"**Translation:**\n\n{translation}")
+            lines.append("")
+        if o.questions is not None:
+            lines.append("**Questions** (✅ marks the answer key):")
+            lines.append("")
+            for number, question in enumerate(o.questions, 1):
+                lines.append(f"{number}. {question['question']}")
+                for index, option in enumerate(question["options"]):
+                    mark = " ✅" if index == question["answer"] else ""
+                    lines.append(f"    - {option}{mark}")
+                if question.get("evidence"):
+                    lines.append(f"    - _Evidence:_ {question['evidence']}")
             lines.append("")
         if o.manual_quality_notes:
             lines.append(f"**Manual quality notes:** {o.manual_quality_notes}")

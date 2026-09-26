@@ -160,3 +160,53 @@ def test_insecure_cookie_setting_is_opt_in(monkeypatch):
     assert get_session_cookie_secure() is True
     monkeypatch.setenv("SESSION_COOKIE_SECURE", "false")
     assert get_session_cookie_secure() is False
+
+
+@pytest.mark.db
+def test_quiz_attempt_records_the_logged_in_user(browser, user, db_session):
+    from story_generator.stories.persistence.models import QuizAttempt, Story
+
+    story = Story(
+        title="点菜",
+        content="我们去饭馆。",
+        comprehension_questions=[
+            {"question": "去哪里？", "options": ["学校", "饭馆"], "answer": 1}
+        ],
+    )
+    db_session.add(story)
+    db_session.flush()
+    log_in(browser)
+
+    response = browser.post(
+        f"/stories/{story.id}/quiz-attempts",
+        json={"answers": [1]},
+        headers={"Origin": ALLOWED_ORIGIN},
+    )
+
+    assert response.status_code == 201
+    assert db_session.get(QuizAttempt, response.json()["id"]).user_id == user.id
+
+
+@pytest.mark.db
+def test_question_flag_records_the_logged_in_user(browser, user, db_session):
+    from story_generator.stories.persistence.models import QuestionFlag, Story
+
+    story = Story(
+        title="点菜",
+        content="我们去饭馆。",
+        comprehension_questions=[
+            {"question": "去哪里？", "options": ["学校", "饭馆"], "answer": 1}
+        ],
+    )
+    db_session.add(story)
+    db_session.flush()
+    log_in(browser)
+
+    response = browser.post(
+        f"/stories/{story.id}/question-flags",
+        json={"question_index": 0},
+        headers={"Origin": ALLOWED_ORIGIN},
+    )
+
+    assert response.status_code == 201
+    assert db_session.get(QuestionFlag, response.json()["id"]).user_id == user.id
