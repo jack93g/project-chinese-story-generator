@@ -18,6 +18,10 @@ durable background workflow.
   generate a structured story through an OpenAI-compatible provider, validate
   vocabulary coverage, and persist the completed story and its vocabulary
   usage.
+- Give each story (from prompt `story-v7`) 3–5 multiple-choice comprehension
+  questions: the API serves them without their answers, marks quiz attempts,
+  and records readers' reports of questions that seem wrong, which
+  `manage-questions` lists for review.
 - Run one or more durable workers safely: database-level claiming prevents two
   workers from processing the same request. Stale running requests are
   reclaimed at worker startup and every few minutes after, and a stopping
@@ -60,8 +64,10 @@ two credentials:
 | `GET` | `/vocabulary-lists` | Returns paginated vocabulary-list summaries, including item counts. Lists deleted in Skritter (archived) or hidden with `manage-lists` are left out. |
 | `GET` | `/vocabulary-lists/{list_id}` | Returns a vocabulary list and its items. `404` for an unknown, archived or hidden list. |
 | `GET` | `/stories` | Returns paginated saved-story summaries. |
-| `GET` | `/stories/{story_id}` | Returns a saved story and its selected vocabulary. |
-| `DELETE` | `/stories/{story_id}` | Permanently deletes a saved story and its vocabulary associations. Returns `204 No Content`. |
+| `GET` | `/stories/{story_id}` | Returns a saved story, its selected vocabulary, its English translation, and its comprehension questions without their answers (`null` for stories from before those existed). |
+| `POST` | `/stories/{story_id}/quiz-attempts` | Marks `{"answers": [...]}`, one option index per question, and returns `201` with the score and each question's correct option and evidence. Every attempt is recorded. `404` for a story without questions; `422` if the answers don't fit the questions. |
+| `POST` | `/stories/{story_id}/question-flags` | Records a report that the question at `{"question_index"}` (0-based) seems wrong, and returns `201`. `422` for an index the story doesn't have. |
+| `DELETE` | `/stories/{story_id}` | Permanently deletes a saved story, its vocabulary associations, quiz attempts and question reports. Returns `204 No Content`. |
 | `GET` | `/sync-status` | Returns the most recent Skritter sync run, or `{"latest_run": null}`. |
 | `POST` | `/story-generations` | Queues a story-generation request and returns `202 Accepted`. |
 | `GET` | `/story-generations/{generation_request_id}` | Returns the request status and completed story ID, if available. |
@@ -101,8 +107,8 @@ API client → FastAPI routes → services → PostgreSQL
   the durable worker.
 - `story_generator/database` contains shared SQLAlchemy setup.
 - `story_generator/cli` provides the vocabulary sync, list hiding
-  (`manage-lists`), login accounts (`manage-users`), generation-worker, and
-  provider-comparison commands.
+  (`manage-lists`), login accounts (`manage-users`), question review
+  (`manage-questions`), generation-worker, and provider-comparison commands.
 - `scripts/` holds the production deploy, backup, and restore scripts that
   run on the Droplet.
 - `infra/terraform` defines the Droplet, firewall, SSH key, and DNS record.
@@ -253,6 +259,19 @@ already made from it are unaffected.
 .venv/bin/manage-lists hide 5057150779981824 # one or more IDs
 .venv/bin/manage-lists show 5057150779981824 # undo
 ```
+
+## Review flagged questions
+
+Comprehension questions are machine-written, and readers can report one as
+seeming wrong after checking their answers. To review the reports:
+
+```bash
+.venv/bin/manage-questions flagged        # most flagged first, with answer keys
+.venv/bin/manage-questions show STORY_ID  # a story's text and all its questions
+```
+
+It only reads data. A bad question is fixed in the next prompt version, not
+edited in the database (see the runbook).
 
 ## Login accounts
 

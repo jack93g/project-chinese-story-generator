@@ -43,9 +43,14 @@ Future infrastructure (Airflow, BigQuery, etc.) is tracked on the
 4. The worker moves the request through `queued → running →
    succeeded|failed` (up to 3 attempts), persisting the generated story and
    its `story_vocabulary_items`, with provider payloads redacted before
-   storage.
+   storage. From `story-v7` the story carries comprehension questions,
+   stored with their options shuffled.
 5. The frontend fetches saved stories and vocabulary metadata via the API
    and lets the learner reveal or hide reading aids.
+6. The learner answers the story's questions. The API holds the answer
+   keys, marks each attempt, and records it in `quiz_attempts`; a report of
+   a question that seems wrong goes to `question_flags`. Both keep the
+   logged-in user, and `manage-questions` reads them back for review.
 
 ## Request flow example: `GET /vocabulary-lists/{list_id}`
 

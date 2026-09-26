@@ -83,11 +83,15 @@ migrations, and provider configuration.
 - `app/story/page.tsx` — story reader (`/story?id=<id>`): Chinese title and
   body with a vocabulary glossary (pinyin and English definition), pinyin
   and English-translation toggles (the English sits under each paragraph),
-  and a not-found state for an unknown story ID.
+  a comprehension quiz after the glossary (`app/components/story-quiz.tsx`:
+  the API marks the answers, then each question shows the sentence that
+  settles it and a "This question seems wrong" report link), and a
+  not-found state for an unknown story ID.
 - `app/components/` — shared UI, e.g. the top navigation.
 - `lib/api.ts` — typed fetch helpers for every backend endpoint the frontend
   calls (vocabulary lists, story generations, saved stories including
-  deletion), including pagination and error handling.
+  deletion, quiz attempts and question reports), including pagination and
+  error handling.
 
 ## Status
 
