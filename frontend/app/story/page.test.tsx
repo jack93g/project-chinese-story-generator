@@ -362,4 +362,26 @@ describe("StoryPage", () => {
     ).toBeInTheDocument();
     expect(fetchStory).toHaveBeenCalledWith("6");
   });
+
+  it("starts the quiz afresh when the story id changes", async () => {
+    useSearchParams.mockReturnValue(new URLSearchParams("id=5"));
+    fetchStory.mockResolvedValueOnce({
+      ...STORY,
+      questions: [{ question: "今天下雨吗？", options: ["下雨", "不下雨"] }],
+    });
+    const { rerender } = render(<StoryPage />);
+    fireEvent.click(await screen.findByRole("radio", { name: "下雨" }));
+
+    useSearchParams.mockReturnValue(new URLSearchParams("id=6"));
+    fetchStory.mockResolvedValueOnce({
+      ...STORY,
+      id: 6,
+      title: "换了故事",
+      questions: [{ question: "谁来了？", options: ["小明", "小红"] }],
+    });
+    rerender(<StoryPage />);
+
+    // Without a fresh quiz, the first option would stay chosen.
+    expect(await screen.findByRole("radio", { name: "小明" })).not.toBeChecked();
+  });
 });

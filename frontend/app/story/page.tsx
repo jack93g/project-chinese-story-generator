@@ -341,7 +341,13 @@ function StoryReader({
       {story.questions && story.questions.length > 0 && (
         <>
           <CloudDivider />
-          <StoryQuiz storyId={story.id} questions={story.questions} />
+          {/* Keyed so that moving to another story starts its quiz afresh
+              rather than carrying over this one's answers and score. */}
+          <StoryQuiz
+            key={story.id}
+            storyId={story.id}
+            questions={story.questions}
+          />
         </>
       )}
     </article>
