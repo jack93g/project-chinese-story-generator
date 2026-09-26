@@ -13,5 +13,10 @@ api.huaben.app {
 		-Server
 	}
 
+	# No trusted_proxies here on purpose: without it, Caddy discards any
+	# X-Forwarded-For the client sends and sets it to the real connecting
+	# address, which the API trusts (FORWARDED_ALLOW_IPS in
+	# docker-compose.prod.yml). Putting a proxy (e.g. Cloudflare) in front
+	# means revisiting both, or callers could spoof their address.
 	reverse_proxy api:8000
 }

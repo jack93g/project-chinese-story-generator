@@ -59,7 +59,11 @@ def reset_rate_limits():
     """The limiters are module-level state; keep tests independent."""
     from story_generator.api import rate_limit
 
-    limiters = (rate_limit._generation_limiter, rate_limit._login_limiter)
+    limiters = (
+        rate_limit._generation_limiter,
+        rate_limit._login_client_limiter,
+        rate_limit._login_limiter,
+    )
     for limiter in limiters:
         limiter.reset()
     yield

@@ -234,7 +234,16 @@ Droplet, cloud-init does all of them.
 - **Caddy** (pinned to `caddy:2.11.4`) serves `api.huaben.app` with an
   automatic Let's Encrypt certificate (kept in the `caddy_data` volume), caps
   request bodies at 64KB, sets security headers, and proxies to `api:8000` on
-  Docker's internal network.
+  Docker's internal network. It replaces any `X-Forwarded-For` a client sends
+  with the real connecting address, and the API trusts that header
+  (`FORWARDED_ALLOW_IPS` in `docker-compose.prod.yml`), so the API's access
+  log and login limit see each caller's own address. Putting another proxy in
+  front (e.g. turning on Cloudflare's orange cloud) means revisiting both.
+- **Container logs are capped**: every service uses Docker's `local` log
+  driver with at most 5 x 10MB per container, so a flood of requests can't
+  fill the disk. Changes to it take effect when a container is recreated: a
+  deploy does that for `api` and `worker`, `db` and `caddy` need
+  `dc up -d db caddy` by hand.
 - **DNS** is a Cloudflare A record `api.huaben.app` → the Droplet, set to **DNS
   only** (grey cloud). If Cloudflare proxied it, Caddy couldn't complete the
   certificate challenge, and the firewall would see Cloudflare's addresses
@@ -257,7 +266,8 @@ without the key, and its interactive docs are disabled.
   `manage-users set-password` revokes all of a user's sessions.
   Cookie-authenticated writes must also carry an `Origin` in
   `CORS_ALLOWED_ORIGINS`, else 403. Login attempts are limited to 10 a minute
-  in total, not per caller.
+  per client address, and 60 a minute across all clients, so a single
+  guesser can't lock everyone else out.
 - **Scripts and `curl`:** the `X-API-Key` header. The frontend no longer uses
   the key at all, so nothing secret is kept in the browser.
 Creating or retrying a generation returns 429 when 3 are already queued or
@@ -281,6 +291,10 @@ gitignored in case one is ever created.
   recreate the Droplet, which would take the database with it. Side effects:
   edits to `cloud-init.yaml` only affect new Droplets, and a new admin key
   isn't pushed to an existing one (see the runbook's secret rotation).
+- **The Droplet has `prevent_destroy`**, so Terraform refuses any plan that
+  would delete it: `terraform destroy`, or a change that forces replacement
+  (e.g. `image` or `region`). To replace it on purpose, take a backup, remove
+  that line for the one run, and put it back afterwards.
 - **Always read `terraform plan` in full** before `apply`, and stop on any
   `forces replacement` or `destroy` line for the Droplet.
 - **State** (`terraform.tfstate`) is local and gitignored, because it can
@@ -292,7 +306,9 @@ gitignored in case one is ever created.
 - **Testing a clean build**: run the same config from a scratch copy of the
   directory with its own state and throwaway names (e.g. `story-droplet-test`,
   `api-test.huaben.app`), do [Rebuild step 2](#rebuild-from-scratch)'s checks,
-  then `terraform destroy` it. Never do this with the real state file.
+  then `terraform destroy` it. The copy needs its `prevent_destroy` line
+  removed first, or the destroy is refused. Never do this with the real state
+  file.
 
 ### Deploy pipeline
 

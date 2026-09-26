@@ -1,6 +1,16 @@
+# Docker's default log driver never rotates, and the API logs every request,
+# so a flood of requests could fill the disk (and take Postgres down with it).
+# The local driver keeps at most max-file x max-size per container.
+x-logging: &logging
+  driver: local
+  options:
+    max-size: "10m"
+    max-file: "5"
+
 services:
 
   db:
+    logging: *logging
     image: postgres:17
     restart: unless-stopped
     ports:
@@ -31,6 +41,7 @@ services:
   api:
     build: .
     restart: unless-stopped
+    logging: *logging
     env_file:
       - .env
     ports:
@@ -46,6 +57,7 @@ services:
   worker:
     build: .
     restart: unless-stopped
+    logging: *logging
     env_file:
       - .env
     command: python -m story_generator.cli.generation_worker

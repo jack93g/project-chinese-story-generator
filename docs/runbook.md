@@ -755,8 +755,10 @@ always full.
    Then check the provider dashboard's activity/cost page for the same
    window. It's the source of truth for money. `usage` is only recorded on
    success, so failed attempts cost tokens that don't show here. Access logs:
-   `dc logs --since 48h api` (client addresses there are Caddy's, not the
-   caller's).
+   `dc logs --since 48h api` (each line shows the caller's address). Logs are
+   capped at 50MB per container, so on a busy attack the oldest lines may
+   already be gone; save them early with
+   `dc logs --no-color api > ~/api-$(date -u +%F).log`.
 4. **Drain the queue.** Prefer cancelling (keeps the audit trail) over
    deleting:
    ```sql

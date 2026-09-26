@@ -25,6 +25,13 @@ services:
   api:
     <<: *app-image
     ports: !reset []
+    environment:
+      # Trust X-Forwarded-For from any peer, so the API sees each caller's
+      # real address (used by the per-client login limit and in the access
+      # log) instead of Caddy's. Safe only because nothing but Caddy can reach
+      # api:8000 here (no published port) and Caddy replaces, rather than
+      # appends to, any X-Forwarded-For a client sends (see the Caddyfile).
+      FORWARDED_ALLOW_IPS: "*"
 
   worker:
     <<: *app-image
@@ -34,6 +41,13 @@ services:
   caddy:
     image: caddy:2.11.4
     restart: unless-stopped
+    # Same bounded logging as the other services (docker-compose.yml's
+    # x-logging; YAML anchors don't reach across files).
+    logging:
+      driver: local
+      options:
+        max-size: "10m"
+        max-file: "5"
     ports:
       - "80:80"
       - "443:443"

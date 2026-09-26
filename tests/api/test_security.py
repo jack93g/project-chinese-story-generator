@@ -78,6 +78,26 @@ def test_sliding_window_limiter_blocks_then_recovers(monkeypatch):
     assert limiter.check() is None
 
 
+def test_sliding_window_limiter_counts_each_key_separately():
+    limiter = SlidingWindowRateLimiter(limit=1, window_seconds=60)
+
+    assert limiter.check("203.0.113.1") is None
+    assert limiter.check("203.0.113.1") is not None
+    assert limiter.check("203.0.113.2") is None
+
+
+def test_sliding_window_limiter_forgets_idle_keys(monkeypatch):
+    now = [100.0]
+    monkeypatch.setattr(rate_limit.time, "monotonic", lambda: now[0])
+    limiter = SlidingWindowRateLimiter(limit=1, window_seconds=60)
+    limiter.check("203.0.113.1")
+
+    now[0] += 61
+    limiter.check("203.0.113.2")
+
+    assert list(limiter._hits) == ["203.0.113.2"]
+
+
 def test_generation_endpoints_return_429_when_rate_limited(monkeypatch):
     monkeypatch.setattr(
         rate_limit, "_generation_limiter", SlidingWindowRateLimiter(1, 60)

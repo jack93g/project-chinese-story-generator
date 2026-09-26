@@ -27,8 +27,14 @@ resource "digitalocean_droplet" "app" {
   # disk, not a separate volume) with it. One consequence: rotating the
   # admin key later won't be picked up by Terraform either; that has to be
   # done by hand (or by deliberately removing ssh_keys from this list).
+  #
+  # prevent_destroy makes Terraform refuse any plan that would delete this
+  # droplet, whether `terraform destroy` or a change that forces replacement
+  # (image, region), since that would delete the database too. To replace it
+  # deliberately, take a backup first and remove this line for that one run.
   lifecycle {
-    ignore_changes = [user_data, ssh_keys]
+    prevent_destroy = true
+    ignore_changes  = [user_data, ssh_keys]
   }
 }
 
