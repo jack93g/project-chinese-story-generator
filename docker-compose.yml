@@ -1,6 +1,26 @@
+# Docker's default log driver never rotates, and the API logs every request,
+# so a flood of requests could fill the disk (and take Postgres down with it).
+# The local driver keeps at most max-file x max-size per container.
+x-logging: &logging
+  driver: local
+  options:
+    max-size: "10m"
+    max-file: "5"
+
+# For the app containers (migrate, api, worker), which handle untrusted input
+# and need no special privileges: drop every Linux capability, and stop any
+# process in them from gaining more (e.g. via a setuid binary). Not applied to
+# db, whose entrypoint needs root capabilities to set up its data directory.
+x-hardening: &hardening
+  cap_drop:
+    - ALL
+  security_opt:
+    - no-new-privileges:true
+
 services:
 
   db:
+    logging: *logging
     image: postgres:17
     restart: unless-stopped
     ports:
@@ -19,6 +39,7 @@ services:
 
   migrate:
     build: .
+    <<: *hardening
     command: alembic upgrade head
     env_file:
       - .env
@@ -30,7 +51,9 @@ services:
 
   api:
     build: .
+    <<: *hardening
     restart: unless-stopped
+    logging: *logging
     env_file:
       - .env
     ports:
@@ -45,7 +68,9 @@ services:
 
   worker:
     build: .
+    <<: *hardening
     restart: unless-stopped
+    logging: *logging
     env_file:
       - .env
     command: python -m story_generator.cli.generation_worker

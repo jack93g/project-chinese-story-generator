@@ -135,6 +135,27 @@ def test_login_is_rate_limited(monkeypatch):
     assert "Retry-After" in limited.headers
 
 
+def test_login_is_limited_per_client_address(monkeypatch):
+    monkeypatch.setattr(
+        rate_limit, "_login_client_limiter", SlidingWindowRateLimiter(1, 60)
+    )
+    shared = SlidingWindowRateLimiter(10, 60)
+    monkeypatch.setattr(rate_limit, "_login_limiter", shared)
+    app = create_app()
+    app.dependency_overrides[get_db] = lambda: None
+    guesser = TestClient(app, client=("203.0.113.1", 50000))
+    owner = TestClient(app, client=("198.51.100.7", 50000))
+
+    assert guesser.post("/auth/login", json={}).status_code == 422
+    for _ in range(3):
+        assert guesser.post("/auth/login", json={}).status_code == 429
+
+    # Another address still gets through, and the guesser's blocked attempts
+    # didn't use up the shared budget.
+    assert owner.post("/auth/login", json={}).status_code == 422
+    assert len(shared._hits[""]) == 2
+
+
 def test_cors_allows_credentials_for_listed_origins(monkeypatch):
     monkeypatch.setenv("CORS_ALLOWED_ORIGINS", ALLOWED_ORIGIN)
     client = TestClient(create_app())

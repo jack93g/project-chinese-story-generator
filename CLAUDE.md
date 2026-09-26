@@ -79,7 +79,9 @@ uses a session cookie; see Authentication below),
 `CORS_ALLOWED_ORIGINS` (comma-separated browser origins; defaults to the
 local Next.js dev server; also the allowlist for cookie-authenticated writes),
 `SESSION_COOKIE_SECURE` (optional, default `true`; `false` only for local
-http if a browser drops the Secure cookie), plus `POSTGRES_USER`, `POSTGRES_PASSWORD`,
+http if a browser drops the Secure cookie), `ENABLE_API_DOCS` (optional,
+default off; `true` serves `/docs`, `/redoc` and `/openapi.json` without
+auth, so local development only, never production), plus `POSTGRES_USER`, `POSTGRES_PASSWORD`,
 `POSTGRES_DB` (used by Compose to create the database and build the
 containers' `DATABASE_URL`).
 
@@ -198,9 +200,9 @@ GHCR, then SSH to the Droplet, where `scripts/droplet-deploy.sh` migrates
 first and then recreates `api` and `worker`. Rollback is the same workflow
 with an older SHA.
 
-- `scripts/droplet-deploy.sh` and `scripts/db-backup.sh` run on the Droplet as
-  hand-installed copies, so changes to them need copying over after merge
-  (see the runbook).
+- `scripts/droplet-deploy.sh`, `scripts/db-backup.sh` and
+  `scripts/backup-serve.sh` run on the Droplet as hand-installed copies, so
+  changes to them need copying over after merge (see the runbook).
 - `infra/terraform/cloud-init.yaml` must stay plain ASCII.
 - Docs: [docs/droplet-setup.md](docs/droplet-setup.md) (how the server is built),
   [docs/runbook.md](docs/runbook.md) (operating procedures).

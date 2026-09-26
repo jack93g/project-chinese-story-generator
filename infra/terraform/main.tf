@@ -27,8 +27,14 @@ resource "digitalocean_droplet" "app" {
   # disk, not a separate volume) with it. One consequence: rotating the
   # admin key later won't be picked up by Terraform either; that has to be
   # done by hand (or by deliberately removing ssh_keys from this list).
+  #
+  # prevent_destroy makes Terraform refuse any plan that would delete this
+  # droplet, whether `terraform destroy` or a change that forces replacement
+  # (image, region), since that would delete the database too. To replace it
+  # deliberately, take a backup first and remove this line for that one run.
   lifecycle {
-    ignore_changes = [user_data, ssh_keys]
+    prevent_destroy = true
+    ignore_changes  = [user_data, ssh_keys]
   }
 }
 
@@ -76,6 +82,25 @@ resource "digitalocean_firewall" "app" {
   outbound_rule {
     protocol              = "icmp"
     destination_addresses = ["0.0.0.0/0"]
+  }
+}
+
+# CAA: only these CAs may issue certificates for the API's name, so a
+# mis-issued certificate from any other CA is refused. Caddy gets its
+# certificate from Let's Encrypt and falls back to ZeroSSL (whose CAA name is
+# sectigo.com). Set on the API subdomain only: the frontend on the apex is
+# served by GitHub Pages, which chooses its own CA.
+resource "cloudflare_dns_record" "api_caa" {
+  for_each = toset(["letsencrypt.org", "sectigo.com"])
+
+  zone_id = var.cloudflare_zone_id
+  name    = var.api_subdomain
+  type    = "CAA"
+  ttl     = 1
+  data = {
+    flags = 0
+    tag   = "issue"
+    value = each.value
   }
 }
 

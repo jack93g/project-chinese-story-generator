@@ -42,7 +42,7 @@ procedures (deploys, rollbacks, backups, secret rotation) are in
   git commit SHA. It's public, so the Droplet can pull without a credential
   (the image contains code only, never secrets).
 - **Terraform** (`infra/terraform/`) defines the Droplet, firewall, SSH key and
-  DNS record as code. **cloud-init** is the first-boot script
+  DNS records as code. **cloud-init** is the first-boot script
   (`infra/terraform/cloud-init.yaml`) that DigitalOcean runs once on a new
   Droplet to create the `deploy` user, install Docker and harden SSH.
 
@@ -70,6 +70,10 @@ procedures (deploys, rollbacks, backups, secret rotation) are in
   key), or Terraform.
 - **Accounts you need**: DigitalOcean, Cloudflare (DNS for `huaben.app`),
   GitHub (repo admin, for Environments and packages), and the AI provider.
+  Turn on two-factor authentication for all of them: each one alone is enough
+  to take over the service (DigitalOcean can power off and rebuild the
+  Droplet, Cloudflare can point `api.huaben.app` elsewhere and get a
+  certificate for it, GitHub can deploy any code).
 
 ## Rebuild from scratch
 
@@ -90,6 +94,13 @@ where it runs. Expect about an hour.
    terraform apply
    ```
 
+   Make both tokens as narrow and short-lived as the job allows, since they
+   only need to exist for this run: for DigitalOcean, **Custom Scopes**
+   covering droplet, firewall and ssh_key (plus the read-only scopes it
+   pre-selects) with a short expiry; for Cloudflare, the "Edit zone DNS"
+   template limited to the `huaben.app` zone only, with a TTL. Revoke them
+   afterwards if you won't need them again soon.
+
    The output gives `droplet_ipv4` and `api_url`. If an old Droplet's host key
    is in `~/.ssh/known_hosts`, remove it (`ssh-keygen -R api.huaben.app` and
    `ssh-keygen -R <old-ip>`).
@@ -101,7 +112,8 @@ where it runs. Expect about an hour.
    docker --version && docker compose version   # Compose must be 2.24+
    sudo -n true && echo "sudo ok"
    command -v age && type dc
-   sudo sshd -T | grep -Ei 'permitrootlogin|passwordauthentication'   # both "no"
+   sudo sshd -T | grep -Ei '^(permitrootlogin|passwordauthentication|allowusers) '   # no, no, deploy
+   sudo wc -c /root/.ssh/authorized_keys                                         # 0
    ```
 
    If `ssh` fails or anything is missing, see
@@ -181,7 +193,9 @@ where it runs. Expect about an hour.
      fail.
 
 9. **Data and backups.** Set up backups (runbook →
-   [Backups → One-time setup](runbook.md#one-time-setup)). If this replaces a
+   [Backups → One-time setup](runbook.md#one-time-setup), then
+   [One-time setup: automatic pull](runbook.md#one-time-setup-automatic-pull)).
+   If this replaces a
    Droplet that had data, restore the newest backup
    (runbook → [Restore from a backup](runbook.md#restore-from-a-backup)).
    Otherwise, import vocabulary: `dc run --rm api sync-skritter --all`.
@@ -205,16 +219,34 @@ Droplet, cloud-init does all of them.
   hand-built Droplet; cloud-init's `sudo:` setting on Terraform Droplets).
 - **Docker** from Docker's own apt repository, not Ubuntu's older `docker.io`
   package. Compose 2.24+ is required: `docker-compose.prod.yml` uses `!reset`.
+- **Automatic updates** (`unattended-upgrades`) cover Docker's repo as well
+  as Ubuntu's security updates, and reboot at 05:00 UTC when needed
+  (`/etc/apt/apt.conf.d/52unattended-upgrades-local`; see the runbook's
+  Patching section).
 - **SSH hardening** in `/etc/ssh/sshd_config.d/00-hardening.conf`:
 
   ```
   PermitRootLogin no
   PasswordAuthentication no
+  KbdInteractiveAuthentication no
+  AllowUsers deploy
+  MaxAuthTries 3
+  X11Forwarding no
+  AllowAgentForwarding no
+  AllowTcpForwarding no
   ```
 
   The `00-` prefix matters: SSH uses the first value it reads, and the main
-  `sshd_config` sets `PermitRootLogin yes`. Check with
-  `sudo sshd -T | grep -Ei 'permitrootlogin|passwordauthentication'`.
+  `sshd_config` sets `PermitRootLogin yes`. Nothing uses SSH forwarding;
+  remove `AllowTcpForwarding no` if you ever want an `ssh -L` tunnel to
+  Postgres. Check with
+  `sudo sshd -T | grep -Ei '^(permitrootlogin|passwordauthentication|allowusers|allowtcpforwarding) '`.
+  To change it on a live Droplet: edit the file, `sudo sshd -t && sudo
+  systemctl reload ssh`, and prove a login from a **new** terminal before
+  closing the current one.
+- **Root's `authorized_keys` is empty.** DigitalOcean installs the admin key
+  for root too; it's removed so that, even if `PermitRootLogin no` were ever
+  lost, that key still couldn't log in as root.
 - **`age`** (for encrypting backups) and the runbook's `dc`/`dbsql` helpers in
   `~deploy/.bashrc`.
 - On the hand-built Droplet, the first `apt upgrade` asked about the modified
@@ -234,7 +266,16 @@ Droplet, cloud-init does all of them.
 - **Caddy** (pinned to `caddy:2.11.4`) serves `api.huaben.app` with an
   automatic Let's Encrypt certificate (kept in the `caddy_data` volume), caps
   request bodies at 64KB, sets security headers, and proxies to `api:8000` on
-  Docker's internal network.
+  Docker's internal network. It replaces any `X-Forwarded-For` a client sends
+  with the real connecting address, and the API trusts that header
+  (`FORWARDED_ALLOW_IPS` in `docker-compose.prod.yml`), so the API's access
+  log and login limit see each caller's own address. Putting another proxy in
+  front (e.g. turning on Cloudflare's orange cloud) means revisiting both.
+- **Container logs are capped**: every service uses Docker's `local` log
+  driver with at most 5 x 10MB per container, so a flood of requests can't
+  fill the disk. Changes to it take effect when a container is recreated: a
+  deploy does that for `api` and `worker`, `db` and `caddy` need
+  `dc up -d db caddy` by hand.
 - **DNS** is a Cloudflare A record `api.huaben.app` → the Droplet, set to **DNS
   only** (grey cloud). If Cloudflare proxied it, Caddy couldn't complete the
   certificate challenge, and the firewall would see Cloudflare's addresses
@@ -245,7 +286,8 @@ Droplet, cloud-init does all of them.
 Every route except `GET /health` and `/auth/login`/`/auth/logout` requires
 either a login session or an `X-API-Key` header matching `API_ACCESS_KEY`
 (compared in constant time); anything else gets 401. The API refuses to start
-without the key, and its interactive docs are disabled.
+without the key, and its interactive docs are disabled (`ENABLE_API_DOCS`
+turns them on for local development; never set it in production).
 
 - **Browser:** the frontend shows a login form. `POST /auth/login` checks the
   password against an argon2 hash and sets a `session` cookie scoped to
@@ -257,7 +299,8 @@ without the key, and its interactive docs are disabled.
   `manage-users set-password` revokes all of a user's sessions.
   Cookie-authenticated writes must also carry an `Origin` in
   `CORS_ALLOWED_ORIGINS`, else 403. Login attempts are limited to 10 a minute
-  in total, not per caller.
+  per client address, and 60 a minute across all clients, so a single
+  guesser can't lock everyone else out.
 - **Scripts and `curl`:** the `X-API-Key` header. The frontend no longer uses
   the key at all, so nothing secret is kept in the browser.
 Creating or retrying a generation returns 429 when 3 are already queued or
@@ -267,7 +310,9 @@ capped at 200 characters.
 ### Terraform
 
 `infra/terraform/` manages the Droplet, the firewall (inbound 22, 80 and 443),
-the admin SSH key and the DNS record. Credentials come only from the shell
+the admin SSH key and the DNS records: the `api` A record, plus CAA records
+allowing only Let's Encrypt and ZeroSSL (`sectigo.com`), the two CAs Caddy
+uses, to issue certificates for it. Credentials come only from the shell
 variables in [Rebuild step 1](#rebuild-from-scratch); `*.tfvars` files are
 gitignored in case one is ever created.
 
@@ -281,6 +326,10 @@ gitignored in case one is ever created.
   recreate the Droplet, which would take the database with it. Side effects:
   edits to `cloud-init.yaml` only affect new Droplets, and a new admin key
   isn't pushed to an existing one (see the runbook's secret rotation).
+- **The Droplet has `prevent_destroy`**, so Terraform refuses any plan that
+  would delete it: `terraform destroy`, or a change that forces replacement
+  (e.g. `image` or `region`). To replace it on purpose, take a backup, remove
+  that line for the one run, and put it back afterwards.
 - **Always read `terraform plan` in full** before `apply`, and stop on any
   `forces replacement` or `destroy` line for the Droplet.
 - **State** (`terraform.tfstate`) is local and gitignored, because it can
@@ -292,7 +341,9 @@ gitignored in case one is ever created.
 - **Testing a clean build**: run the same config from a scratch copy of the
   directory with its own state and throwaway names (e.g. `story-droplet-test`,
   `api-test.huaben.app`), do [Rebuild step 2](#rebuild-from-scratch)'s checks,
-  then `terraform destroy` it. Never do this with the real state file.
+  then `terraform destroy` it. The copy needs its `prevent_destroy` line
+  removed first, or the destroy is refused. Never do this with the real state
+  file.
 
 ### Deploy pipeline
 
@@ -334,6 +385,17 @@ covers when and how to copy it.
 only in the `production` GitHub Environment, which only `main` can use, and
 the Droplet's host key is pinned in that Environment so CI can't be pointed at
 an impostor server.
+
+**Known gap: the image isn't tied to the commit as tightly as the code is.**
+The deploy script checks the *commit* is on `main`, but pulls the image by
+tag, and GHCR tags can be overwritten. Any workflow run with
+`packages: write` can push to them, including one started from another
+branch with an edited workflow file. So someone able to push a branch could
+replace the image behind a `main` SHA, and the next deploy or rollback of
+that SHA would run it. This is accepted for now: the repo has one
+collaborator, and anyone who can push already controls the repo. If that
+changes, pin images by digest (record each SHA's digest at build time and
+deploy `image@digest`) or verify build attestations on the Droplet.
 
 The Droplet fetches code over HTTPS without a credential because the repo is
 public. If it ever goes private, the Droplet will need a read-only deploy key

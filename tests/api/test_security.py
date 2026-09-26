@@ -43,9 +43,21 @@ def test_missing_key_on_write_endpoints_returns_401(anonymous_client):
     assert anonymous_client.delete("/stories/1").status_code == 401
 
 
-def test_docs_and_openapi_are_not_exposed(anonymous_client):
+def test_docs_and_openapi_are_not_exposed_by_default(monkeypatch):
+    # A developer's .env may turn them on; the default must still be off.
+    monkeypatch.delenv("ENABLE_API_DOCS", raising=False)
+    client = TestClient(create_app())
+
     for path in ("/docs", "/redoc", "/openapi.json"):
-        assert anonymous_client.get(path).status_code == 404
+        assert client.get(path).status_code == 404
+
+
+def test_docs_and_openapi_can_be_enabled_for_local_development(monkeypatch):
+    monkeypatch.setenv("ENABLE_API_DOCS", "true")
+    client = TestClient(create_app())
+
+    for path in ("/docs", "/redoc", "/openapi.json"):
+        assert client.get(path).status_code == 200
 
 
 def test_cors_preflight_allows_the_key_header_without_needing_it(monkeypatch):
@@ -76,6 +88,26 @@ def test_sliding_window_limiter_blocks_then_recovers(monkeypatch):
 
     now[0] += 61
     assert limiter.check() is None
+
+
+def test_sliding_window_limiter_counts_each_key_separately():
+    limiter = SlidingWindowRateLimiter(limit=1, window_seconds=60)
+
+    assert limiter.check("203.0.113.1") is None
+    assert limiter.check("203.0.113.1") is not None
+    assert limiter.check("203.0.113.2") is None
+
+
+def test_sliding_window_limiter_forgets_idle_keys(monkeypatch):
+    now = [100.0]
+    monkeypatch.setattr(rate_limit.time, "monotonic", lambda: now[0])
+    limiter = SlidingWindowRateLimiter(limit=1, window_seconds=60)
+    limiter.check("203.0.113.1")
+
+    now[0] += 61
+    limiter.check("203.0.113.2")
+
+    assert list(limiter._hits) == ["203.0.113.2"]
 
 
 def test_generation_endpoints_return_429_when_rate_limited(monkeypatch):

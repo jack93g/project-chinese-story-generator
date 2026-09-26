@@ -20,6 +20,7 @@ guess.
 - [Inspect and retry a failed generation request](#inspect-and-retry-a-failed-generation-request)
 - [Scheduled Skritter sync](#scheduled-skritter-sync)
 - [Backups](#backups)
+- [Monitoring and alerts](#monitoring-and-alerts)
 - [Restore from a backup](#restore-from-a-backup)
 - [Rotate a secret](#rotate-a-secret)
 - [Hide vocabulary lists](#hide-vocabulary-lists)
@@ -108,22 +109,23 @@ it failed at or after step 4, the new containers are already live, so decide
 whether to roll back ([below](#roll-back-application-code)) or fix forward.
 If it failed before step 4, nothing that's running changed.
 
-**If the merge changed `scripts/droplet-deploy.sh` or `scripts/db-backup.sh`**,
+**If the merge changed `scripts/droplet-deploy.sh`, `scripts/db-backup.sh` or `scripts/backup-serve.sh`**,
 the deploy doesn't pick that up on its own. Follow
 [Update the deploy or backup script](#update-the-deploy-or-backup-script).
 
 ## Update the deploy or backup script
 
-Two scripts run on the Droplet from their **own copies** in the `deploy`
+Three scripts run on the Droplet from their **own copies** in the `deploy`
 user's home, not from the git checkout in `~/app`:
 
 | Script in the repo | Copy the Droplet runs | Run by |
 | --- | --- | --- |
 | `scripts/droplet-deploy.sh` | `~/deploy.sh` | every deploy (the CI key can run only this) |
 | `scripts/db-backup.sh` | `~/db-backup.sh` | the weekly cron job |
+| `scripts/backup-serve.sh` | `~/backup-serve.sh` | the laptop's weekly backup pull (the backup key can run only this) |
 
 A merge to `main` updates `~/app` but never these copies. So after a merge
-that changes either script, the Droplet keeps running the old version until
+that changes any of them, the Droplet keeps running the old version until
 you copy the new one over.
 
 **Why copies?**
@@ -169,6 +171,14 @@ cp scripts/db-backup.sh ~/db-backup.sh
 diff ~/db-backup.sh scripts/db-backup.sh && echo "db-backup.sh up to date"
 ```
 
+Backup-serving script:
+
+```bash
+diff ~/backup-serve.sh scripts/backup-serve.sh    # read what changes
+cp scripts/backup-serve.sh ~/backup-serve.sh
+diff ~/backup-serve.sh scripts/backup-serve.sh && echo "backup-serve.sh up to date"
+```
+
 `cp` onto an existing file keeps its permissions, so no `chmod` is needed.
 
 **Check it works:**
@@ -185,6 +195,9 @@ diff ~/db-backup.sh scripts/db-backup.sh && echo "db-backup.sh up to date"
   be `==> deployed <sha>`.
 - Backup script, on the Droplet: run `~/db-backup.sh` once and check that a
   new file appears in `~/backups/`.
+- Backup-serving script, on your laptop: run the pull now with
+  `launchctl kickstart gui/$(id -u)/app.huaben.backup-pull` and check
+  `tail ~/Library/Logs/huaben-backup-pull.log` ends with `==> ok`.
 
 ## Migration policy
 
@@ -466,8 +479,9 @@ encrypted with [age](https://age-encryption.org) by
 the encryption, so no plaintext copy is ever written.
 
 **Where:** first in `~deploy/backups/` on the Droplet (28 days kept, so the last 4), then
-pulled to your laptop (90 days kept). The laptop copy is the off-VM copy: the
-Droplet's copies die with the Droplet.
+pulled to your laptop automatically every Monday (90 days kept). The laptop
+copy is the off-VM copy: the Droplet's copies die with the Droplet, and
+anyone who took over the Droplet could delete them.
 
 **Protection:**
 
@@ -480,6 +494,10 @@ Droplet's copies die with the Droplet.
 - `~deploy/backups/` is mode 700, each file 600. On the laptop the files are
   encrypted, so ordinary disk backups of that folder (Time Machine etc.) are
   fine.
+- The laptop **pulls**; the Droplet never pushes. So the Droplet holds no
+  credentials for anywhere else, and the laptop's pull key is locked to
+  `~/backup-serve.sh`, which can only list backups and read one back: it can't
+  write, delete, or run anything else.
 
 **What's worth protecting:** stories and generation history are the only data
 that can't be recreated. Vocabulary can be re-imported from Skritter
@@ -520,25 +538,117 @@ Add this line to the crontab (Sundays, 03:17 UTC):
 17 3 * * 0 /home/deploy/db-backup.sh >> /home/deploy/backups/backup.log 2>&1
 ```
 
-### Weekly (Mondays): pull and check
+### Automatic weekly pull (laptop)
+
+Every Monday at 09:00 (or at the next wake, if the Mac was asleep), a launchd
+job runs [scripts/pull-backups.sh](../scripts/pull-backups.sh). It:
+
+1. copies any new backups from the Droplet to `~/Backups/huaben/`;
+2. deletes laptop copies older than 90 days;
+3. fails if the newest backup is more than 8 days old (the Droplet's cron
+   stopped);
+4. decrypts the newest backup and reads the whole dump, proving it's
+   complete and restorable, without writing plaintext anywhere;
+5. pings Healthchecks: success, or `/fail` if any step failed. No ping
+   within 8 days also raises an alert ([Monitoring](#monitoring-and-alerts)).
+
+Its log is `~/Library/Logs/huaben-backup-pull.log`. Run it now, e.g. after
+setup or a missed week:
 
 ```bash
-rsync -a --ignore-existing --include='db-*.dump.age' --exclude='*' \
-  deploy@api.huaben.app:backups/ ~/Backups/huaben/
-ls -t ~/Backups/huaben | head -3        # newest should be from this Sunday
-find ~/Backups/huaben -name 'db-*.dump.age' -mtime +90 -delete
-
-# Decrypts and reads the newest dump's table of contents, which proves it's
-# a complete, decryptable dump without restoring it.
-f=$(ls -t ~/Backups/huaben/db-*.dump.age | head -1)
-age -d -i ~/.config/story-backup/age-key.txt "$f" | pg_restore --list > /dev/null && echo "ok: $f"
+launchctl kickstart gui/$(id -u)/app.huaben.backup-pull
+tail -n 5 ~/Library/Logs/huaben-backup-pull.log
 ```
 
-If the newest file is old, read `~deploy/backups/backup.log` on the Droplet.
-Cron failures are silent otherwise.
+If it fails: "newest backup is N days old" means read
+`~deploy/backups/backup.log` on the Droplet (cron failures are silent there);
+an SSH error means check the `story-backups` entry in `~/.ssh/config` and the
+`backup-pull` line in the Droplet's `authorized_keys`.
+
+### One-time setup: automatic pull
+
+On your laptop, create the pull key (no passphrase: launchd can't type one;
+it can only read encrypted backups, see Protection above):
+
+```bash
+ssh-keygen -t ed25519 -f ~/.ssh/story_backup_pull -N "" -C backup-pull
+```
+
+and add this to `~/.ssh/config` (`HostName` the same as your `story` entry,
+so the known host key is reused):
+
+```
+Host story-backups
+    HostName api.huaben.app
+    User deploy
+    IdentityFile ~/.ssh/story_backup_pull
+    IdentitiesOnly yes
+    BatchMode yes
+```
+
+Copy the serving script to the Droplet, from the repo on your laptop:
+
+```bash
+scp scripts/backup-serve.sh story:backup-serve.sh
+```
+
+On the Droplet, make it executable and append the key to
+`~/.ssh/authorized_keys`, with the contents of `~/.ssh/story_backup_pull.pub`
+from your laptop in place of `ssh-ed25519 AAAA...`:
+
+```bash
+chmod 755 ~/backup-serve.sh
+```
+
+```
+command="/home/deploy/backup-serve.sh",restrict ssh-ed25519 AAAA... backup-pull
+```
+
+Back on the laptop: `ssh story-backups list` should print the backup names.
+Save the Healthchecks ping URL ([Monitoring](#monitoring-and-alerts)), then
+install the schedule and run it once:
+
+```bash
+echo 'https://hc-ping.com/<uuid>' > ~/.config/story-backup/ping-url
+scripts/install-backup-pull.sh
+launchctl kickstart gui/$(id -u)/app.huaben.backup-pull
+```
+
+The schedule runs the script from this checkout: re-run
+`scripts/install-backup-pull.sh` if you move the repo.
 
 A manual backup (e.g. before a destructive migration or a Postgres upgrade)
 is just `~/db-backup.sh` on the Droplet.
+
+## Monitoring and alerts
+
+Two free external services email you when something stops. Neither holds
+any secret: they only see a ping URL and the public `/health` page.
+
+| Service | Watches | Alerts when |
+| --- | --- | --- |
+| [Healthchecks.io](https://healthchecks.io) | the laptop's weekly backup pull | a pull reports failure, or no ping arrives within 8 days |
+| [UptimeRobot](https://uptimerobot.com) | `https://api.huaben.app/health` every 5 minutes | the API doesn't answer with a success status (down, or Caddy returning 502) |
+
+**Setup (once):**
+
+- Healthchecks: create a check named `huaben backup pull`, period **7 days**,
+  grace **1 day**, and put its ping URL in
+  `~/.config/story-backup/ping-url` on the laptop. Nothing on the Droplet
+  pings it: the laptop's pull succeeding proves the backup ran *and* reached
+  the laptop.
+- UptimeRobot: an **HTTP(s)** monitor on `https://api.huaben.app/health`,
+  5-minute interval, email alert. A plain status check is enough: when the
+  API is down, Caddy answers 502.
+
+**When an alert fires:**
+
+- Backup pull: read `~/Library/Logs/huaben-backup-pull.log`, then see
+  [Automatic weekly pull](#automatic-weekly-pull-laptop). A laptop that was
+  off all week also triggers it; running the pull clears it.
+- API down: `curl -s https://api.huaben.app/health`, then on the Droplet
+  `dc ps` and `dc logs --tail=50 api caddy`. A timeout rather than a refusal
+  points at the firewall (droplet-setup.md, Gotchas).
 
 ## Restore from a backup
 
@@ -755,8 +865,10 @@ always full.
    Then check the provider dashboard's activity/cost page for the same
    window. It's the source of truth for money. `usage` is only recorded on
    success, so failed attempts cost tokens that don't show here. Access logs:
-   `dc logs --since 48h api` (client addresses there are Caddy's, not the
-   caller's).
+   `dc logs --since 48h api` (each line shows the caller's address). Logs are
+   capped at 50MB per container, so on a busy attack the oldest lines may
+   already be gone; save them early with
+   `dc logs --no-color api > ~/api-$(date -u +%F).log`.
 4. **Drain the queue.** Prefer cancelling (keeps the audit trail) over
    deleting:
    ```sql
@@ -785,7 +897,19 @@ always full.
 ## Patching
 
 **Host OS.** Ubuntu's `unattended-upgrades` applies security updates
-automatically. Check it's on with `systemctl is-active unattended-upgrades`.
+automatically, once a day (around 06:00 UTC). A local file,
+`/etc/apt/apt.conf.d/52unattended-upgrades-local` (written by cloud-init),
+adds two things to Ubuntu's defaults:
+
+- **Docker Engine and containerd** from Docker's own repo are updated too.
+  Upgrading the engine restarts every container: under a minute of downtime,
+  and a generation in progress is retried.
+- **Automatic reboot at 05:00 UTC** when an update needs one (e.g. a
+  kernel), clear of the Sunday 03:17 backup and the 04:23 sync.
+
+Check it's on with `systemctl is-active unattended-upgrades`, and see what
+it did in `/var/log/unattended-upgrades/unattended-upgrades.log`. Ordinary
+(non-security) updates from `noble-updates` still wait for the manual pass.
 Monthly, or when a notable CVE lands:
 
 ```bash
@@ -798,7 +922,15 @@ All services have `restart: unless-stopped`, so they come back after a reboot
 or a Docker engine upgrade. Afterwards: `dc ps` (all Up) and
 `curl -s https://api.huaben.app/health`. Expect a minute or so of downtime.
 
-**App image** (`FROM python:3.12`, a moving tag). Every build resolves the tag
+Then clear out old images: every deploy pulls a new app image and nothing
+removes the old ones. This deletes only images no container is using; a
+rollback just pulls its image from GHCR again.
+
+```bash
+docker image prune -af && df -h /
+```
+
+**App image** (`FROM python:3.12-slim`, a moving tag). Every build resolves the tag
 again, so any deploy picks up the latest Python patch release and Debian
 security updates. Normally that's enough. For an urgent base-image fix with no
 code change to ship, rebuild the current `main` (*Run workflow* on `main`

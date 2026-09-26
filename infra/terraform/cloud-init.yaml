@@ -18,10 +18,18 @@ users:
       - ${ssh_public_key}   # interpolated by Terraform's templatefile()
 
 write_files:
+  # Nothing uses SSH forwarding (no tunnels in docs/runbook.md); drop
+  # AllowTcpForwarding if you ever want `ssh -L` to reach Postgres.
   - path: /etc/ssh/sshd_config.d/00-hardening.conf
     content: |
       PermitRootLogin no
       PasswordAuthentication no
+      KbdInteractiveAuthentication no
+      AllowUsers deploy
+      MaxAuthTries 3
+      X11Forwarding no
+      AllowAgentForwarding no
+      AllowTcpForwarding no
 
   - path: /etc/apt/sources.list.d/docker.sources
     content: |
@@ -30,6 +38,17 @@ write_files:
       Suites: noble
       Components: stable
       Signed-By: /etc/apt/keyrings/docker.asc
+
+  # unattended-upgrades additions (docs/runbook.md, "Patching"): also update
+  # Docker Engine/containerd from Docker's repo, and reboot at 05:00 UTC
+  # (clear of the backup and sync cron jobs) when an update needs it.
+  - path: /etc/apt/apt.conf.d/52unattended-upgrades-local
+    content: |
+      Unattended-Upgrade::Origins-Pattern {
+              "origin=Docker,label=Docker CE";
+      };
+      Unattended-Upgrade::Automatic-Reboot "true";
+      Unattended-Upgrade::Automatic-Reboot-Time "05:00";
 
   # Shell helpers from docs/runbook.md ("Conventions"); keep the two in sync.
   # defer: write_files normally runs before users are created, and writing
@@ -51,6 +70,11 @@ runcmd:
   # Docker's official apt repo (not Ubuntu's docker.io), matching the manual setup.
   - install -m 0755 -d /etc/apt/keyrings
   - curl -fsSL https://download.docker.com/linux/ubuntu/gpg -o /etc/apt/keyrings/docker.asc
+  # Refuse a key that isn't Docker's published one (fingerprint from
+  # docs.docker.com), rather than trusting whatever that URL served. exit
+  # stops the rest of runcmd, so Docker is never installed from an unverified
+  # repo; see "cloud-init failures are silent" in docs/droplet-setup.md.
+  - gpg --show-keys --with-colons /etc/apt/keyrings/docker.asc | grep -q '^fpr:::::::::9DC858229FC7DD38854AE2D88D81803C0EBFCD88:$' || { rm -f /etc/apt/keyrings/docker.asc; echo "Docker signing key fingerprint mismatch" >&2; exit 1; }
   - chmod a+r /etc/apt/keyrings/docker.asc
   - apt-get update
   # DEBIAN_FRONTEND=noninteractive plus the two dpkg options below make
@@ -67,6 +91,10 @@ runcmd:
   # run now, not in the users: block above. Doing it there fails useradd
   # outright, since the docker group doesn't exist yet at that point.
   - usermod -aG docker deploy
+  # DigitalOcean also installs the admin key for root. Root login is refused
+  # above anyway; emptying this means a lost PermitRootLogin line still
+  # wouldn't let that key in as root.
+  - truncate -s 0 /root/.ssh/authorized_keys
   - sshd -t && systemctl reload ssh
 
 # cloud-init runs user_data once per instance ID, not on every boot, so this
