@@ -1,4 +1,7 @@
-FROM python:3.12
+# slim: the same Debian base without compilers and dev libraries, which the
+# app doesn't need (every dependency installs from a prebuilt wheel), so the
+# image carries far fewer packages with CVEs to patch.
+FROM python:3.12-slim
 
 # Write print() output straight through, so `docker compose logs` shows the
 # API's and worker's lines when they happen rather than when a buffer fills

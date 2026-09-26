@@ -820,7 +820,7 @@ rollback just pulls its image from GHCR again.
 docker image prune -af && df -h /
 ```
 
-**App image** (`FROM python:3.12`, a moving tag). Every build resolves the tag
+**App image** (`FROM python:3.12-slim`, a moving tag). Every build resolves the tag
 again, so any deploy picks up the latest Python patch release and Debian
 security updates. Normally that's enough. For an urgent base-image fix with no
 code change to ship, rebuild the current `main` (*Run workflow* on `main`

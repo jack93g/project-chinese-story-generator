@@ -7,6 +7,16 @@ x-logging: &logging
     max-size: "10m"
     max-file: "5"
 
+# For the app containers (migrate, api, worker), which handle untrusted input
+# and need no special privileges: drop every Linux capability, and stop any
+# process in them from gaining more (e.g. via a setuid binary). Not applied to
+# db, whose entrypoint needs root capabilities to set up its data directory.
+x-hardening: &hardening
+  cap_drop:
+    - ALL
+  security_opt:
+    - no-new-privileges:true
+
 services:
 
   db:
@@ -29,6 +39,7 @@ services:
 
   migrate:
     build: .
+    <<: *hardening
     command: alembic upgrade head
     env_file:
       - .env
@@ -40,6 +51,7 @@ services:
 
   api:
     build: .
+    <<: *hardening
     restart: unless-stopped
     logging: *logging
     env_file:
@@ -56,6 +68,7 @@ services:
 
   worker:
     build: .
+    <<: *hardening
     restart: unless-stopped
     logging: *logging
     env_file:
