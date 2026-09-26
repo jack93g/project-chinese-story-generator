@@ -85,6 +85,25 @@ resource "digitalocean_firewall" "app" {
   }
 }
 
+# CAA: only these CAs may issue certificates for the API's name, so a
+# mis-issued certificate from any other CA is refused. Caddy gets its
+# certificate from Let's Encrypt and falls back to ZeroSSL (whose CAA name is
+# sectigo.com). Set on the API subdomain only: the frontend on the apex is
+# served by GitHub Pages, which chooses its own CA.
+resource "cloudflare_dns_record" "api_caa" {
+  for_each = toset(["letsencrypt.org", "sectigo.com"])
+
+  zone_id = var.cloudflare_zone_id
+  name    = var.api_subdomain
+  type    = "CAA"
+  ttl     = 1
+  data = {
+    flags = 0
+    tag   = "issue"
+    value = each.value
+  }
+}
+
 resource "cloudflare_dns_record" "api" {
   zone_id = var.cloudflare_zone_id
   name    = var.api_subdomain

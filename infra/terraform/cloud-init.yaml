@@ -70,6 +70,11 @@ runcmd:
   # Docker's official apt repo (not Ubuntu's docker.io), matching the manual setup.
   - install -m 0755 -d /etc/apt/keyrings
   - curl -fsSL https://download.docker.com/linux/ubuntu/gpg -o /etc/apt/keyrings/docker.asc
+  # Refuse a key that isn't Docker's published one (fingerprint from
+  # docs.docker.com), rather than trusting whatever that URL served. exit
+  # stops the rest of runcmd, so Docker is never installed from an unverified
+  # repo; see "cloud-init failures are silent" in docs/droplet-setup.md.
+  - gpg --show-keys --with-colons /etc/apt/keyrings/docker.asc | grep -q '^fpr:::::::::9DC858229FC7DD38854AE2D88D81803C0EBFCD88:$' || { rm -f /etc/apt/keyrings/docker.asc; echo "Docker signing key fingerprint mismatch" >&2; exit 1; }
   - chmod a+r /etc/apt/keyrings/docker.asc
   - apt-get update
   # DEBIAN_FRONTEND=noninteractive plus the two dpkg options below make

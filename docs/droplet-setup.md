@@ -42,7 +42,7 @@ procedures (deploys, rollbacks, backups, secret rotation) are in
   git commit SHA. It's public, so the Droplet can pull without a credential
   (the image contains code only, never secrets).
 - **Terraform** (`infra/terraform/`) defines the Droplet, firewall, SSH key and
-  DNS record as code. **cloud-init** is the first-boot script
+  DNS records as code. **cloud-init** is the first-boot script
   (`infra/terraform/cloud-init.yaml`) that DigitalOcean runs once on a new
   Droplet to create the `deploy` user, install Docker and harden SSH.
 
@@ -297,7 +297,9 @@ capped at 200 characters.
 ### Terraform
 
 `infra/terraform/` manages the Droplet, the firewall (inbound 22, 80 and 443),
-the admin SSH key and the DNS record. Credentials come only from the shell
+the admin SSH key and the DNS records: the `api` A record, plus CAA records
+allowing only Let's Encrypt and ZeroSSL (`sectigo.com`), the two CAs Caddy
+uses, to issue certificates for it. Credentials come only from the shell
 variables in [Rebuild step 1](#rebuild-from-scratch); `*.tfvars` files are
 gitignored in case one is ever created.
 
@@ -370,6 +372,17 @@ covers when and how to copy it.
 only in the `production` GitHub Environment, which only `main` can use, and
 the Droplet's host key is pinned in that Environment so CI can't be pointed at
 an impostor server.
+
+**Known gap: the image isn't tied to the commit as tightly as the code is.**
+The deploy script checks the *commit* is on `main`, but pulls the image by
+tag, and GHCR tags can be overwritten. Any workflow run with
+`packages: write` can push to them, including one started from another
+branch with an edited workflow file. So someone able to push a branch could
+replace the image behind a `main` SHA, and the next deploy or rollback of
+that SHA would run it. This is accepted for now: the repo has one
+collaborator, and anyone who can push already controls the repo. If that
+changes, pin images by digest (record each SHA's digest at build time and
+deploy `image@digest`) or verify build attestations on the Droplet.
 
 The Droplet fetches code over HTTPS without a credential because the repo is
 public. If it ever goes private, the Droplet will need a read-only deploy key
