@@ -423,3 +423,73 @@ def test_run_single_records_the_translation_and_whether_it_lines_up():
     markdown = to_markdown([outcome])
     assert "| 2/3 ❌ |" in markdown
     assert "**Translation:**\n\nHe reads the menu.\n\nHe orders and eats." in markdown
+
+
+def test_run_single_records_the_questions_and_reports_their_answer_keys():
+    snapshot = [
+        {"id": 1, "writing": "菜单", "reading": "càidān", "definition_en": "menu"}
+    ]
+    provider = FakeStoryGenerationProvider(
+        raw_response=(
+            '{"title": "故事", "body": "他看菜单。", "questions": ['
+            '{"question": "他看什么？", "options": ["书", "菜单"], "answer": 1}]}'
+        )
+    )
+    spec = ProviderSpec(
+        label="fake",
+        provider=provider,
+        model="fake-model",
+        base_url="https://fake.test",
+    )
+
+    outcome = run_single(_fixture(snapshot, prompt_version="story-v7"), spec)
+
+    assert outcome.questions == [
+        {"question": "他看什么？", "options": ["书", "菜单"], "answer": 1}
+    ]
+    markdown = to_markdown([outcome])
+    assert "| — | 1 |" in markdown  # no translation, one question
+    assert "1. 他看什么？\n    - 书\n    - 菜单 ✅" in markdown
+
+
+def test_report_shows_each_questions_evidence():
+    snapshot = [
+        {"id": 1, "writing": "菜单", "reading": "càidān", "definition_en": "menu"}
+    ]
+    provider = FakeStoryGenerationProvider(
+        raw_response=(
+            '{"title": "故事", "body": "他看菜单。", "questions": ['
+            '{"question": "他看什么？", "options": ["书", "菜单"], "answer": 1, '
+            '"evidence": "他看菜单。"}]}'
+        )
+    )
+    spec = ProviderSpec(
+        label="fake",
+        provider=provider,
+        model="fake-model",
+        base_url="https://fake.test",
+    )
+
+    markdown = to_markdown([run_single(_fixture(snapshot), spec)])
+
+    assert "    - 菜单 ✅\n    - _Evidence:_ 他看菜单。" in markdown
+
+
+def test_report_lists_stray_english_words():
+    snapshot = [
+        {"id": 1, "writing": "菜单", "reading": "càidān", "definition_en": "menu"}
+    ]
+    provider = FakeStoryGenerationProvider(
+        raw_response='{"title": "故事", "body": "他 quickly 看菜单。"}'
+    )
+    spec = ProviderSpec(
+        label="fake",
+        provider=provider,
+        model="fake-model",
+        base_url="https://fake.test",
+    )
+
+    outcome = run_single(_fixture(snapshot), spec)
+
+    assert outcome.stray_english == ["quickly"]
+    assert "| — | quickly |" in to_markdown([outcome])

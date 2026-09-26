@@ -38,6 +38,7 @@ insufficient coverage, or success — so every failure mode is
 diagnosable from raw_generation_payloads.
 """
 
+import random
 import threading
 import time
 from datetime import timedelta
@@ -76,9 +77,30 @@ def _apply_glossary(db: Session, snapshot: list[dict], glossary: list[dict]) -> 
             vocabulary_item.definition_en = entry.get("definition_en")
 
 
+def _shuffle_options(questions: list[dict], rng: random.Random) -> list[dict]:
+    """Each question with its options in random order and its answer index
+    moved to match. Models tend to put the correct option in the same place
+    every time, which a learner would soon notice."""
+    shuffled = []
+    for question in questions:
+        order = list(range(len(question["options"])))
+        rng.shuffle(order)
+        shuffled.append(
+            {
+                **question,
+                "options": [question["options"][i] for i in order],
+                "answer": order.index(question["answer"]),
+            }
+        )
+    return shuffled
+
+
 class GenerationWorker:
-    def __init__(self, provider: StoryGenerationProvider):
+    def __init__(
+        self, provider: StoryGenerationProvider, rng: random.Random | None = None
+    ):
         self._provider = provider
+        self._rng = rng or random.Random()
         self._stop = threading.Event()
 
     def request_stop(self) -> None:
@@ -170,6 +192,9 @@ class GenerationWorker:
             title=result.title,
             content=result.body,
             translation_en=result.translation,
+            comprehension_questions=_shuffle_options(result.questions, self._rng)
+            if result.questions is not None
+            else None,
             target_hsk=request.target_hsk_level,
         )
         for item in request.selected_vocabulary_snapshot:

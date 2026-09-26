@@ -63,6 +63,24 @@ def word_appears(writing: str, text: str) -> bool:
     return re.search(pattern, text) is not None
 
 
+# A run of Latin letters with a lowercase letter in it: an English word
+# left in the Chinese text (Kimi K2 wrote "hurriedly" and "walking" in 2 of
+# ~70 evaluation stories), as opposed to an abbreviation Chinese writers
+# use as it is ("CEO", "AI").
+_ENGLISH_WORD = re.compile(r"[A-Za-z]*[a-z][A-Za-z]*")
+
+
+def stray_english(result: GenerationResult) -> list[str]:
+    """English words in the text meant to be Chinese: the title, body, and
+    questions and their options (not the translation, which is English).
+    Each word once, in order of appearance."""
+    texts = [result.title, result.body]
+    for question in result.questions or []:
+        texts += [question["question"], *question["options"]]
+    words = [word for text in texts for word in _ENGLISH_WORD.findall(text)]
+    return list(dict.fromkeys(words))
+
+
 def split_paragraphs(body: str) -> list[str]:
     """A story body's paragraphs: its non-blank lines. story-v3+ asks for
     blank lines between paragraphs, but a single line break also separates
@@ -117,6 +135,9 @@ def validate_story(
         "coverage": coverage,
         "coverage_threshold": VOCABULARY_COVERAGE_THRESHOLD,
         "meets_coverage_threshold": coverage >= VOCABULARY_COVERAGE_THRESHOLD,
+        # Recorded, not enforced: one stray word leaves the story readable,
+        # and it's rare enough that the fix is the prompt (story-v10).
+        "stray_english": stray_english(result),
     }
     # Recorded, not enforced, like length: the reader shows an English list
     # that doesn't line up with the paragraphs as one block instead.
@@ -124,4 +145,7 @@ def validate_story(
         report["translation_aligned"] = len(result.translation) == len(
             split_paragraphs(result.body)
         )
+    # Also recorded only: a story with no usable questions is still readable.
+    if result.questions is not None:
+        report["question_count"] = len(result.questions)
     return report, used_map

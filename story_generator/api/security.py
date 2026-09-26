@@ -59,16 +59,21 @@ def require_auth(
     request: Request,
     session_token: str | None = Depends(_session_token_or_valid_api_key),
     db: Session = Depends(get_db),
-) -> None:
+) -> AuthenticatedUser | None:
     """
     Gate for every protected route: accept either the shared X-API-Key
     (scripts, curl, operations) or a logged-in browser's session cookie.
+    Returns the logged-in user, or None for the API key, which has no user;
+    a route that records who did something can depend on it again to get
+    the user (FastAPI runs it once per request).
     """
     if session_token is None:
-        return
+        return None
     _require_allowed_origin(request)
-    if AuthService(AuthRepository(db)).authenticate(session_token) is None:
+    user = AuthService(AuthRepository(db)).authenticate(session_token)
+    if user is None:
         raise _unauthorized()
+    return user
 
 
 def require_session_user(

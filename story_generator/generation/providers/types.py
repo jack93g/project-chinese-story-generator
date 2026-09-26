@@ -63,3 +63,9 @@ class GenerationResult:
     # Optional English translation, one string per paragraph of body
     # (story-v6+); best-effort, None when absent or malformed.
     translation: list[str] | None = None
+    # Optional multiple-choice comprehension questions (story-v7+):
+    # [{"question": str, "options": [str, ...], "answer": int}], answer
+    # being the index of the correct option, plus "evidence" (story-v9+):
+    # the sentence of body that settles the answer. Best-effort, None when
+    # absent or when none of them is well-formed.
+    questions: list[dict] | None = None

@@ -1,3 +1,5 @@
+import random
+
 import pytest
 
 from story_generator.generation.persistence.models import (
@@ -79,6 +81,7 @@ def test_run_once_persists_story_and_marks_request_succeeded_atomically(db_sessi
     assert story.title == "问候"
     assert story.content == "小明说你好。"
     assert story.translation_en is None
+    assert story.comprehension_questions is None
 
     associations = (
         db_session.query(StoryVocabularyItem).filter_by(story_id=story.id).all()
@@ -185,3 +188,60 @@ def test_run_once_stores_the_translation_with_the_story(db_session):
     assert story.translation_en == ["Xiao Ming says hello.", "Xiao Hong smiles."]
     db_session.refresh(request)
     assert request.validation_report["translation_aligned"] is True
+
+
+def test_run_once_stores_the_questions_with_their_options_shuffled(db_session):
+    request = _make_queued_request(
+        db_session, skritter_list_id="worker-questions", writing="你好"
+    )
+    options = ["小明", "小红", "老师", "妈妈"]
+    provider = FakeStoryGenerationProvider(
+        scenario="success",
+        raw_response=(
+            '{"title": "问候", "body": "小明说你好。", "questions": ['
+            '{"question": "谁说你好？", "options": ["小明", "小红", "老师", "妈妈"], '
+            '"answer": 0}]}'
+        ),
+    )
+    # Seeded so the shuffle is repeatable; any order must keep the answer on
+    # the option that was correct.
+    worker = GenerationWorker(provider=provider, rng=random.Random(7))
+
+    assert worker.run_once(db_session) is True
+
+    story = db_session.query(Story).filter_by(generation_request_id=request.id).one()
+    [question] = story.comprehension_questions
+    assert question["question"] == "谁说你好？"
+    assert sorted(question["options"]) == sorted(options)
+    assert question["options"][question["answer"]] == "小明"
+    db_session.refresh(request)
+    assert request.validation_report["question_count"] == 1
+
+
+def test_shuffling_moves_the_answer_with_its_option():
+    from story_generator.generation.worker import _shuffle_options
+
+    question = {"question": "谁？", "options": ["甲", "乙", "丙", "丁"], "answer": 2}
+    positions = set()
+    for seed in range(40):
+        [shuffled] = _shuffle_options([question], random.Random(seed))
+        assert shuffled["options"][shuffled["answer"]] == "丙"
+        positions.add(shuffled["answer"])
+
+    # The correct option doesn't stay where the model put it.
+    assert positions == {0, 1, 2, 3}
+
+
+def test_shuffling_keeps_the_evidence():
+    from story_generator.generation.worker import _shuffle_options
+
+    question = {
+        "question": "谁？",
+        "options": ["甲", "乙"],
+        "answer": 0,
+        "evidence": "甲说你好。",
+    }
+
+    [shuffled] = _shuffle_options([question], random.Random(1))
+
+    assert shuffled["evidence"] == "甲说你好。"

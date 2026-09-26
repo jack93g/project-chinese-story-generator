@@ -33,6 +33,9 @@ python3.12 -m venv .venv
 
 .venv/bin/manage-lists list                      # every vocabulary list, by Skritter ID
 .venv/bin/manage-lists hide SKRITTER_LIST_ID...  # hide lists from the app (show ... undoes it)
+
+.venv/bin/manage-questions flagged               # questions readers reported as wrong
+.venv/bin/manage-questions show STORY_ID         # a story with all its questions and answer keys
 ```
 
 Tests:
@@ -160,6 +163,8 @@ should be structured.
   `session.py`).
 - `cli/` — `ingestion` (Skritter sync), `generation_worker`, `users`
   (`manage-users`), `lists` (`manage-lists`: hide/show vocabulary lists),
+  `questions` (`manage-questions`: review flagged comprehension questions,
+  read-only; the review logic is in `stories/review.py`),
   `provider_comparison` (evaluate a provider against a fixed eval set before
   allowlisting it, without touching the application database).
 
@@ -167,7 +172,10 @@ should be structured.
 `vocabulary_lists`/`list_vocabulary` (Skritter list membership), `sync_runs` +
 `raw_skritter_payloads` (ingestion audit trail), `story_generation_requests` +
 `raw_generation_payloads` (generation lifecycle/debug trail), `stories` +
-`story_vocabulary_items` (generated output), `users` + `auth_sessions`
+`story_vocabulary_items` (generated output; story-v7+ stories also carry
+`comprehension_questions`), `quiz_attempts` (one row per marked quiz
+attempt, with the user when logged in) and `question_flags` (one row per
+"this question seems wrong" report), `users` + `auth_sessions`
 (frontend logins).
 
 **Authentication** (`api/security.py`): `require_auth` guards every router

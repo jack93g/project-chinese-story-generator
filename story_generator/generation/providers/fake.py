@@ -26,7 +26,10 @@ from story_generator.generation.providers.types import (
 DEFAULT_RAW_RESPONSE = (
     '{"title": "菜单的故事", "body": "小明去饭馆点了一份菜单上的菜。", '
     '"translation": ["Xiao Ming went to a restaurant and ordered a dish '
-    'from the menu."]}'
+    'from the menu."], '
+    '"questions": [{"question": "小明去了哪里？", '
+    '"options": ["学校", "饭馆", "商店", "医院"], "answer": 1, '
+    '"evidence": "小明去饭馆点了一份菜单上的菜。"}]}'
 )
 DEFAULT_USAGE = UsageMetadata(prompt_tokens=120, completion_tokens=80, total_tokens=200)
 

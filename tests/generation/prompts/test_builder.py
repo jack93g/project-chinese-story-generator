@@ -6,6 +6,10 @@ from story_generator.generation.prompts.builder import (
     build_story_v4_prompt,
     build_story_v5_prompt,
     build_story_v6_prompt,
+    build_story_v7_prompt,
+    build_story_v8_prompt,
+    build_story_v9_prompt,
+    build_story_v10_prompt,
 )
 from story_generator.generation.providers.types import GenerationRequestInput
 
@@ -99,8 +103,8 @@ def test_prompt_requests_structured_json_output():
     assert '"body"' in prompt
 
 
-def test_current_prompt_version_is_v6():
-    assert CURRENT_PROMPT_VERSION == "story-v6"
+def test_current_prompt_version_is_v10():
+    assert CURRENT_PROMPT_VERSION == "story-v10"
 
 
 def test_v3_prompt_states_a_length_band_and_paragraph_plan():
@@ -220,3 +224,104 @@ def test_v6_prompt_keeps_the_glossary_after_the_translation():
 
     assert "glossary entry for each of these words: 饭馆" in prompt
     assert prompt.index('"translation"') < prompt.index('"glossary"')
+
+
+def test_v7_prompt_adds_comprehension_questions_to_v6():
+    request = _make_request(prompt_version="story-v7", target_word_count=300)
+
+    v6 = build_story_v6_prompt(request)
+    v7 = build_story_v7_prompt(request)
+
+    assert build_prompt(request) == v7
+    assert '"questions"' not in v6
+    # one question per planned paragraph (3 here), after the translation
+    assert "also write 3 multiple-choice questions" in v7
+    assert (
+        '"<English translation of paragraph 3>"], "questions": [{"question": '
+        '"<question in Chinese>", "options": ["<option>", "<option>", '
+        '"<option>", "<option>"], "answer": <index of the correct option, 0-3>}]}'
+    ) in v7
+    # the guidance follows the translation guidance, and v7 is otherwise v6
+    guidance_start = v7.index("Questions:")
+    assert v7.index("Translation:") < guidance_start < v7.index("Respond with")
+    guidance = v7[guidance_start : v7.index("Respond with")]
+    questions_field = v7[v7.index(', "questions": [') : v7.index("}]}") + 2]
+    assert v7.replace(guidance, "").replace(questions_field, "") == v6
+
+
+def test_v7_prompt_asks_for_between_three_and_five_questions():
+    short = build_story_v7_prompt(
+        _make_request(prompt_version="story-v7", target_word_count=60)
+    )
+    long = build_story_v7_prompt(
+        _make_request(prompt_version="story-v7", target_word_count=1000)
+    )
+
+    assert "also write 3 multiple-choice questions" in short
+    assert "also write 5 multiple-choice questions" in long
+
+
+def test_v7_prompt_keeps_the_glossary_last():
+    request = _make_request(
+        prompt_version="story-v7",
+        vocabulary_snapshot=[
+            {"id": 2, "writing": "饭馆", "reading": None, "definition_en": None},
+        ],
+    )
+
+    prompt = build_story_v7_prompt(request)
+
+    assert prompt.index('"translation"') < prompt.index('"questions"')
+    assert prompt.index('"questions"') < prompt.index('"glossary"')
+
+
+def test_v8_prompt_adds_question_rules_to_v7():
+    request = _make_request(prompt_version="story-v8", target_word_count=300)
+
+    v7 = build_story_v7_prompt(request)
+    v8 = build_story_v8_prompt(request)
+
+    assert build_prompt(request) == v8
+    assert "only ask why something happened if the story says why" in v8
+    assert "only ask why" not in v7
+    # the rules follow "settle every answer", and v8 is otherwise v7
+    rules_start = v8.index("So only ask why")
+    assert v8.index("settle every answer.") < rules_start
+    rules = v8[rules_start : v8.index("The questions don't count")]
+    assert v8.replace(rules, "") == v7
+
+
+def test_v9_prompt_asks_each_question_for_its_evidence():
+    request = _make_request(prompt_version="story-v9", target_word_count=300)
+
+    v8 = build_story_v8_prompt(request)
+    v9 = build_story_v9_prompt(request)
+
+    assert build_prompt(request) == v9
+    assert '"evidence"' not in v8
+    assert (
+        '"answer": <index of the correct option, 0-3>, '
+        '"evidence": "<sentence copied exactly from the body>"}]}'
+    ) in v9
+    # the rule follows v8's rules, and v9 is otherwise v8
+    rule_start = v9.index('For each question, also give "evidence"')
+    assert v9.index("options like") < rule_start
+    rule = v9[rule_start : v9.index("The questions don't count")]
+    field = ', "evidence": "<sentence copied exactly from the body>"'
+    assert v9.replace(rule, "").replace(field, "") == v8
+
+
+def test_v10_prompt_adds_a_chinese_only_rule_to_v9():
+    request = _make_request(prompt_version="story-v10", target_word_count=300)
+
+    v9 = build_story_v9_prompt(request)
+    v10 = build_story_v10_prompt(request)
+
+    assert build_prompt(request) == v10
+    assert "Never switch to an English word" in v10
+    # the rule sits between the length section and the translation guidance,
+    # and v10 is otherwise v9
+    rule_start = v10.index("Language:")
+    assert v10.index("Length:") < rule_start < v10.index("Translation:")
+    rule = v10[rule_start : v10.index("Translation:")]
+    assert v10.replace(rule, "") == v9

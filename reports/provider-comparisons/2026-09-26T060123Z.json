@@ -1,0 +1,1683 @@
+[
+  {
+    "fixture_name": "hsk1_basic",
+    "category": "hsk_level",
+    "provider_label": "openrouter",
+    "model": "moonshotai/kimi-k2-0905",
+    "base_url": "https://openrouter.ai/api/v1/chat/completions",
+    "schema_valid": true,
+    "error_code": null,
+    "error_message": null,
+    "requested_vocabulary_count": 5,
+    "used_vocabulary_count": 5,
+    "coverage": 1.0,
+    "meets_coverage_threshold": true,
+    "missing_vocabulary": [],
+    "target_word_count": 150,
+    "actual_character_count": 139,
+    "length_ratio": 0.9266666666666666,
+    "latency_ms": 19847,
+    "title": "小明的新朋友",
+    "body": "你好！我是小明。今天我去公园，看见一个男孩。他说：\"你好！\"我说：\"你好！\"他是我的朋友。我们一起吃苹果，喝一点水。他说：\"谢谢！\"我说：\"不用谢！\"\n\n下午，我的朋友要回家。他说：\"明天见！\"我说：\"明天见！\"我很高兴，我有一个新朋友。我想明天再吃苹果，再喝水，再见我的朋友。",
+    "manual_quality_notes": "",
+    "prompt_version": "story-v9",
+    "meets_length_threshold": true,
+    "sample": 1,
+    "translation": [
+      "Hello! I am Xiaoming. Today I went to the park and saw a boy. He said: \"Hello!\" I said: \"Hello!\" He is my friend. We ate apples together and drank a little water. He said: \"Thank you!\" I said: \"You're welcome!\"",
+      "In the afternoon, my friend had to go home. He said: \"See you tomorrow!\" I said: \"See you tomorrow!\" I am very happy that I have a new friend. I want to eat apples again, drink water again, and see my friend again tomorrow."
+    ],
+    "translation_aligned": true,
+    "questions": [
+      {
+        "question": "小明和朋友吃什么？",
+        "options": [
+          "苹果",
+          "米饭",
+          "面包",
+          "面条"
+        ],
+        "answer": 0,
+        "evidence": "我们一起吃苹果，喝一点水。"
+      },
+      {
+        "question": "朋友为什么对小明说\"谢谢\"？",
+        "options": [
+          "因为小明给他苹果和水",
+          "因为小明给他钱",
+          "因为小明帮他回家",
+          "因为小明教他中文"
+        ],
+        "answer": 0,
+        "evidence": "我们一起吃苹果，喝一点水。他说：\"谢谢！\""
+      },
+      {
+        "question": "朋友什么时候回家？",
+        "options": [
+          "早上",
+          "中午",
+          "下午",
+          "晚上"
+        ],
+        "answer": 2,
+        "evidence": "下午，我的朋友要回家。"
+      }
+    ]
+  },
+  {
+    "fixture_name": "hsk1_basic",
+    "category": "hsk_level",
+    "provider_label": "openrouter",
+    "model": "moonshotai/kimi-k2-0905",
+    "base_url": "https://openrouter.ai/api/v1/chat/completions",
+    "schema_valid": true,
+    "error_code": null,
+    "error_message": null,
+    "requested_vocabulary_count": 5,
+    "used_vocabulary_count": 5,
+    "coverage": 1.0,
+    "meets_coverage_threshold": true,
+    "missing_vocabulary": [],
+    "target_word_count": 150,
+    "actual_character_count": 164,
+    "length_ratio": 1.0933333333333333,
+    "latency_ms": 8704,
+    "title": "新朋友",
+    "body": "你好！我是小明。今天我去公园，看见一个男孩。他说：“你好，我是大伟。”我说：“你好，我是小明。你是我的朋友吗？”他说：“是，我是你的朋友。”我们很高兴。我想吃苹果，但是我没有苹果。大伟有苹果，他说：“你吃我的苹果吧。”我说：“谢谢！”我们吃苹果，喝水，说话。下午下雨了，我们回家。大伟说：“明天见！”我说：“明天见，我的朋友！”",
+    "manual_quality_notes": "",
+    "prompt_version": "story-v9",
+    "meets_length_threshold": true,
+    "sample": 2,
+    "translation": [
+      "Hello! I am Xiaoming. Today I went to the park and saw a boy. He said, \"Hello, I am Dawei.\" I said, \"Hello, I am Xiaoming. Are you my friend?\" He said, \"Yes, I am your friend.\" We were very happy. I wanted to eat an apple, but I didn't have an apple. Dawei had an apple, and he said, \"Eat my apple.\" I said, \"Thank you!\" We ate apples, drank water, and talked. In the afternoon it rained, so we went home. Dawei said, \"See you tomorrow!\" I said, \"See you tomorrow, my friend!\"",
+      "We ate apples, drank water, and talked. In the afternoon it rained, so we went home."
+    ],
+    "translation_aligned": false,
+    "questions": [
+      {
+        "question": "小明和大伟在哪里见面？",
+        "options": [
+          "在公园",
+          "在学校",
+          "在商店",
+          "在家里"
+        ],
+        "answer": 0,
+        "evidence": "今天我去公园，看见一个男孩。"
+      },
+      {
+        "question": "大伟给小明什么？",
+        "options": [
+          "水",
+          "苹果",
+          "书",
+          "钱"
+        ],
+        "answer": 1,
+        "evidence": "大伟有苹果，他说：“你吃我的苹果吧。”"
+      },
+      {
+        "question": "他们为什么回家？",
+        "options": [
+          "因为他们饿了",
+          "因为下雨了",
+          "因为他们累了",
+          "因为天黑了"
+        ],
+        "answer": 1,
+        "evidence": "下午下雨了，我们回家。"
+      }
+    ]
+  },
+  {
+    "fixture_name": "hsk1_basic",
+    "category": "hsk_level",
+    "provider_label": "openrouter",
+    "model": "moonshotai/kimi-k2-0905",
+    "base_url": "https://openrouter.ai/api/v1/chat/completions",
+    "schema_valid": true,
+    "error_code": null,
+    "error_message": null,
+    "requested_vocabulary_count": 5,
+    "used_vocabulary_count": 5,
+    "coverage": 1.0,
+    "meets_coverage_threshold": true,
+    "missing_vocabulary": [],
+    "target_word_count": 150,
+    "actual_character_count": 148,
+    "length_ratio": 0.9866666666666667,
+    "latency_ms": 27184,
+    "title": "图书馆里的好朋友",
+    "body": "李明在学校图书馆看见一个新朋友。他微笑着打招呼：“你好！”新朋友正在喝水，放下杯子说：“你渴了吗？”李明点点头。朋友递给他一瓶水，李明非常高兴。\n\n接着，朋友问：“你想吃苹果吗？”李明摇摇头说：“我已经吃过饭了。”朋友笑着说：“没关系，那我们回家吧。”李明说：“谢谢你的水。”他们一起走出图书馆。",
+    "manual_quality_notes": "",
+    "prompt_version": "story-v9",
+    "meets_length_threshold": true,
+    "sample": 3,
+    "translation": [
+      "Li Ming sees a new friend in the school library. He greets him with a smile: 'Hello!' The new friend is drinking water, puts down his cup, and asks: 'Are you thirsty?' Li Ming nods. The friend hands him a bottle of water, and Li Ming is very happy.",
+      "Then, the friend asks: 'Do you want to eat an apple?' Li Ming shakes his head and says: 'I have already eaten.' The friend smiles and says: 'It doesn't matter, let's go home together.' Li Ming says: 'Thank you for the water.' They walk out of the library together."
+    ],
+    "translation_aligned": true,
+    "questions": [
+      {
+        "question": "李明为什么高兴？",
+        "options": [
+          "因为朋友给他水。",
+          "因为朋友给他苹果。",
+          "因为他在图书馆看书。",
+          "因为朋友请他吃饭。"
+        ],
+        "answer": 0,
+        "evidence": "朋友递给他一瓶水，李明非常高兴。"
+      },
+      {
+        "question": "李明为什么摇摇头？",
+        "options": [
+          "因为他已经吃过饭了。",
+          "因为他不喜欢苹果。",
+          "因为他想喝水。",
+          "因为他要回家。"
+        ],
+        "answer": 0,
+        "evidence": "李明摇摇头说：“我已经吃过饭了。”"
+      },
+      {
+        "question": "他们最后在哪里？",
+        "options": [
+          "图书馆外",
+          "公园里",
+          "家里",
+          "学校门口"
+        ],
+        "answer": 0,
+        "evidence": "他们一起走出图书馆。"
+      }
+    ]
+  },
+  {
+    "fixture_name": "hsk3_intermediate",
+    "category": "hsk_level",
+    "provider_label": "openrouter",
+    "model": "moonshotai/kimi-k2-0905",
+    "base_url": "https://openrouter.ai/api/v1/chat/completions",
+    "schema_valid": true,
+    "error_code": null,
+    "error_message": null,
+    "requested_vocabulary_count": 6,
+    "used_vocabulary_count": 6,
+    "coverage": 1.0,
+    "meets_coverage_threshold": true,
+    "missing_vocabulary": [],
+    "target_word_count": 300,
+    "actual_character_count": 293,
+    "length_ratio": 0.9766666666666667,
+    "latency_ms": 19023,
+    "title": "新工作的第一天",
+    "body": "小李刚从大学毕业，想找一份好工作。有一天，他得到一个面试的机会，心里非常高兴。面试前，他向有经验的朋友请教，朋友给了他一些建议：“你要多了解公司的环境，还要准备好讨论你的学习计划。”小李认真地记下了这些话。\n\n第二天，小李来到公司。这里的环境很好，办公室又大又明亮。面试官问他：“你为什么决定来我们公司？”小李回答说：“我想在这里学习新东西，积累更多经验。”面试官听了很满意，他们一起讨论了很多问题，小李觉得自己表现不错。\n\n几天后，小李收到了录取通知。他非常高兴，因为这是他人生中的重要决定。他知道，这次机会很难得，以后要继续努力工作。他也感谢朋友的建议，让他在新环境中有了好的开始。",
+    "manual_quality_notes": "",
+    "prompt_version": "story-v9",
+    "meets_length_threshold": true,
+    "sample": 1,
+    "translation": [
+      "Xiao Li had just graduated from university and wanted to find a good job. One day, he got an opportunity for an interview and was very happy. Before the interview, he asked a friend with experience for advice, and the friend gave him some suggestions: \"You should learn more about the company's environment, and also be prepared to discuss your study plans.\" Xiao Li carefully wrote down these words.",
+      "The next day, Xiao Li arrived at the company. The environment here was very good—the office was large and bright. The interviewer asked him: \"Why did you decide to come to our company?\" Xiao Li replied: \"I want to learn new things here and accumulate more experience.\" The interviewer was very satisfied after hearing this. They discussed many questions together, and Xiao Li felt he had performed well.",
+      "A few days later, Xiao Li received the job offer. He was very happy because this was an important decision in his life. He knew this opportunity was rare and that he needed to continue working hard in the future. He also thanked his friend for the suggestions, which gave him a good start in the new environment."
+    ],
+    "translation_aligned": true,
+    "questions": [
+      {
+        "question": "小李面试前向谁请教？",
+        "options": [
+          "向老师",
+          "向有经验的朋友",
+          "向父母",
+          "向同学"
+        ],
+        "answer": 1,
+        "evidence": "面试前，他向有经验的朋友请教，朋友给了他一些建议"
+      },
+      {
+        "question": "面试官问了小李什么问题？",
+        "options": [
+          "你有多少经验",
+          "你为什么决定来我们公司",
+          "你喜欢什么环境",
+          "你有什么建议"
+        ],
+        "answer": 1,
+        "evidence": "面试官问他：“你为什么决定来我们公司？”"
+      },
+      {
+        "question": "小李为什么感谢他的朋友？",
+        "options": [
+          "因为朋友给了他面试的机会",
+          "因为朋友和他一起讨论问题",
+          "因为朋友的建议让他在新环境中有了好的开始",
+          "因为朋友帮他做了决定"
+        ],
+        "answer": 2,
+        "evidence": "他也感谢朋友的建议，让他在新环境中有了好的开始。"
+      }
+    ]
+  },
+  {
+    "fixture_name": "hsk3_intermediate",
+    "category": "hsk_level",
+    "provider_label": "openrouter",
+    "model": "moonshotai/kimi-k2-0905",
+    "base_url": "https://openrouter.ai/api/v1/chat/completions",
+    "schema_valid": true,
+    "error_code": null,
+    "error_message": null,
+    "requested_vocabulary_count": 6,
+    "used_vocabulary_count": 6,
+    "coverage": 1.0,
+    "meets_coverage_threshold": true,
+    "missing_vocabulary": [],
+    "target_word_count": 300,
+    "actual_character_count": 295,
+    "length_ratio": 0.9833333333333333,
+    "latency_ms": 11545,
+    "title": "第一次工作面试",
+    "body": "小王大学刚毕业，想在大城市找一份好工作。他没有什么工作经验，所以心里有点紧张。一天，他看到一家环保公司的招聘广告，觉得这是一个很好的机会，于是决定申请这个职位。\n\n面试那天，小王提前半小时到了公司。他发现这里的工作环境非常好，办公室明亮又干净。面试官让他介绍自己，还问了他很多问题。小王诚实地回答，也主动分享了自己在大学做志愿者的经历。面试结束后，面试官给了他一个建议：多学习一些专业知识。小王认真地记了下来。\n\n几天后，小王收到了录取通知。他和朋友们讨论这个好消息，大家都为他高兴。小王明白，这次成功不仅是因为运气，更是因为他勇敢地抓住了机会。他决定以后要更加努力，在工作中积累更多经验。",
+    "manual_quality_notes": "",
+    "prompt_version": "story-v9",
+    "meets_length_threshold": true,
+    "sample": 2,
+    "translation": [
+      "Xiao Wang had just graduated from university and wanted to find a good job in a big city. He didn't have much work experience, so he felt a bit nervous. One day, he saw a recruitment advertisement from an environmental protection company and thought this was a very good opportunity, so he decided to apply for this position.",
+      "On the interview day, Xiao Wang arrived at the company half an hour early. He found that the working environment here was very good—the office was bright and clean. The interviewer asked him to introduce himself and also asked him many questions. Xiao Wang answered honestly and also actively shared his volunteer experience from university. After the interview ended, the interviewer gave him a suggestion: study more professional knowledge. Xiao Wang wrote it down carefully.",
+      "A few days later, Xiao Wang received the job offer. He discussed this good news with his friends, and everyone was happy for him. Xiao Wang understood that this success was not only because of luck, but more importantly because he bravely seized the opportunity. He decided to work even harder in the future and accumulate more experience in his work."
+    ],
+    "translation_aligned": true,
+    "questions": [
+      {
+        "question": "小王为什么决定申请环保公司的工作？",
+        "options": [
+          "因为他有很多工作经验",
+          "因为他觉得这是一个很好的机会",
+          "因为他的朋友建议他去",
+          "因为他想讨论环境问题"
+        ],
+        "answer": 1,
+        "evidence": "一天，他看到一家环保公司的招聘广告，觉得这是一个很好的机会，于是决定申请这个职位。"
+      },
+      {
+        "question": "面试结束后，面试官给了小王什么建议？",
+        "options": [
+          "多学习一些专业知识",
+          "换一份更好的工作",
+          "早点到公司",
+          "不要紧张"
+        ],
+        "answer": 0,
+        "evidence": "面试结束后，面试官给了他一个建议：多学习一些专业知识。"
+      },
+      {
+        "question": "小王收到录取通知后，他和谁讨论了这个好消息？",
+        "options": [
+          "他的面试官",
+          "环保公司的同事",
+          "他的朋友们",
+          "他的大学老师"
+        ],
+        "answer": 2,
+        "evidence": "他和朋友们讨论这个好消息，大家都为他高兴。"
+      }
+    ]
+  },
+  {
+    "fixture_name": "hsk3_intermediate",
+    "category": "hsk_level",
+    "provider_label": "openrouter",
+    "model": "moonshotai/kimi-k2-0905",
+    "base_url": "https://openrouter.ai/api/v1/chat/completions",
+    "schema_valid": true,
+    "error_code": null,
+    "error_message": null,
+    "requested_vocabulary_count": 6,
+    "used_vocabulary_count": 6,
+    "coverage": 1.0,
+    "meets_coverage_threshold": true,
+    "missing_vocabulary": [],
+    "target_word_count": 300,
+    "actual_character_count": 288,
+    "length_ratio": 0.96,
+    "latency_ms": 11586,
+    "title": "去农村工作",
+    "body": "小王在城市里工作三年了，每天都很忙。有一天，公司给他一个好机会，让他去农村工作一年。小王有点担心，因为他没有农村工作的经验。晚上，他和朋友讨论这个决定，朋友建议他试试，说农村的环境很好，空气新鲜。\n\n小王听了朋友的建议，决定接受这个机会。他来到农村后，发现这里的环境真的很不错，山很绿，水很清。虽然工作有点难，但是村民们很友好，经常帮助他。小王慢慢学会了和村民一起工作，他觉得这次经历让他学到了很多东西。\n\n一年后，小王要回城市了。村民们为他开了一个告别会，感谢他这一年的工作。小王说，这是他做过的最好的决定。现在他有很多农村工作的经验，如果以后还有这样的机会，他一定会再去。",
+    "manual_quality_notes": "",
+    "prompt_version": "story-v9",
+    "meets_length_threshold": true,
+    "sample": 3,
+    "translation": [
+      "Xiao Wang had been working in the city for three years and was busy every day. One day, his company gave him a good opportunity to work in the countryside for a year. Xiao Wang was a bit worried because he had no experience working in rural areas. That evening, he discussed this decision with his friend, who suggested he give it a try, saying the rural environment was very nice with fresh air.",
+      "Xiao Wang followed his friend's suggestion and decided to accept this opportunity. After arriving in the countryside, he discovered that the environment here was truly excellent—the mountains were very green and the water very clear. Although the work was somewhat difficult, the villagers were very friendly and often helped him. Xiao Wang gradually learned to work alongside the villagers, and he felt this experience had taught him many things.",
+      "After one year, Xiao Wang had to return to the city. The villagers held a farewell party for him, thanking him for his work that year. Xiao Wang said this was the best decision he had ever made. Now he had plenty of experience working in rural areas, and if there were such opportunities in the future, he would definitely go again."
+    ],
+    "translation_aligned": true,
+    "questions": [
+      {
+        "question": "小王为什么担心去农村工作？",
+        "options": [
+          "因为他没有农村工作的经验",
+          "因为他不喜欢农村的环境",
+          "因为他和朋友讨论过这个决定",
+          "因为他已经工作三年了"
+        ],
+        "answer": 0,
+        "evidence": "小王有点担心，因为他没有农村工作的经验。"
+      },
+      {
+        "question": "朋友给小王什么建议？",
+        "options": [
+          "建议他回城市工作",
+          "建议他试试去农村工作",
+          "建议他讨论这个决定",
+          "建议他拒绝这个机会"
+        ],
+        "answer": 1,
+        "evidence": "朋友建议他试试，说农村的环境很好，空气新鲜。"
+      },
+      {
+        "question": "小王觉得去农村工作怎么样？",
+        "options": [
+          "这是他做过的最坏的决定",
+          "他不想再有这样的机会",
+          "这是他做过的最好的决定",
+          "他没有学到任何东西"
+        ],
+        "answer": 2,
+        "evidence": "小王说，这是他做过的最好的决定。"
+      }
+    ]
+  },
+  {
+    "fixture_name": "hsk6_advanced",
+    "category": "hsk_level",
+    "provider_label": "openrouter",
+    "model": "moonshotai/kimi-k2-0905",
+    "base_url": "https://openrouter.ai/api/v1/chat/completions",
+    "schema_valid": true,
+    "error_code": null,
+    "error_message": null,
+    "requested_vocabulary_count": 5,
+    "used_vocabulary_count": 5,
+    "coverage": 1.0,
+    "meets_coverage_threshold": true,
+    "missing_vocabulary": [],
+    "target_word_count": 400,
+    "actual_character_count": 428,
+    "length_ratio": 1.07,
+    "latency_ms": 17594,
+    "title": "合并之路",
+    "body": "林氏科技是一家拥有巨大潜力的新兴企业，创始人林峰却在公司发展方向上与投资人产生了严重分歧。投资人主张立即上市套现，而林峰坚持先深耕核心技术。双方僵持不下，最终不得不坐上谈判桌，开始了长达三个月的艰难对话。\n\n谈判初期，气氛剑拔弩张。投资人代表拍桌威胁撤资，林峰则冷静地分析市场数据，提出了一套全新的战略方案。他建议先引入战略伙伴，而非急于上市。经过反复权衡利弊，投资人终于松口，同意给公司十八个月的缓冲期。\n\n然而真正的考验才刚刚开始。在股权分配问题上，双方都不愿轻易妥协。林峰连续三周每天只睡四小时，逐条研究合同条款。他意识到，完全的胜利不存在，唯有互相让步才能共赢。最终他主动让出两个董事会席位，换取了核心技术团队的独立决策权。\n\n协议签署那天，林峰站在窗前俯瞰城市灯火。这场博弈教会他：商业不是零和游戏，战略的本质是找到最大公约数。公司保留了成长空间，投资人获得了合理回报，这场看似对立的谈判，最终成就了彼此。他相信，这段经历将成为企业最宝贵的财富。",
+    "manual_quality_notes": "",
+    "prompt_version": "story-v9",
+    "meets_length_threshold": true,
+    "sample": 1,
+    "translation": [
+      "Lin's Technology was an emerging enterprise with enormous potential, but founder Lin Feng had serious disagreements with investors over the company's development direction. The investors advocated for immediate listing to cash out, while Lin Feng insisted on first deepening core technologies. The two sides reached an impasse and finally had to sit at the negotiating table, beginning three months of difficult dialogue.",
+      "The negotiations began with a tense atmosphere. The investor representative slammed the table and threatened to withdraw funding, but Lin Feng calmly analyzed market data and proposed a completely new strategic plan. He suggested first introducing strategic partners rather than rushing to list. After repeatedly weighing the pros and cons, the investors finally relented and agreed to give the company an eighteen-month buffer period.",
+      "However, the real test had just begun. On the issue of equity distribution, neither side was willing to compromise easily. Lin Feng slept only four hours a day for three consecutive weeks, studying contract terms one by one. He realized that complete victory did not exist, and only mutual concessions could achieve win-win results. In the end, he voluntarily gave up two board seats in exchange for independent decision-making power for the core technical team.",
+      "On the day the agreement was signed, Lin Feng stood by the window overlooking the city lights. This battle taught him: business is not a zero-sum game, and the essence of strategy is finding the greatest common divisor. The company retained room for growth, the investors obtained reasonable returns, and this seemingly confrontational negotiation ultimately benefited both sides. He believed this experience would become the enterprise's most precious asset."
+    ],
+    "translation_aligned": true,
+    "questions": [
+      {
+        "question": "林峰与投资人最初的分歧是什么？",
+        "options": [
+          "林峰想立即上市，投资人想深耕技术",
+          "投资人想立即上市套现，林峰想先深耕核心技术",
+          "双方都想立即上市，只是价格没谈拢",
+          "林峰想撤资，投资人想继续投资"
+        ],
+        "answer": 1,
+        "evidence": "投资人主张立即上市套现，而林峰坚持先深耕核心技术。"
+      },
+      {
+        "question": "投资人最终为什么同意给公司缓冲期？",
+        "options": [
+          "林峰威胁要辞职",
+          "林峰分析了市场数据并提出新战略方案，投资人权衡后同意",
+          "政府出面调解",
+          "其他公司愿意高价收购"
+        ],
+        "answer": 1,
+        "evidence": "他建议先引入战略伙伴，而非急于上市。经过反复权衡利弊，投资人终于松口，同意给公司十八个月的缓冲期。"
+      },
+      {
+        "question": "关于'妥协'，下列哪项符合故事内容？",
+        "options": [
+          "林峰完全拒绝让步，坚持原有方案",
+          "双方都未做任何让步，谈判破裂",
+          "林峰主动让出两个董事会席位，换取核心技术团队的独立决策权",
+          "投资人单方面妥协，放弃所有要求"
+        ],
+        "answer": 2,
+        "evidence": "最终他主动让出两个董事会席位，换取了核心技术团队的独立决策权。"
+      },
+      {
+        "question": "协议最终达成后，林峰如何看待这场谈判的结果？",
+        "options": [
+          "认为自己是唯一的赢家",
+          "认为谈判毫无意义，浪费了时间",
+          "认为商业不是零和游戏，双方实现了共赢",
+          "认为投资人被欺骗了"
+        ],
+        "answer": 2,
+        "evidence": "这场博弈教会他：商业不是零和游戏，战略的本质是找到最大公约数。"
+      }
+    ]
+  },
+  {
+    "fixture_name": "hsk6_advanced",
+    "category": "hsk_level",
+    "provider_label": "openrouter",
+    "model": "moonshotai/kimi-k2-0905",
+    "base_url": "https://openrouter.ai/api/v1/chat/completions",
+    "schema_valid": true,
+    "error_code": null,
+    "error_message": null,
+    "requested_vocabulary_count": 5,
+    "used_vocabulary_count": 5,
+    "coverage": 1.0,
+    "meets_coverage_threshold": true,
+    "missing_vocabulary": [],
+    "target_word_count": 400,
+    "actual_character_count": 416,
+    "length_ratio": 1.04,
+    "latency_ms": 15974,
+    "title": "并购风云",
+    "body": "林远站在会议室的落地窗前，望着窗外繁华的城市夜景。作为科技公司的首席执行官，他深知明天的谈判将决定企业的命运。竞争对手提出收购要约，但他不愿轻易妥协，必须制定一套精妙的战略来应对这场博弈。\n\n第二天上午，双方在豪华酒店展开正式谈判。对方代表张总态度强硬，要求完全控股。林远冷静地分析局势，他明白公司虽然规模较小，却在人工智能领域拥有巨大潜力。他提出保留核心研发团队的建议，并详细阐述了未来发展的技术优势。\n\n经过八小时的激烈交锋，双方陷入僵局。林远开始权衡各种方案的利弊：完全拒绝可能面临恶意收购，过度让步又会丧失自主权。他想起导师曾说过，真正的商业智慧在于寻找双赢的妥协。于是他主动调整条件，提议建立合资公司而非全资收购。\n\n最终，张总被这个兼顾双方利益的方案打动。当双方在合同上签字时，林远感到一阵释然。这场艰难的谈判教会他，战略不仅是进攻的艺术，更是在关键时刻懂得进退取舍的智慧。窗外的阳光洒进会议室，照亮了两只握在一起的手。",
+    "manual_quality_notes": "",
+    "prompt_version": "story-v9",
+    "meets_length_threshold": true,
+    "sample": 2,
+    "translation": [
+      "Lin Yuan stood by the floor-to-ceiling windows of the conference room, gazing at the bustling city nightscape outside. As CEO of the technology company, he knew that tomorrow's negotiation would determine the enterprise's fate. A competitor had made an acquisition offer, but he was unwilling to compromise easily; he had to devise a sophisticated strategy to handle this game.",
+      "The next morning, both sides began formal negotiations at a luxury hotel. The opposing representative, President Zhang, took a tough stance and demanded full control. Lin Yuan calmly analyzed the situation. He understood that although his company was smaller in scale, it possessed enormous potential in the artificial intelligence field. He proposed keeping the core R&D team and elaborated on the company's future technological advantages in detail.",
+      "After eight hours of intense confrontation, both sides reached an impasse. Lin Yuan began to weigh the pros and cons of various options: complete refusal might invite a hostile takeover, while excessive concessions would mean losing autonomy. He remembered his mentor once said that true business wisdom lies in finding win-win compromises. So he proactively adjusted the conditions, proposing a joint venture rather than full acquisition.",
+      "In the end, President Zhang was moved by this solution that considered both parties' interests. When both sides signed the contract, Lin Yuan felt a wave of relief. This difficult negotiation taught him that strategy is not only the art of offense, but also the wisdom of knowing when to advance and retreat at critical moments. Sunlight streamed through the conference room windows, illuminating two hands clasped together."
+    ],
+    "translation_aligned": true,
+    "questions": [
+      {
+        "question": "林远为什么不愿轻易接受竞争对手的收购要约？",
+        "options": [
+          "因为他认为公司规模已经很大",
+          "因为他想制定战略来应对这场博弈",
+          "因为他不喜欢对方代表张总",
+          "因为他觉得收购价格太低"
+        ],
+        "answer": 1,
+        "evidence": "竞争对手提出收购要约，但他不愿轻易妥协，必须制定一套精妙的战略来应对这场博弈。"
+      },
+      {
+        "question": "林远在谈判中提出保留什么团队的建议？",
+        "options": [
+          "市场销售团队",
+          "核心研发团队",
+          "行政管理团队",
+          "客户服务团队"
+        ],
+        "answer": 1,
+        "evidence": "他提出保留核心研发团队的建议，并详细阐述了未来发展的技术优势。"
+      },
+      {
+        "question": "林远最终提出了什么方案来解决僵局？",
+        "options": [
+          "完全拒绝收购要约",
+          "接受全资收购",
+          "提议建立合资公司",
+          "要求提高收购价格"
+        ],
+        "answer": 2,
+        "evidence": "于是他主动调整条件，提议建立合资公司而非全资收购。"
+      },
+      {
+        "question": "张总为什么最终被说服？",
+        "options": [
+          "因为林远的态度强硬",
+          "因为方案兼顾了双方利益",
+          "因为林远的导师出面调解",
+          "因为政府介入了谈判"
+        ],
+        "answer": 1,
+        "evidence": "最终，张总被这个兼顾双方利益的方案打动。"
+      }
+    ]
+  },
+  {
+    "fixture_name": "hsk6_advanced",
+    "category": "hsk_level",
+    "provider_label": "openrouter",
+    "model": "moonshotai/kimi-k2-0905",
+    "base_url": "https://openrouter.ai/api/v1/chat/completions",
+    "schema_valid": true,
+    "error_code": null,
+    "error_message": null,
+    "requested_vocabulary_count": 5,
+    "used_vocabulary_count": 5,
+    "coverage": 1.0,
+    "meets_coverage_threshold": true,
+    "missing_vocabulary": [],
+    "target_word_count": 400,
+    "actual_character_count": 535,
+    "length_ratio": 1.3375,
+    "latency_ms": 20323,
+    "title": "收购风云",
+    "body": "林氏集团的会议室里，气氛凝重得像凝固的冰块。董事长林远山正与跨国企业代表进行一场关乎公司命运的谈判，对方提出的收购条件苛刻得令人窒息。他深知，若完全拒绝，公司多年积累的技术潜力将因资金短缺而永远无法释放；但若全盘接受，创始团队将失去全部话语权。他必须制定一套精密的战略，在守住底线的同时争取最大空间。\n\n\"我们可以接受百分之三十的股权转让，\"林远山沉稳地开口，目光扫过对方律师团队，\"但核心技术专利必须留在中方手中。\"对方首席代表皱眉摇头，声称这是不可谈判的底线。会议室陷入僵局，助理递来的咖啡早已凉透，却无人顾及。林远山暗自权衡：让步过多，公司沦为附庸；坚持过刚，合作可能彻底破裂。\n\n深夜，双方终于达成妥协。林远山同意让出百分之五十一的股权，换取对方承诺三年内不干预研发方向，并追加两亿美元投资。签字那一刻，他的手微微颤抖——这不是理想的结局，却是现实中最优的解。他想起父亲创业时的艰辛，眼眶不禁有些湿润。\n\n三个月后，新资金注入让沉睡的项目焕发生机。林远山站在实验室窗前，看着年轻工程师们忙碌的身影，心中五味杂陈。他失去了绝对控制权，却换来了企业重生的机会。战略的本质从来不是追求完美，而是在复杂的局势中找到那条能走下去的路。他轻轻叹了口气，转身投入到新的工作中。",
+    "manual_quality_notes": "",
+    "prompt_version": "story-v9",
+    "meets_length_threshold": true,
+    "sample": 3,
+    "translation": [
+      "In the conference room of Lin Group, the atmosphere was as heavy as frozen ice. Chairman Lin Yuanshan was engaged in a negotiation with representatives of a multinational corporation that would determine the company's fate; their acquisition terms were harsh enough to take one's breath away. He knew well that if he completely refused, the technological potential accumulated over years would never be unleashed due to capital shortage; yet if he accepted everything, the founding team would lose all voice. He had to devise a precise strategy to secure maximum room while holding the bottom line.",
+      "\"We can accept a thirty percent equity transfer,\" Lin Yuanshan spoke steadily, his gaze sweeping across the opposing legal team, \"but core technology patents must remain in Chinese hands.\" The chief representative on the other side frowned and shook his head, claiming this was a non-negotiable bottom line. The conference room fell into deadlock; the coffee brought by his assistant had long gone cold, yet no one paid it any mind. Lin Yuanshan weighed his options secretly: too much concession would reduce the company to a vassal; too rigid insistence might completely shatter the cooperation.",
+      "Late at night, both sides finally reached a compromise. Lin Yuanshan agreed to cede fifty-one percent equity in exchange for the other party's promise not to interfere with R&D direction for three years, plus an additional two hundred million dollars in investment. The moment he signed, his hand trembled slightly—this was not the ideal outcome, yet it was the optimal solution in reality. He recalled the hardships of his father's entrepreneurship, and his eyes could not help growing moist.",
+      "Three months later, the injection of new capital brought dormant projects back to life. Standing by the laboratory window, watching the busy figures of young engineers, Lin Yuanshan felt mixed emotions. He had lost absolute control, yet gained an opportunity for the company's rebirth. The essence of strategy was never about pursuing perfection, but about finding a viable path amid complex circumstances. He sighed softly, turned around, and threw himself into new work."
+    ],
+    "translation_aligned": true,
+    "questions": [
+      {
+        "question": "林远山为什么认为完全拒绝对方的收购条件是不可取的？",
+        "options": [
+          "因为公司需要对方的品牌声誉",
+          "因为公司技术潜力会因资金短缺而无法释放",
+          "因为竞争对手也在寻求收购",
+          "因为政府要求必须接受外资"
+        ],
+        "answer": 1,
+        "evidence": "他深知，若完全拒绝，公司多年积累的技术潜力将因资金短缺而永远无法释放"
+      },
+      {
+        "question": "双方在谈判中最终达成的妥协是什么？",
+        "options": [
+          "林远山保留全部股权但放弃技术研发",
+          "对方完全退出收购计划",
+          "林远山让出百分之五十一股权换取投资和不干预承诺",
+          "林远山只转让百分之三十股权"
+        ],
+        "answer": 2,
+        "evidence": "林远山同意让出百分之五十一的股权，换取对方承诺三年内不干预研发方向，并追加两亿美元投资"
+      },
+      {
+        "question": "林远山在谈判陷入僵局时主要做了什么？",
+        "options": [
+          "立即同意对方的所有条件",
+          "威胁要终止谈判",
+          "暗自权衡各种选择的利弊",
+          "离开会议室去休息"
+        ],
+        "answer": 2,
+        "evidence": "林远山暗自权衡：让步过多，公司沦为附庸；坚持过刚，合作可能彻底破裂"
+      },
+      {
+        "question": "故事最后，林远山对战略的本质有了什么认识？",
+        "options": [
+          "战略的本质是追求完美无缺",
+          "战略的本质是复杂的局势中找到能走下去的路",
+          "战略的本质是绝不向对手妥协",
+          "战略的本质是保持绝对控制权"
+        ],
+        "answer": 1,
+        "evidence": "战略的本质从来不是追求完美，而是在复杂的局势中找到那条能走下去的路"
+      }
+    ]
+  },
+  {
+    "fixture_name": "ambiguous_heteronyms",
+    "category": "ambiguous_words",
+    "provider_label": "openrouter",
+    "model": "moonshotai/kimi-k2-0905",
+    "base_url": "https://openrouter.ai/api/v1/chat/completions",
+    "schema_valid": true,
+    "error_code": null,
+    "error_message": null,
+    "requested_vocabulary_count": 5,
+    "used_vocabulary_count": 5,
+    "coverage": 1.0,
+    "meets_coverage_threshold": true,
+    "missing_vocabulary": [],
+    "target_word_count": 300,
+    "actual_character_count": 285,
+    "length_ratio": 0.95,
+    "latency_ms": 11813,
+    "title": "李明的银行工作",
+    "body": "李明在银行工作已经三年了。他每天都穿得很正式，因为银行对员工的要求很高。虽然工作很忙，但他还很喜欢这份工作，因为可以认识很多不同的人。他的工资不算高，不过每个月都能存下一些钱。\n\n上个星期，李明被差到另一个城市的分行帮忙。那里的业务很重，他需要重复做很多同样的工作。晚上回到酒店，他觉得身体很累，头也很重。他给妈妈打电话说：\"这里的条件比总部差一些，但我能学到新东西。\"妈妈告诉他要注意休息，不要太辛苦。\n\n两个月后，李明回到了原来的银行。经理说他长了不少经验，以后会有更好的机会。李明把借的书还给了图书馆的朋友，然后继续努力工作。他知道，只要坚持，未来一定会越来越好。",
+    "manual_quality_notes": "",
+    "prompt_version": "story-v9",
+    "meets_length_threshold": true,
+    "sample": 1,
+    "translation": [
+      "Li Ming has been working at the bank for three years already. He dresses very formally every day because the bank has high requirements for employees. Although the work is busy, he still likes this job very much because he can meet many different people. His salary is not very high, but he can save some money every month.",
+      "Last week, Li Ming was dispatched to help at a branch in another city. The business there was very heavy, and he needed to repeat a lot of the same work. When he returned to the hotel in the evening, he felt very tired and his head was heavy. He called his mother and said: \"The conditions here are somewhat poorer than at headquarters, but I can learn new things.\" His mother told him to pay attention to rest and not to work too hard.",
+      "Two months later, Li Ming returned to his original bank. The manager said he had grown a lot of experience and would have better opportunities in the future. Li Ming returned the borrowed books to his friend at the library, then continued working hard. He knew that as long as he persisted, the future would definitely get better and better."
+    ],
+    "translation_aligned": true,
+    "questions": [
+      {
+        "question": "李明为什么还很喜欢在银行的工作？",
+        "options": [
+          "因为工资很高",
+          "因为可以认识很多不同的人",
+          "因为工作很轻松",
+          "因为不用穿正式的衣服"
+        ],
+        "answer": 1,
+        "evidence": "虽然工作很忙，但他还很喜欢这份工作，因为可以认识很多不同的人。"
+      },
+      {
+        "question": "李明被差到另一个城市后，晚上感觉怎么样？",
+        "options": [
+          "觉得很兴奋",
+          "觉得头很轻",
+          "觉得很累，头也很重",
+          "觉得条件很好"
+        ],
+        "answer": 2,
+        "evidence": "晚上回到酒店，他觉得身体很累，头也很重。"
+      },
+      {
+        "question": "经理说李明长了不少什么？",
+        "options": [
+          "不少钱",
+          "不少朋友",
+          "不少经验",
+          "不少书"
+        ],
+        "answer": 2,
+        "evidence": "经理说他长了不少经验，以后会有更好的机会。"
+      }
+    ]
+  },
+  {
+    "fixture_name": "ambiguous_heteronyms",
+    "category": "ambiguous_words",
+    "provider_label": "openrouter",
+    "model": "moonshotai/kimi-k2-0905",
+    "base_url": "https://openrouter.ai/api/v1/chat/completions",
+    "schema_valid": true,
+    "error_code": null,
+    "error_message": null,
+    "requested_vocabulary_count": 5,
+    "used_vocabulary_count": 5,
+    "coverage": 1.0,
+    "meets_coverage_threshold": true,
+    "missing_vocabulary": [],
+    "target_word_count": 300,
+    "actual_character_count": 251,
+    "length_ratio": 0.8366666666666667,
+    "latency_ms": 11114,
+    "title": "李明的长周末",
+    "body": "李明在银行工作了三年，每天都很忙。这个周末，他终于有时间休息。早上，他看着窗外的树，发现树叶已经长得很长了。他想起自己还欠朋友一本书，于是决定出门还书。\n\n他拿着那本很重的书走到朋友家。朋友开门时笑着说：“你怎么还亲自送来？差一点儿我就可以去你家拿了。”李明摇摇头说：“没关系，我想出来走走。”他们聊了很久，李明觉得心情轻松多了。\n\n回家的路上，李明决定重新开始锻炼身体。他想，工作虽然重要，但健康更重要。以后每个周末，他都要去公园跑步，不再让工作占满所有时间。这个周末虽然简单，却让他明白了很多道理。",
+    "manual_quality_notes": "",
+    "prompt_version": "story-v9",
+    "meets_length_threshold": true,
+    "sample": 2,
+    "translation": [
+      "Li Ming had worked at the bank for three years and was busy every day. This weekend, he finally had time to rest. In the morning, he looked at the trees outside the window and noticed the leaves had already grown very long. He remembered he still owed his friend a book, so he decided to go out and return it.",
+      "He carried that very heavy book to his friend's house. When his friend opened the door, he smiled and said, 'Why did you still bring it yourself? I was almost about to go to your place to get it.' Li Ming shook his head and said, 'It's fine, I wanted to come out for a walk.' They chatted for a long time, and Li Ming felt much more relaxed.",
+      "On the way home, Li Ming decided to start exercising again. He thought that although work was important, health was more important. From now on, every weekend he would go running in the park and no longer let work occupy all his time. This weekend, though simple, made him understand many things."
+    ],
+    "translation_aligned": true,
+    "questions": [
+      {
+        "question": "李明为什么决定出门？",
+        "options": [
+          "他想去银行加班",
+          "他想还朋友一本书",
+          "他想去公园跑步",
+          "他想去买一本新书"
+        ],
+        "answer": 1,
+        "evidence": "他想起自己还欠朋友一本书，于是决定出门还书。"
+      },
+      {
+        "question": "朋友为什么说“差一点儿我就可以去你家拿了”？",
+        "options": [
+          "因为朋友已经去过李明的家",
+          "因为朋友本来打算自己去拿书",
+          "因为朋友不想见到李明",
+          "因为朋友的书差一本"
+        ],
+        "answer": 1,
+        "evidence": "朋友开门时笑着说：“你怎么还亲自送来？差一点儿我就可以去你家拿了。”"
+      },
+      {
+        "question": "李明在朋友家做了什么？",
+        "options": [
+          "他帮朋友打扫房间",
+          "他和朋友一起跑步",
+          "他和朋友聊了很久",
+          "他向朋友借了另一本书"
+        ],
+        "answer": 2,
+        "evidence": "他们聊了很久，李明觉得心情轻松多了。"
+      }
+    ]
+  },
+  {
+    "fixture_name": "ambiguous_heteronyms",
+    "category": "ambiguous_words",
+    "provider_label": "openrouter",
+    "model": "moonshotai/kimi-k2-0905",
+    "base_url": "https://openrouter.ai/api/v1/chat/completions",
+    "schema_valid": true,
+    "error_code": null,
+    "error_message": null,
+    "requested_vocabulary_count": 5,
+    "used_vocabulary_count": 5,
+    "coverage": 1.0,
+    "meets_coverage_threshold": true,
+    "missing_vocabulary": [],
+    "target_word_count": 300,
+    "actual_character_count": 275,
+    "length_ratio": 0.9166666666666666,
+    "latency_ms": 10506,
+    "title": "小李的银行工作",
+    "body": "小李去年大学毕业后，进入一家银行工作。刚开始他觉得这份工作很轻松，但很快发现压力很重。每天早上他都要处理很多客户的业务，有时候还要重复核对同样的信息，确保不出差错。\n\n有一天，一位老人来银行办理业务。老人记性差，总是忘记带证件，小李耐心地帮他解决问题。老人感动地说：“你长得像我孙子，他还经常来看我。”小李听了心里暖暖的，决定以后要更加用心服务每一位客户。\n\n几个月后，小李的工作能力有了很大长进。领导还派他去其他城市学习新的业务知识。虽然出差的日子很辛苦，但小李觉得这些经历让他成长了很多。现在他已经不再害怕工作中的困难，而是勇敢地面对每一个挑战。",
+    "manual_quality_notes": "",
+    "prompt_version": "story-v9",
+    "meets_length_threshold": true,
+    "sample": 3,
+    "translation": [
+      "After graduating from university last year, Xiao Li started working at a bank. At first he thought the job was easy, but soon discovered the pressure was heavy. Every morning he had to handle many customers' business, and sometimes had to repeat checking the same information to ensure no mistakes.",
+      "One day, an elderly man came to the bank to handle business. The old man had a poor memory and always forgot to bring his documents, but Xiao Li patiently helped him solve the problems. The old man said movedly: 'You look like my grandson, and he still often comes to see me.' Xiao Li felt warm in his heart and decided to serve every customer with more dedication in the future.",
+      "A few months later, Xiao Li's work ability had greatly improved. The leader also dispatched him to other cities to learn new business knowledge. Although the days of business trips were hard, Xiao Li felt these experiences made him grow a lot. Now he is no longer afraid of difficulties at work, but bravely faces every challenge."
+    ],
+    "translation_aligned": true,
+    "questions": [
+      {
+        "question": "小李刚开始觉得银行工作怎么样？",
+        "options": [
+          "很轻松",
+          "压力很重",
+          "非常有趣",
+          "特别困难"
+        ],
+        "answer": 0,
+        "evidence": "刚开始他觉得这份工作很轻松，但很快发现压力很重。"
+      },
+      {
+        "question": "老人为什么说小李长得像他孙子？",
+        "options": [
+          "因为小李和孙子一样高",
+          "因为小李长得像他孙子",
+          "因为小李说话声音像孙子",
+          "因为小李和孙子同年毕业"
+        ],
+        "answer": 1,
+        "evidence": "老人感动地说：“你长得像我孙子，他还经常来看我。”"
+      },
+      {
+        "question": "领导派小李去其他城市做什么？",
+        "options": [
+          "去银行存钱",
+          "去旅游休息",
+          "学习新的业务知识",
+          "看望老人的孙子"
+        ],
+        "answer": 2,
+        "evidence": "领导还派他去其他城市学习新的业务知识。"
+      }
+    ]
+  },
+  {
+    "fixture_name": "short_list_single_word",
+    "category": "short_list",
+    "provider_label": "openrouter",
+    "model": "moonshotai/kimi-k2-0905",
+    "base_url": "https://openrouter.ai/api/v1/chat/completions",
+    "schema_valid": true,
+    "error_code": null,
+    "error_message": null,
+    "requested_vocabulary_count": 1,
+    "used_vocabulary_count": 1,
+    "coverage": 1.0,
+    "meets_coverage_threshold": true,
+    "missing_vocabulary": [],
+    "target_word_count": 100,
+    "actual_character_count": 66,
+    "length_ratio": 0.66,
+    "latency_ms": 6272,
+    "title": "小猫不见了",
+    "body": "我家有一只小猫，它叫咪咪。今天早上，我找不到它了。我在房间里找，在桌子下面找，都没有看见它。后来，我在椅子上面看见了它。它在睡觉呢！",
+    "manual_quality_notes": "",
+    "prompt_version": "story-v9",
+    "meets_length_threshold": false,
+    "sample": 1,
+    "translation": [
+      "I have a small cat at home, its name is Mimi. This morning, I couldn't find it. I looked in the room, I looked under the table, but didn't see it anywhere. Later, I saw it on the chair. It was sleeping!"
+    ],
+    "translation_aligned": true,
+    "questions": [
+      {
+        "question": "小猫叫什么名字？",
+        "options": [
+          "花花",
+          "咪咪",
+          "小白",
+          "小黑"
+        ],
+        "answer": 1,
+        "evidence": "我家有一只小猫，它叫咪咪。"
+      },
+      {
+        "question": "我在哪里找到了小猫？",
+        "options": [
+          "桌子下面",
+          "房间里",
+          "椅子上面",
+          "门外"
+        ],
+        "answer": 2,
+        "evidence": "后来，我在椅子上面看见了它。"
+      },
+      {
+        "question": "小猫在做什么？",
+        "options": [
+          "吃东西",
+          "玩球",
+          "睡觉",
+          "跑"
+        ],
+        "answer": 2,
+        "evidence": "它在睡觉呢！"
+      }
+    ]
+  },
+  {
+    "fixture_name": "short_list_single_word",
+    "category": "short_list",
+    "provider_label": "openrouter",
+    "model": "moonshotai/kimi-k2-0905",
+    "base_url": "https://openrouter.ai/api/v1/chat/completions",
+    "schema_valid": true,
+    "error_code": null,
+    "error_message": null,
+    "requested_vocabulary_count": 1,
+    "used_vocabulary_count": 1,
+    "coverage": 1.0,
+    "meets_coverage_threshold": true,
+    "missing_vocabulary": [],
+    "target_word_count": 100,
+    "actual_character_count": 120,
+    "length_ratio": 1.2,
+    "latency_ms": 6762,
+    "title": "我的猫",
+    "body": "我家有一只猫。它叫小花，是白色的。每天早上，小花会叫我起床。它喜欢吃鱼，也喜欢喝牛奶。昨天，我的朋友来我家，小花很高兴。朋友问：“这只猫叫什么名字？”我说：“它叫小花。”朋友笑了，说：“小花真可爱！”晚上，小花和我一起睡觉。它是我的好朋友。",
+    "manual_quality_notes": "",
+    "prompt_version": "story-v9",
+    "meets_length_threshold": true,
+    "sample": 2,
+    "translation": [
+      "I have a cat at home. It's called Xiaohua, and it's white. Every morning, Xiaohua wakes me up. It likes to eat fish and also likes to drink milk. Yesterday, my friend came to my home, and Xiaohua was very happy. My friend asked: \"What's this cat's name?\" I said: \"It's called Xiaohua.\" My friend smiled and said: \"Xiaohua is so cute!\" In the evening, Xiaohua sleeps with me. It is my good friend."
+    ],
+    "translation_aligned": true,
+    "questions": [
+      {
+        "question": "小花是什么颜色的？",
+        "options": [
+          "白色的",
+          "黑色的",
+          "黄色的",
+          "红色的"
+        ],
+        "answer": 0,
+        "evidence": "它叫小花，是白色的。"
+      },
+      {
+        "question": "小花喜欢吃什么？",
+        "options": [
+          "鱼",
+          "肉",
+          "米饭",
+          "面包"
+        ],
+        "answer": 0,
+        "evidence": "它喜欢吃鱼，也喜欢喝牛奶。"
+      },
+      {
+        "question": "朋友来我家的时候，小花怎么样？",
+        "options": [
+          "很高兴",
+          "很害怕",
+          "很生气",
+          "很困"
+        ],
+        "answer": 0,
+        "evidence": "昨天，我的朋友来我家，小花很高兴。"
+      }
+    ]
+  },
+  {
+    "fixture_name": "short_list_single_word",
+    "category": "short_list",
+    "provider_label": "openrouter",
+    "model": "moonshotai/kimi-k2-0905",
+    "base_url": "https://openrouter.ai/api/v1/chat/completions",
+    "schema_valid": true,
+    "error_code": null,
+    "error_message": null,
+    "requested_vocabulary_count": 1,
+    "used_vocabulary_count": 1,
+    "coverage": 1.0,
+    "meets_coverage_threshold": true,
+    "missing_vocabulary": [],
+    "target_word_count": 100,
+    "actual_character_count": 96,
+    "length_ratio": 0.96,
+    "latency_ms": 9066,
+    "title": "小猫的一天",
+    "body": "我家有一只猫，它叫小白。每天早上，小白喜欢晒太阳。它躺在地上，眼睛闭着，很舒服。下午，它去找小鸟玩。小鸟在树上，猫在树下看。晚上，小白饿了，我给它饭吃。它吃了很多，然后睡觉了。我很喜欢我的猫。",
+    "manual_quality_notes": "",
+    "prompt_version": "story-v9",
+    "meets_length_threshold": true,
+    "sample": 3,
+    "translation": [
+      "I have a cat at home; its name is Little White. Every morning, Little White likes to sunbathe. It lies on the ground with its eyes closed, very comfortable. In the afternoon, it goes to play with the little bird. The bird is in the tree, and the cat watches from under the tree. In the evening, Little White is hungry, so I give it food. It eats a lot, then goes to sleep. I really like my cat."
+    ],
+    "translation_aligned": true,
+    "questions": [
+      {
+        "question": "小白早上喜欢做什么？",
+        "options": [
+          "吃饭",
+          "晒太阳",
+          "睡觉",
+          "找小鸟"
+        ],
+        "answer": 1,
+        "evidence": "每天早上，小白喜欢晒太阳。"
+      },
+      {
+        "question": "下午谁在树上？",
+        "options": [
+          "小白",
+          "我",
+          "小鸟",
+          "太阳"
+        ],
+        "answer": 2,
+        "evidence": "小鸟在树上，猫在树下看。"
+      },
+      {
+        "question": "晚上小白为什么吃饭？",
+        "options": [
+          "它困了",
+          "它饿了",
+          "它想玩",
+          "它冷"
+        ],
+        "answer": 1,
+        "evidence": "晚上，小白饿了，我给它饭吃。"
+      }
+    ]
+  },
+  {
+    "fixture_name": "mixed_known_vocabulary",
+    "category": "mixed_known",
+    "provider_label": "openrouter",
+    "model": "moonshotai/kimi-k2-0905",
+    "base_url": "https://openrouter.ai/api/v1/chat/completions",
+    "schema_valid": true,
+    "error_code": null,
+    "error_message": null,
+    "requested_vocabulary_count": 5,
+    "used_vocabulary_count": 5,
+    "coverage": 1.0,
+    "meets_coverage_threshold": true,
+    "missing_vocabulary": [],
+    "target_word_count": 300,
+    "actual_character_count": 340,
+    "length_ratio": 1.1333333333333333,
+    "latency_ms": 12916,
+    "title": "雨中的邂逅",
+    "body": "去年夏天，我在云南旅行时，与一位老朋友不期而遇。那天下午突然下起大雨，我躲进一家小茶馆，正踌躇着要不要点杯热茶，忽然听见有人叫我的名字。回头一看，竟然是你——我们大学时的室友，已经五年没见了。你笑着走过来，手里还拿着一杯冒着热气的水。\n\n我们兴奋地聊起这些年的生活。你说你现在住在附近的小村庄，每天帮村民修理水管。我惊讶于你的选择，你却说这样很安静，能听见水流的声音。雨渐渐小了，窗外的青山笼罩在薄雾中，像一幅水墨画。你提议带我去看看你的工作，我毫不犹豫地答应了。\n\n傍晚时分，我们沿着小溪 walking，你指着远处说那里就是你的家。分别时，你塞给我一张纸条，上面写着你的地址，说下次再来一定要提前通知。我望着你消失在夕阳中的背影，心想：人生最美的风景，往往来自这样意外的邂逅。",
+    "manual_quality_notes": "",
+    "prompt_version": "story-v9",
+    "meets_length_threshold": true,
+    "sample": 1,
+    "translation": [
+      "Last summer, while traveling in Yunnan, I had an unexpected encounter with an old friend. That afternoon, it suddenly started raining heavily, and I ducked into a small teahouse. Just as I was hesitating whether to order a cup of hot tea, I suddenly heard someone call my name. Turning around, it was actually you—my college roommate whom I hadn't seen for five years. You walked over smiling, still holding a cup of steaming water in your hand.",
+      "We excitedly chatted about our lives over the years. You said you now live in a small village nearby, helping villagers repair water pipes every day. I was surprised by your choice, but you said it was very peaceful and you could hear the sound of flowing water. The rain gradually lightened, and the green mountains outside the window were shrouded in mist, like an ink wash painting. You suggested taking me to see your work, and I agreed without hesitation.",
+      "In the evening, we walked along the small stream. You pointed into the distance and said that was where your home was. When we parted, you pressed a note into my hand with your address written on it, saying to let you know in advance next time I came. Watching your figure disappear into the sunset, I thought: the most beautiful scenery in life often comes from such unexpected encounters."
+    ],
+    "translation_aligned": true,
+    "questions": [
+      {
+        "question": "主人公在茶馆里为什么踌躇？",
+        "options": [
+          "因为不知道朋友会不会来",
+          "因为犹豫要不要点热茶",
+          "因为外面雨下得太大",
+          "因为找不到座位"
+        ],
+        "answer": 1,
+        "evidence": "那天下午突然下起大雨，我躲进一家小茶馆，正踌躇着要不要点杯热茶，忽然听见有人叫我的名字。"
+      },
+      {
+        "question": "朋友现在的工作是什么？",
+        "options": [
+          "在茶馆当服务员",
+          "帮村民修理水管",
+          "画水墨画卖钱",
+          "在旅行社当导游"
+        ],
+        "answer": 1,
+        "evidence": "你说你现在住在附近的小村庄，每天帮村民修理水管。"
+      },
+      {
+        "question": "主人公和朋友是怎么重逢的？",
+        "options": [
+          "通过网上约好的",
+          "在茶馆偶然遇见的",
+          "在村庄特意拜访的",
+          "通过旅行社介绍的"
+        ],
+        "answer": 1,
+        "evidence": "去年夏天，我在云南旅行时，与一位老朋友不期而遇。"
+      }
+    ]
+  },
+  {
+    "fixture_name": "mixed_known_vocabulary",
+    "category": "mixed_known",
+    "provider_label": "openrouter",
+    "model": "moonshotai/kimi-k2-0905",
+    "base_url": "https://openrouter.ai/api/v1/chat/completions",
+    "schema_valid": true,
+    "error_code": null,
+    "error_message": null,
+    "requested_vocabulary_count": 5,
+    "used_vocabulary_count": 5,
+    "coverage": 1.0,
+    "meets_coverage_threshold": true,
+    "missing_vocabulary": [],
+    "target_word_count": 300,
+    "actual_character_count": 267,
+    "length_ratio": 0.89,
+    "latency_ms": 11947,
+    "title": "雨中的邂逅",
+    "body": "那天下午，天空突然下起了大雨。我撑着伞走在回家的路上，心里想着晚饭要吃什么。就在路过那家老书店的时候，我在门口踌躇了片刻，不知道要不要进去躲雨。\n\n就在我犹豫的时候，一个熟悉的声音从身后传来：「你也在这里？」我转过身，惊讶地发现那是我的老朋友小林。我们已经有五年没见了，没想到会在这里邂逅。他笑着拍了拍我的肩膀，说：「走，进去喝杯茶，外面水太大了。」\n\n书店里很暖和，我们坐在窗边聊了很久。原来他刚从国外回来，正好也住在这附近。雨停的时候，我们交换了新的联系方式，约定周末一起去爬山。有时候，一场意外的雨，反而让老朋友重新走到了一起。",
+    "manual_quality_notes": "",
+    "prompt_version": "story-v9",
+    "meets_length_threshold": true,
+    "sample": 2,
+    "translation": [
+      "That afternoon, the sky suddenly started pouring rain. I walked home with an umbrella, wondering what to have for dinner. As I passed by that old bookstore, I hesitated at the entrance for a moment, unsure whether to go in and take shelter from the rain.",
+      "Just as I was wavering, a familiar voice came from behind: 'You're here too?' I turned around and was surprised to discover it was my old friend Xiaolin. We hadn't seen each other for five years; I never expected we would have a chance encounter here. He smiled and patted my shoulder, saying, 'Come on, let's go in and have some tea—the water outside is too heavy.'",
+      "The bookstore was very warm, and we sat by the window chatting for a long time. It turned out he had just returned from abroad and happened to live nearby too. When the rain stopped, we exchanged new contact information and made plans to go hiking together on the weekend. Sometimes, an unexpected rain can actually bring old friends back together."
+    ],
+    "translation_aligned": true,
+    "questions": [
+      {
+        "question": "主人公在书店门口为什么踌躇？",
+        "options": [
+          "因为他忘记带钱了",
+          "因为他不知道要不要进去躲雨",
+          "因为他不想见到老朋友",
+          "因为书店已经关门了"
+        ],
+        "answer": 1,
+        "evidence": "就在我犹豫的时候，一个熟悉的声音从身后传来：「你也在这里？」我转过身，惊讶地发现那是我的老朋友小林。"
+      },
+      {
+        "question": "主人公和小林是怎么重逢的？",
+        "options": [
+          "通过朋友介绍认识的",
+          "在书店里偶然邂逅",
+          "在网上聊天时发现的",
+          "在爬山的时候遇到的"
+        ],
+        "answer": 1,
+        "evidence": "我们已经有五年没见了，没想到会在这里邂逅。"
+      },
+      {
+        "question": "小林为什么说「外面水太大了」？",
+        "options": [
+          "因为地上积水很多",
+          "因为外面的河水上涨了",
+          "因为书店里没有水卖",
+          "因为他想喝水"
+        ],
+        "answer": 0,
+        "evidence": "他笑着拍了拍我的肩膀，说：「走，进去喝杯茶，外面水太大了。」"
+      }
+    ]
+  },
+  {
+    "fixture_name": "mixed_known_vocabulary",
+    "category": "mixed_known",
+    "provider_label": "openrouter",
+    "model": "moonshotai/kimi-k2-0905",
+    "base_url": "https://openrouter.ai/api/v1/chat/completions",
+    "schema_valid": true,
+    "error_code": null,
+    "error_message": null,
+    "requested_vocabulary_count": 5,
+    "used_vocabulary_count": 5,
+    "coverage": 1.0,
+    "meets_coverage_threshold": true,
+    "missing_vocabulary": [],
+    "target_word_count": 300,
+    "actual_character_count": 255,
+    "length_ratio": 0.85,
+    "latency_ms": 10887,
+    "title": "雨中的邂逅",
+    "body": "那天下午，天空突然下起了大雨。我没有带伞，只好躲在一家小咖啡馆门口，心里有些踌躇，不知道要不要冲回家。就在这时，我听见有人叫我的名字。\n\n回头一看，竟然是我多年未见的老朋友小林。我们在大学时是室友，毕业后就失去了联系。这场雨中的邂逅让我又惊又喜。小林热情地拉我进咖啡馆，给我倒了一杯温水。我们聊了很久，说起这些年的经历，仿佛时光从未流逝。\n\n临走时，小林把伞借给了我，说下次见面再还。我握着那把伞，看着雨水顺着伞沿滴落，心想：有时候，一场意外的雨，反而能让老朋友重逢。你永远不会知道，生活中什么时刻会带来惊喜。",
+    "manual_quality_notes": "",
+    "prompt_version": "story-v9",
+    "meets_length_threshold": true,
+    "sample": 3,
+    "translation": [
+      "That afternoon, the sky suddenly started pouring rain. I hadn't brought an umbrella, so I had to take shelter in the doorway of a small café, feeling somewhat hesitant about whether to dash home. Just then, I heard someone call my name.",
+      "Turning around, I saw it was actually my old friend Xiaolin, whom I hadn't seen for many years. We had been roommates in university but lost touch after graduation. This chance encounter in the rain surprised and delighted me. Xiaolin warmly pulled me into the café and poured me a cup of warm water. We talked for a long time about our experiences over the years, as if time had never passed.",
+      "When leaving, Xiaolin lent me the umbrella, saying I could return it next time we met. Holding that umbrella and watching the rainwater drip along its edge, I thought: sometimes, an unexpected rain can instead bring old friends back together. You never know what moment in life will bring surprises."
+    ],
+    "translation_aligned": true,
+    "questions": [
+      {
+        "question": "主人公为什么在咖啡馆门口踌躇？",
+        "options": [
+          "因为他不知道要不要买咖啡",
+          "因为他没有带伞，在犹豫要不要冲回家",
+          "因为他在等朋友",
+          "因为他不想见小林"
+        ],
+        "answer": 1,
+        "evidence": "我没有带伞，只好躲在一家小咖啡馆门口，心里有些踌躇，不知道要不要冲回家。"
+      },
+      {
+        "question": "主人公和小林是怎么重逢的？",
+        "options": [
+          "通过电话联系",
+          "在咖啡馆门口偶然相遇",
+          "经朋友介绍见面",
+          "在大学同学会上"
+        ],
+        "answer": 1,
+        "evidence": "这场雨中的邂逅让我又惊又喜。"
+      },
+      {
+        "question": "小林借给主人公什么东西？",
+        "options": [
+          "一杯水",
+          "一把伞",
+          "一本书",
+          "一件衣服"
+        ],
+        "answer": 1,
+        "evidence": "临走时，小林把伞借给了我，说下次见面再还。"
+      }
+    ]
+  },
+  {
+    "fixture_name": "large_vocabulary_near_max_length",
+    "category": "stress_length",
+    "provider_label": "openrouter",
+    "model": "moonshotai/kimi-k2-0905",
+    "base_url": "https://openrouter.ai/api/v1/chat/completions",
+    "schema_valid": true,
+    "error_code": null,
+    "error_message": null,
+    "requested_vocabulary_count": 12,
+    "used_vocabulary_count": 12,
+    "coverage": 1.0,
+    "meets_coverage_threshold": true,
+    "missing_vocabulary": [],
+    "target_word_count": 900,
+    "actual_character_count": 829,
+    "length_ratio": 0.9211111111111111,
+    "latency_ms": 30208,
+    "title": "延误的航班",
+    "body": "去年夏天，我们一家人决定去云南旅行。爸爸提前两个月就开始计划这次假期，妈妈负责预订机票和酒店，我和弟弟则兴奋地准备行李。我们听说那里的风景特别美，早就想去看看了。\n\n出发那天早上，天气非常好，阳光明媚。我们带着满满的行李来到机场，每个人的背包里都装着护照和身份证。弟弟还特意带了一个空箱子，说要多买一些纪念品回来送给朋友。\n\n可是当我们到达登机口时，广播里突然传来消息：由于目的地天气突然变坏，我们的航班延误了。工作人员说可能要等四个小时，具体时间还不确定。听到这个消息，妈妈叹了口气，爸爸也开始担心我们的预算会不会超支。\n\n我们只好在机场等待。爸爸去买了几杯咖啡，妈妈打开平板电脑，重新安排后面的行程。我和弟弟坐在椅子上玩手机游戏，但心里都很着急。原本预订的导游下午要在机场接我们，现在肯定赶不上了。\n\n两个小时后，天气依然没有好转。爸爸打电话给旅行社，想问问能不能改期。旅行社的工作人员很客气，说导游可以明天再来接我们，但是今晚的酒店不能退款。妈妈听了以后有些不高兴，但也没有办法。\n\n为了打发时间，我们去机场的商店逛了逛。那里有很多云南特色的纪念品，虽然比外面贵一些，但做工很精致。妈妈买了一个手工刺绣的包，爸爸选了几盒普洱茶，我和弟弟各挑了一个民族风格的小挂件。\n\n终于，在等了五个多小时以后，广播通知我们可以登机了。大家立刻拿起行李，快步走向登机口。虽然很累，但想到马上就要看到美丽的风景，我们又兴奋起来。飞机起飞的时候，天已经黑了，从窗户望出去，城市的灯光像星星一样。\n\n到达云南的时候，已经是深夜。导游果然没有来，我们自己打车去了酒店。前台的服务员很热情，帮我们办理了入住手续。房间虽然不大，但干净舒适，我们很快就睡着了。\n\n第二天早上，导游准时来到酒店。他向我们道歉，说昨天因为航班延误没能接到我们。我们笑着说没关系，旅行中总会有意外发生。接下来的几天，我们欣赏了美丽的风景，拍了很多照片，这次家庭旅行虽然开头不顺利，但最后大家都觉得很值得。",
+    "manual_quality_notes": "",
+    "prompt_version": "story-v9",
+    "meets_length_threshold": true,
+    "sample": 1,
+    "translation": [
+      "Last summer, our whole family decided to travel to Yunnan. Dad started planning this vacation two months in advance, Mom was in charge of booking flights and hotels, and my brother and I excitedly prepared our luggage. We had heard that the scenery there was especially beautiful and had wanted to go see it for a long time.",
+      "On the morning of departure, the weather was very good, with bright sunshine. We came to the airport with full luggage, everyone's backpack containing passports and ID cards. My brother even specially brought an empty suitcase, saying he wanted to buy lots of souvenirs to bring back for his friends.",
+      "But when we arrived at the boarding gate, a sudden announcement came over the loudspeaker: due to sudden bad weather at the destination, our flight was delayed. The staff said we might have to wait four hours, and the exact time was still uncertain. Hearing this news, Mom sighed, and Dad also began to worry whether our budget would be exceeded.",
+      "We had no choice but to wait at the airport. Dad went to buy a few cups of coffee, Mom opened her tablet to rearrange our later itinerary. My brother and I sat in chairs playing mobile games, but we were both anxious in our hearts. The tour guide we had originally booked was supposed to pick us up at the airport in the afternoon, but now he definitely couldn't make it.",
+      "After two hours, the weather still hadn't improved. Dad called the travel agency to ask if we could reschedule. The agency staff were very polite, saying the tour guide could come pick us up tomorrow instead, but tonight's hotel couldn't be refunded. Mom was somewhat unhappy hearing this, but there was nothing she could do.",
+      "To pass the time, we browsed the shops at the airport. There were many Yunnan-characteristic souvenirs there; although they were somewhat more expensive than outside, the craftsmanship was exquisite. Mom bought a handmade embroidered bag, Dad selected a few boxes of Pu'er tea, and my brother and I each picked out an ethnic-style small ornament.",
+      "Finally, after waiting for more than five hours, the announcement notified us that we could board. Everyone immediately picked up their luggage and walked quickly toward the boarding gate. Although very tired, thinking that we would soon see the beautiful scenery, we became excited again. When the plane took off, it was already dark, and looking out the window, the city lights were like stars.",
+      "When we arrived in Yunnan, it was already late at night. The tour guide indeed hadn't come, so we took a taxi to the hotel ourselves. The front desk attendant was very enthusiastic and helped us check in. Although the room wasn't large, it was clean and comfortable, and we fell asleep quickly.",
+      "The next morning, the tour guide arrived at the hotel on time. He apologized to us, saying he couldn't pick us up yesterday because of the flight delay. We smiled and said it was fine, that unexpected things always happen during travel. In the following days, we admired the beautiful scenery, took many photos, and although this family trip didn't start smoothly, in the end everyone felt it was worth it."
+    ],
+    "translation_aligned": true,
+    "questions": [
+      {
+        "question": "为什么航班延误了？",
+        "options": [
+          "因为飞机出了技术问题",
+          "因为目的地的天气突然变坏",
+          "因为机场工作人员罢工",
+          "因为乘客的护照有问题"
+        ],
+        "answer": 1,
+        "evidence": "广播里突然传来消息：由于目的地天气突然变坏，我们的航班延误了。"
+      },
+      {
+        "question": "妈妈为什么担心预算会超支？",
+        "options": [
+          "因为纪念品太贵了",
+          "因为航班延误可能导致额外花费",
+          "因为导游要加收钱",
+          "因为酒店价格涨了"
+        ],
+        "answer": 1,
+        "evidence": "听到这个消息，妈妈叹了口气，爸爸也开始担心我们的预算会不会超支。"
+      },
+      {
+        "question": "他们在机场等待的时候做了什么？",
+        "options": [
+          "去机场外面的餐厅吃饭",
+          "爸爸买咖啡，妈妈重新安排行程，孩子们玩游戏",
+          "给旅行社打电话要求退款",
+          "在机场睡觉休息"
+        ],
+        "answer": 1,
+        "evidence": "爸爸去买了几杯咖啡，妈妈打开平板电脑，重新安排后面的行程。我和弟弟坐在椅子上玩手机游戏，但心里都很着急。"
+      },
+      {
+        "question": "关于昨晚的酒店，旅行社说了什么？",
+        "options": [
+          "可以免费取消",
+          "可以改到明天住",
+          "不能退款",
+          "可以换成更好的房间"
+        ],
+        "answer": 2,
+        "evidence": "旅行社的工作人员很客气，说导游可以明天再来接我们，但是今晚的酒店不能退款。"
+      },
+      {
+        "question": "最后导游是什么时候来接他们的？",
+        "options": [
+          "当天晚上",
+          "第二天早上",
+          "第三天早上",
+          "根本没有来"
+        ],
+        "answer": 1,
+        "evidence": "第二天早上，导游准时来到酒店。"
+      }
+    ]
+  },
+  {
+    "fixture_name": "large_vocabulary_near_max_length",
+    "category": "stress_length",
+    "provider_label": "openrouter",
+    "model": "moonshotai/kimi-k2-0905",
+    "base_url": "https://openrouter.ai/api/v1/chat/completions",
+    "schema_valid": true,
+    "error_code": null,
+    "error_message": null,
+    "requested_vocabulary_count": 12,
+    "used_vocabulary_count": 12,
+    "coverage": 1.0,
+    "meets_coverage_threshold": true,
+    "missing_vocabulary": [],
+    "target_word_count": 900,
+    "actual_character_count": 832,
+    "length_ratio": 0.9244444444444444,
+    "latency_ms": 26525,
+    "title": "延误的航班",
+    "body": "去年夏天，我们一家人计划去云南旅行。爸爸提前三个月就预订了机票和酒店，妈妈做了详细的预算，连每天的吃饭钱都算好了。我和弟弟兴奋地收拾行李，把护照检查了好几遍，生怕忘带什么重要的东西。\n\n出发那天早上，天气特别好，阳光明媚，蓝蓝的天空上没有一朵云。我们早早地来到机场，导游已经在那里等着我们了。她是一位年轻的女士，笑容很亲切，给我们讲了好多云南有趣的风景和故事。\n\n可是，就在我们准备登机的时候，广播里突然传来消息：因为目的地机场有大雾，我们的航班要延误四个小时。听到这个消息，弟弟差点哭了出来，我也感到非常失望。\n\n爸爸赶紧打电话联系酒店，说明情况，希望他们能保留我们的房间。妈妈则打开行李箱，拿出给我们准备的零食，让大家先吃点东西。虽然遇到了麻烦，但一家人在一起，心情慢慢好了一些。\n\n导游建议我们去机场的书店逛逛，她说等待的时候看看书时间过得快。我在书店里买了一本介绍云南风景的画册，里面的照片真美，有雪山、湖泊，还有古老的村庄。看着这些图片，我对这次旅行又充满了期待。\n\n四个小时终于过去了，广播通知我们可以登机了。我们快速地收拾好随身物品，跟着导游走向登机口。飞机起飞后，我从窗户望出去，城市的灯光渐渐变小，心里想着马上就要看到那些美丽的风景了。\n\n到达云南的时候已经是晚上十点，比原计划晚了很久。不过酒店的服务员很热情，还给我们准备了热腾腾的米线当夜宵。虽然第一天的行程被打乱了，但大家都没有抱怨，反而觉得这样的经历很难忘。\n\n接下来的几天，我们按照新的计划游玩。导游带我们去了丽江古城，那里的石板路和小桥流水特别有味道。妈妈在古城里买了很多纪念品，有手工做的银饰、漂亮的围巾，还有好吃的鲜花饼。她说这些东西要送给家里的亲戚朋友。\n\n这次旅行让我明白了一个道理：计划再完美，也可能会遇到意外。重要的是一家人能够互相理解、一起面对困难。虽然航班延误了，但我们看到了最美的风景，也收获了最珍贵的回忆。回家的路上，我在心里默默想：下次旅行，我还要和家人一起去。",
+    "manual_quality_notes": "",
+    "prompt_version": "story-v9",
+    "meets_length_threshold": true,
+    "sample": 2,
+    "translation": [
+      "Last summer, our whole family planned to travel to Yunnan. Dad booked the plane tickets and hotel three months in advance, Mom made a detailed budget, calculating even our daily meal expenses. My younger brother and I excitedly packed our luggage, checking our passports several times, afraid we might forget something important.",
+      "On the morning of departure, the weather was especially nice, with bright sunshine and not a single cloud in the blue sky. We arrived at the airport early, and the tour guide was already there waiting for us. She was a young woman with a warm smile, telling us many interesting stories about Yunnan's scenery.",
+      "However, just as we were about to board, an announcement came over the loudspeaker: due to heavy fog at our destination airport, our flight would be delayed by four hours. Hearing this news, my younger brother almost cried, and I also felt very disappointed.",
+      "Dad quickly called the hotel to explain the situation, hoping they could keep our room for us. Mom opened the suitcase and took out the snacks she had prepared for us, letting everyone eat something first. Although we had encountered trouble, being together as a family, our mood gradually improved.",
+      "The tour guide suggested we visit the airport bookstore, saying that time passes quickly when reading while waiting. I bought a picture book introducing Yunnan's scenery in the bookstore; the photos inside were truly beautiful, with snow-capped mountains, lakes, and ancient villages. Looking at these pictures, I became full of anticipation for this trip again.",
+      "Four hours finally passed, and the announcement notified us that we could board. We quickly packed our belongings and followed the tour guide to the boarding gate. After the plane took off, I looked out the window, watching the city lights gradually grow smaller, thinking that I would soon see those beautiful landscapes.",
+      "We arrived in Yunnan at ten o'clock at night, much later than originally planned. However, the hotel staff were very enthusiastic and even prepared steaming hot rice noodles for us as a late-night snack. Although the first day's itinerary was disrupted, no one complained; instead, everyone felt this experience was quite memorable.",
+      "Over the next few days, we followed our new plan for sightseeing. The tour guide took us to Lijiang Ancient Town, where the stone-paved roads and small bridges over flowing water had a special charm. Mom bought many souvenirs in the ancient town, including handmade silver jewelry, beautiful scarves, and delicious flower cakes. She said she would give these things to relatives and friends back home.",
+      "This trip taught me a truth: no matter how perfect the plan, unexpected things can still happen. What matters is that family members can understand each other and face difficulties together. Although the flight was delayed, we saw the most beautiful scenery and gained the most precious memories. On the way home, I silently thought to myself: next time I travel, I want to go with my family again."
+    ],
+    "translation_aligned": true,
+    "questions": [
+      {
+        "question": "为什么航班延误了？",
+        "options": [
+          "因为飞机坏了",
+          "因为目的地机场有大雾",
+          "因为飞行员生病了",
+          "因为机场人太多"
+        ],
+        "answer": 1,
+        "evidence": "因为目的地机场有大雾，我们的航班要延误四个小时。"
+      },
+      {
+        "question": "导游建议大家去哪里打发时间？",
+        "options": [
+          "咖啡厅",
+          "机场的书店",
+          "礼品店",
+          "餐厅"
+        ],
+        "answer": 1,
+        "evidence": "导游建议我们去机场的书店逛逛，她说等待的时候看看书时间过得快。"
+      },
+      {
+        "question": "妈妈在古城里买了什么？",
+        "options": [
+          "只有鲜花饼",
+          "手工做的银饰、漂亮的围巾和鲜花饼",
+          "只有围巾",
+          "只有银饰"
+        ],
+        "answer": 1,
+        "evidence": "妈妈在古城里买了很多纪念品，有手工做的银饰、漂亮的围巾，还有好吃的鲜花饼。"
+      },
+      {
+        "question": "他们到达云南的时候是几点？",
+        "options": [
+          "下午四点",
+          "晚上六点",
+          "晚上十点",
+          "早上八点"
+        ],
+        "answer": 2,
+        "evidence": "到达云南的时候已经是晚上十点，比原计划晚了很久。"
+      },
+      {
+        "question": "这次旅行让作者明白了什么道理？",
+        "options": [
+          "旅行一定要带很多行李",
+          "计划再完美，也可能会遇到意外",
+          "一定要提前半年预订机票",
+          "导游比家人更重要"
+        ],
+        "answer": 1,
+        "evidence": "这次旅行让我明白了一个道理：计划再完美，也可能会遇到意外。"
+      }
+    ]
+  },
+  {
+    "fixture_name": "large_vocabulary_near_max_length",
+    "category": "stress_length",
+    "provider_label": "openrouter",
+    "model": "moonshotai/kimi-k2-0905",
+    "base_url": "https://openrouter.ai/api/v1/chat/completions",
+    "schema_valid": true,
+    "error_code": null,
+    "error_message": null,
+    "requested_vocabulary_count": 12,
+    "used_vocabulary_count": 12,
+    "coverage": 1.0,
+    "meets_coverage_threshold": true,
+    "missing_vocabulary": [],
+    "target_word_count": 900,
+    "actual_character_count": 967,
+    "length_ratio": 1.0744444444444445,
+    "latency_ms": 28226,
+    "title": "延误的航班",
+    "body": "去年夏天，我们一家人计划去云南旅行。爸爸提前三个月就预订了机票和酒店，妈妈仔细计算了预算，确保每一分钱都花在最有意义的地方。我和妹妹负责整理行李，把护照、衣服和相机都装进了大箱子里。我们期待着看到那里美丽的风景，心里充满了兴奋。\n\n出发那天早上，天气突然变得很差。大雨从灰色的天空中落下来，打湿了街道。爸爸看了看手机上的天气预报，担心地说：“希望不会影响我们的航班。”我们加快脚步，提前两个小时就到了机场，办理了登机手续，把沉重的行李托运好。\n\n我们在候机大厅里等了一个小时，广播里突然传来消息：“各位乘客，由于天气原因，您乘坐的航班将延误四个小时。”听到这个消息，妹妹差点哭了出来，因为这意味着我们预订的导游会在目的地白等很久。妈妈赶紧打电话联系旅行社，说明了情况。\n\n爸爸安慰我们说：“延误虽然让人着急，但安全第一。我们可以在机场逛逛，看看有什么纪念品可以买。”于是我们开始在机场里散步，发现了一家卖当地特产的小店。妈妈用剩下的预算买了一些茶叶和手工编织的小包，准备送给朋友。\n\n四个小时过去了，天气终于好转。我们再次来到登机口，看到许多乘客都在抱怨这次延误打乱了他们的计划。一位老先生告诉我们，他已经等了六个小时，错过了重要的商务会议。相比之下，我们一家人能一起旅行，已经很幸运了。\n\n飞机终于起飞了。从窗户望出去，云海像棉花糖一样柔软，阳光照在上面，闪闪发光。妹妹忘记了等待的烦恼，开始想象云南的风景会是什么样子。爸爸则在看旅行指南，复习导游将要带我们去的几个著名景点。\n\n到达昆明机场时，天已经黑了。我们预订的导游举着牌子在出口等我们，脸上带着理解的微笑。她说：“航班延误是常有的事，不用担心，我会调整明天的行程。”我们感激她的耐心，把从机场买的小纪念品送给她作为感谢。\n\n第二天一早，阳光明媚，天气好极了。导游带我们去了石林，那里的风景果然名不虚传。巨大的石头像森林一样耸立，形态各异，让人感叹大自然的神奇。我们拍了很多照片，爸爸笑着说：“昨天的等待都是值得的，能看到这样的美景，多花几个小时算什么。”\n\n旅行结束时，我们的预算还剩下一些。妈妈提议用这些钱再买些纪念品带回家。在机场的免税店里，我选了一个绣着云南风景的小钱包，准备送给最好的朋友。虽然航班延误让我们的计划有所改变，但这次家庭旅行依然充满了欢笑和温暖的回忆。",
+    "manual_quality_notes": "",
+    "prompt_version": "story-v9",
+    "meets_length_threshold": true,
+    "sample": 3,
+    "translation": [
+      "Last summer, our whole family planned to travel to Yunnan. Dad booked the plane tickets and hotel three months in advance, Mom carefully calculated the budget to ensure every penny was spent in the most meaningful way. My sister and I were responsible for packing luggage, putting passports, clothes, and cameras into the big suitcase. We looked forward to seeing the beautiful scenery there, our hearts full of excitement.",
+      "On the morning of departure, the weather suddenly became very bad. Heavy rain fell from the gray sky, soaking the streets. Dad looked at the weather forecast on his phone and said worriedly, 'I hope this won't affect our flight.' We quickened our pace and arrived at the airport two hours early, checked in, and checked our heavy luggage.",
+      "We waited in the departure hall for an hour when suddenly an announcement came over the loudspeaker: 'Dear passengers, due to weather conditions, your flight will be delayed by four hours.' Hearing this news, my sister almost cried, because this meant the tour guide we had booked would be waiting in vain for a long time at the destination. Mom quickly called the travel agency to explain the situation.",
+      "Dad comforted us by saying, 'Delays are frustrating, but safety comes first. We can walk around the airport and see what souvenirs are available.' So we started walking around the airport and discovered a small shop selling local specialties. Mom used the remaining budget to buy some tea and hand-woven small bags to give to friends.",
+      "After four hours passed, the weather finally improved. We returned to the boarding gate and saw many passengers complaining that this delay had disrupted their plans. An elderly gentleman told us he had already waited six hours and missed an important business meeting. In comparison, our whole family being able to travel together was already quite fortunate.",
+      "The plane finally took off. Looking out the window, the sea of clouds was as soft as cotton candy, with sunlight shining on it, sparkling. My sister forgot about the waiting troubles and began to imagine what the scenery in Yunnan would look like. Dad was reading the travel guide, reviewing the several famous attractions the tour guide would take us to.",
+      "When we arrived at Kunming Airport, it was already dark. The tour guide we had booked was waiting at the exit with a sign, a understanding smile on her face. She said, 'Flight delays happen often, don't worry, I will adjust tomorrow's itinerary.' We were grateful for her patience and gave her the small souvenir we bought at the airport as thanks.",
+      "The next morning, the sun was shining and the weather was wonderful. The tour guide took us to the Stone Forest, where the scenery was indeed well-deserved of its fame. Huge rocks stood like a forest, each with a different shape, making people marvel at the magic of nature. We took many photos, and Dad smiled saying, 'Yesterday's wait was all worth it, to see such beautiful scenery, what are a few extra hours?'",
+      "When the trip ended, we still had some budget left. Mom suggested using this money to buy more souvenirs to take home. At the airport duty-free shop, I chose a small wallet embroidered with Yunnan scenery to give to my best friend. Although the flight delay changed our plans, this family trip was still full of laughter and warm memories."
+    ],
+    "translation_aligned": true,
+    "questions": [
+      {
+        "question": "为什么航班延误了？",
+        "options": [
+          "因为机场工作人员罢工",
+          "因为天气不好",
+          "因为飞机出现了机械故障",
+          "因为乘客迟到了"
+        ],
+        "answer": 1,
+        "evidence": "各位乘客，由于天气原因，您乘坐的航班将延误四个小时。"
+      },
+      {
+        "question": "妈妈用预算买了什么？",
+        "options": [
+          "机票和酒店",
+          "茶叶和手工编织的小包",
+          "相机和衣服",
+          "旅行指南和地图"
+        ],
+        "answer": 1,
+        "evidence": "妈妈用剩下的预算买了一些茶叶和手工编织的小包，准备送给朋友。"
+      },
+      {
+        "question": "导游对他们说了什么？",
+        "options": [
+          "她责怪他们迟到",
+          "她说航班延误是常有的事，会调整行程",
+          "她说不能带他们去石林了",
+          "她要求他们支付额外的费用"
+        ],
+        "answer": 1,
+        "evidence": "她说：“航班延误是常有的事，不用担心，我会调整明天的行程。”"
+      },
+      {
+        "question": "他们在哪里把行李托运了？",
+        "options": [
+          "在火车站",
+          "在酒店",
+          "在机场",
+          "在旅行社"
+        ],
+        "answer": 2,
+        "evidence": "我们加快脚步，提前两个小时就到了机场，办理了登机手续，把沉重的行李托运好。"
+      },
+      {
+        "question": "爸爸什么时候预订了机票和酒店？",
+        "options": [
+          "出发前一周",
+          "出发前一个月",
+          "提前三个月",
+          "出发前一天"
+        ],
+        "answer": 2,
+        "evidence": "爸爸提前三个月就预订了机票和酒店，妈妈仔细计算了预算，确保每一分钱都花在最有意义的地方。"
+      }
+    ]
+  },
+  {
+    "fixture_name": "dense_vocabulary",
+    "category": "stress_density",
+    "provider_label": "openrouter",
+    "model": "moonshotai/kimi-k2-0905",
+    "base_url": "https://openrouter.ai/api/v1/chat/completions",
+    "schema_valid": true,
+    "error_code": null,
+    "error_message": null,
+    "requested_vocabulary_count": 20,
+    "used_vocabulary_count": 20,
+    "coverage": 1.0,
+    "meets_coverage_threshold": true,
+    "missing_vocabulary": [],
+    "target_word_count": 350,
+    "actual_character_count": 453,
+    "length_ratio": 1.2942857142857143,
+    "latency_ms": 21311,
+    "title": "德国的新生活",
+    "body": "李明是一位从国内移民到德国的年轻工程师。他特意选择在柏林定居，因为这座城市既有深厚的历史，又充满现代气息。初到德国，他发现身边的朋友们都很直接，说话干脆，从不绕弯子，这让他一开始有些不习惯。\n\n有一次，李明在公司的会议上提出了一个关于减少工业污染的理论方案。一位德国同事立刻怼了回来，说他只会空谈，缺乏实践经验。李明感到有些难看，但他没有反抗，而是冷静地解释自己的理由。会后，那位同事特意发来一个表情包道歉，这让李明觉得德国人其实也有幽默的一面。\n\n渐渐地，李明适应了德国的社会文化。他发现这里虽然强调个人主义，但人们也很重视团队合作。他的口语能力和阅读能力都有了很大提高，甚至开始觉得西装革履的打扮有些洋气。不过，他始终无法理解为什么德国会把一些轻微犯罪的人送进条件不错的监狱，而不是用暴力手段惩罚他们。\n\n一年后，李明已经完全融入了当地生活。他带来的新技术为公司带来了更高的地位，也让他自己获得了尊重。他终于明白，德国社会之所以稳定，是因为人们愿意把平等和自由的理论真正付诸实践，而不是只停留在口号上。",
+    "manual_quality_notes": "",
+    "prompt_version": "story-v9",
+    "meets_length_threshold": true,
+    "sample": 1,
+    "translation": [
+      "Li Ming is a young engineer who immigrated to Germany from China. He specially chose to settle in Berlin because this city has both profound history and modern atmosphere. When he first arrived in Germany, he found that friends around him were very direct, speaking straightforwardly without beating around the bush, which made him somewhat uncomfortable at first.",
+      "Once, Li Ming proposed a theoretical plan about reducing industrial pollution at a company meeting. A German colleague immediately talked back to him, saying he only knew empty talk and lacked practical experience. Li Ming felt somewhat embarrassed, but he did not resist; instead, he calmly explained his reasons. After the meeting, that colleague specially sent a meme to apologize, which made Li Ming feel that Germans actually have a humorous side too.",
+      "Gradually, Li Ming adapted to German social culture. He discovered that although individualism is emphasized here, people also value teamwork. His speaking ability and reading ability have improved greatly, and he even started to feel that dressing in suits looks somewhat stylish. However, he could never understand why Germany sends people who commit minor crimes to decent prisons rather than punishing them with violent means.",
+      "A year later, Li Ming has completely integrated into local life. The new technology he brought brought higher status to the company and earned him respect as well. He finally understood that German society is stable because people are willing to truly put the theories of equality and freedom into practice, rather than just leaving them as slogans."
+    ],
+    "translation_aligned": true,
+    "questions": [
+      {
+        "question": "李明为什么选择在柏林定居？",
+        "options": [
+          "因为柏林既有深厚的历史，又充满现代气息",
+          "因为柏林的污染最少",
+          "因为柏林的监狱条件最好",
+          "因为柏林人最喜欢用表情包"
+        ],
+        "answer": 0,
+        "evidence": "他特意选择在柏林定居，因为这座城市既有深厚的历史，又充满现代气息。"
+      },
+      {
+        "question": "德国同事为什么会在会后给李明发表情包？",
+        "options": [
+          "因为他想嘲笑李明的理论",
+          "因为他为自己在会上怼了李明而道歉",
+          "因为他想展示德国的暴力文化",
+          "因为他想邀请李明去监狱参观"
+        ],
+        "answer": 1,
+        "evidence": "会后，那位同事特意发来一个表情包道歉，这让李明觉得德国人其实也有幽默的一面。"
+      },
+      {
+        "question": "李明对公司会议上的批评做了什么反应？",
+        "options": [
+          "他立刻反抗并离开了会议室",
+          "他感到难看，但冷静地解释了理由",
+          "他干脆放弃了理论方案",
+          "他用暴力回应了同事"
+        ],
+        "answer": 1,
+        "evidence": "李明感到有些难看，但他没有反抗，而是冷静地解释自己的理由。"
+      },
+      {
+        "question": "李明最后明白了德国社会稳定的什么原因？",
+        "options": [
+          "因为德国有很多移民带来了新技术",
+          "因为德国人愿意把平等和自由的理论真正付诸实践",
+          "因为德国的污染控制得最好",
+          "因为德国人的个人主义最强烈"
+        ],
+        "answer": 1,
+        "evidence": "他终于明白，德国社会之所以稳定，是因为人们愿意把平等和自由的理论真正付诸实践，而不是只停留在口号上。"
+      }
+    ]
+  },
+  {
+    "fixture_name": "dense_vocabulary",
+    "category": "stress_density",
+    "provider_label": "openrouter",
+    "model": "moonshotai/kimi-k2-0905",
+    "base_url": "https://openrouter.ai/api/v1/chat/completions",
+    "schema_valid": false,
+    "error_code": "ProviderTimeoutError",
+    "error_message": "Provider did not respond within 75s",
+    "requested_vocabulary_count": 20,
+    "used_vocabulary_count": null,
+    "coverage": null,
+    "meets_coverage_threshold": null,
+    "missing_vocabulary": [],
+    "target_word_count": 350,
+    "actual_character_count": null,
+    "length_ratio": null,
+    "latency_ms": null,
+    "title": null,
+    "body": null,
+    "manual_quality_notes": "",
+    "prompt_version": "story-v9",
+    "meets_length_threshold": null,
+    "sample": 2,
+    "translation": null,
+    "translation_aligned": null,
+    "questions": null
+  },
+  {
+    "fixture_name": "dense_vocabulary",
+    "category": "stress_density",
+    "provider_label": "openrouter",
+    "model": "moonshotai/kimi-k2-0905",
+    "base_url": "https://openrouter.ai/api/v1/chat/completions",
+    "schema_valid": true,
+    "error_code": null,
+    "error_message": null,
+    "requested_vocabulary_count": 20,
+    "used_vocabulary_count": 20,
+    "coverage": 1.0,
+    "meets_coverage_threshold": true,
+    "missing_vocabulary": [],
+    "target_word_count": 350,
+    "actual_character_count": 423,
+    "length_ratio": 1.2085714285714286,
+    "latency_ms": 15394,
+    "title": "德国的新生活",
+    "body": "张明是一位从山东来的移民，为了提高自己的口语能力和阅读能力，他特意报名参加了柏林的语言学校。他的老师告诉他，在德国，个人主义虽然受到尊重，但实践社会责任同样重要。张明把这句话牢牢记在心里，决定用行动来证明自己的价值。\n\n有一天，张明在公园里看到几个年轻人在讨论环保问题。他们发了很多表情包，抱怨空气污染让城市变得难看。张明走过去，用刚学的德语说：\"与其只在网上怼政府，不如干脆参加清理活动。\"年轻人听了，觉得这位中国人说话很洋气，却也有道理。\n\n后来张明了解到，德国历史上有人因为反抗暴力统治而被关进监狱，他们的理论带来了社会地位的变革。他明白了，真正的改变不需要理由去等待，身边的每个人都可以成为推动进步的力量。于是他组织了一个志愿者小组，专门清理河边的垃圾。\n\n一年后，张明成了社区里受人尊敬的成员。他常常告诉新来的移民：\"在德国，污染问题不会自己消失，只有主动参与才能赢得尊重。\"他的故事证明，把理论变成实践，每个人都能找到属于自己的位置。",
+    "manual_quality_notes": "",
+    "prompt_version": "story-v9",
+    "meets_length_threshold": true,
+    "sample": 3,
+    "translation": [
+      "Zhang Ming is an immigrant from Shandong. To improve his speaking ability and reading ability, he specially enrolled in a language school in Berlin. His teacher told him that in Germany, although individualism is respected, putting social responsibility into practice is equally important. Zhang Ming kept these words firmly in mind and decided to prove his worth through action.",
+      "One day, Zhang Ming saw several young people discussing environmental issues in the park. They posted many meme images, complaining that air pollution made the city ugly. Zhang Ming walked over and said in his newly learned German: 'Rather than just talking back to the government online, you might as well participate in cleanup activities.' The young people thought this Chinese person spoke in a stylish way, yet also made sense.",
+      "Later Zhang Ming learned that in German history, some people were imprisoned for resisting violent rule, and their theories brought about changes in social status. He understood that real change doesn't need a reason to wait, and everyone around you can become a force for progress. So he organized a volunteer group specifically to clean up garbage along the river.",
+      "A year later, Zhang Ming became a respected member of the community. He often told new immigrants: 'In Germany, pollution problems won't disappear by themselves; only by actively participating can you earn respect.' His story proves that by turning theory into practice, everyone can find their own place."
+    ],
+    "translation_aligned": true,
+    "questions": [
+      {
+        "question": "张明为什么特意报名参加柏林的语言学校？",
+        "options": [
+          "为了提高口语能力和阅读能力",
+          "为了认识德国朋友",
+          "为了找工作",
+          "为了旅游方便"
+        ],
+        "answer": 0,
+        "evidence": "张明是一位从山东来的移民，为了提高自己的口语能力和阅读能力，他特意报名参加了柏林的语言学校。"
+      },
+      {
+        "question": "张明看到年轻人在公园里做什么？",
+        "options": [
+          "发了很多表情包抱怨空气污染",
+          "在踢足球",
+          "在卖东西",
+          "在上课"
+        ],
+        "answer": 0,
+        "evidence": "他们发了很多表情包，抱怨空气污染让城市变得难看。"
+      },
+      {
+        "question": "张明对年轻人说了什么建议？",
+        "options": [
+          "与其只在网上怼政府，不如干脆参加清理活动",
+          "应该搬家到别的城市",
+          "不要关心政治",
+          "多发一些表情包"
+        ],
+        "answer": 0,
+        "evidence": "与其只在网上怼政府，不如干脆参加清理活动。"
+      },
+      {
+        "question": "张明从德国历史中学到了什么？",
+        "options": [
+          "反抗暴力统治的人被关进监狱，他们的理论带来了社会地位的变革",
+          "德国没有污染问题",
+          "个人主义是最重要的",
+          "不需要学习德语"
+        ],
+        "answer": 0,
+        "evidence": "德国历史上有人因为反抗暴力统治而被关进监狱，他们的理论带来了社会地位的变革。"
+      }
+    ]
+  }
+]

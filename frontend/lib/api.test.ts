@@ -250,6 +250,66 @@ describe("deleteStory", () => {
   });
 });
 
+describe("submitQuizAttempt", () => {
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  it("posts the answers to the story's quiz attempts", async () => {
+    const marked = {
+      id: 3,
+      correct_count: 1,
+      question_count: 1,
+      results: [{ selected: 2, answer: 2, correct: true }],
+    };
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => marked,
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    const { submitQuizAttempt } = await import("./api");
+
+    await expect(submitQuizAttempt("../7", [2])).resolves.toEqual(marked);
+    expect(fetchMock).toHaveBeenCalledWith(
+      "http://localhost:8000/stories/..%2F7/quiz-attempts",
+      {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ answers: [2] }),
+        credentials: "include",
+      },
+    );
+  });
+});
+
+describe("flagQuestion", () => {
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  it("posts the question's index to the story's question flags", async () => {
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({ id: 4 }),
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    const { flagQuestion } = await import("./api");
+
+    await expect(flagQuestion(7, 2)).resolves.toEqual({ id: 4 });
+    expect(fetchMock).toHaveBeenCalledWith(
+      "http://localhost:8000/stories/7/question-flags",
+      {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ question_index: 2 }),
+        credentials: "include",
+      },
+    );
+  });
+});
+
 describe("session handling", () => {
   afterEach(async () => {
     vi.unstubAllGlobals();
