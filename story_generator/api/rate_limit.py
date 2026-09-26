@@ -29,6 +29,7 @@ class SlidingWindowRateLimiter:
         self.limit = limit
         self.window_seconds = window_seconds
         self._hits: dict[str, deque[float]] = {}
+        self._last_forget = float("-inf")
         self._lock = Lock()
 
     def reset(self) -> None:
@@ -41,7 +42,9 @@ class SlidingWindowRateLimiter:
         with self._lock:
             hits = self._hits.get(key)
             if hits is None:
-                self._forget_idle_keys(now)
+                if now - self._last_forget >= self.window_seconds:
+                    self._forget_idle_keys(now)
+                    self._last_forget = now
                 hits = self._hits[key] = deque()
             while hits and now - hits[0] >= self.window_seconds:
                 hits.popleft()
@@ -51,8 +54,9 @@ class SlidingWindowRateLimiter:
             return None
 
     def _forget_idle_keys(self, now: float) -> None:
-        # Run whenever a new key arrives, so memory is bounded by the keys
-        # seen within one window rather than growing with every address ever.
+        # Run when a new key arrives, at most once per window: memory stays
+        # bounded by the keys seen in the last two windows, and a burst of new
+        # addresses costs one scan per window rather than one per address.
         idle = [
             key
             for key, hits in self._hits.items()
@@ -90,7 +94,8 @@ def generation_rate_limit() -> None:
 def login_rate_limit(request: Request) -> None:
     detail = "Too many login attempts; try again in a minute"
     client = request.client.host if request.client else ""
-    # Per client first: a client that is already blocked doesn't also use up
-    # the shared budget.
+    # Per client first, so a client that is already blocked doesn't also use
+    # up the shared budget. The reverse isn't true: an attempt the shared cap
+    # refuses still counts against that client's own limit.
     _enforce(_login_client_limiter, detail, key=client)
     _enforce(_login_limiter, detail)
