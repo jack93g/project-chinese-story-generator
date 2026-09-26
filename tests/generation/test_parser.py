@@ -193,6 +193,10 @@ def _raw_with_question(evidence_json: str) -> str:
         "他说：“我们去饭馆吧！”",
         "“我们去饭馆吧",
         "他们去了饭馆",
+        # a clause or list mark added at the end
+        "他们去了饭馆；",
+        "他们去了饭馆：",
+        "他们去了饭馆、",
         # whitespace ignored
         " 他说：“我们去饭馆吧！” 他们去了饭馆。 ",
     ],

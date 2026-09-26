@@ -68,7 +68,7 @@ def parse_structured_result(raw_text: str, usage: UsageMetadata) -> GenerationRe
 # Stripped from both ends of a question's evidence before looking for it in
 # the body: a model quoting a sentence often adds or drops its quotation
 # marks or final punctuation.
-_EVIDENCE_EDGES = "\"'“”‘’「」『』。！？!?.，,"
+_EVIDENCE_EDGES = "\"'“”‘’「」『』。！？!?.，,；;：:、"
 _WHITESPACE = re.compile(r"\s+")
 
 
