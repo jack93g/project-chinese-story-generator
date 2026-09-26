@@ -206,6 +206,10 @@ Droplet, cloud-init does all of them.
   hand-built Droplet; cloud-init's `sudo:` setting on Terraform Droplets).
 - **Docker** from Docker's own apt repository, not Ubuntu's older `docker.io`
   package. Compose 2.24+ is required: `docker-compose.prod.yml` uses `!reset`.
+- **Automatic updates** (`unattended-upgrades`) cover Docker's repo as well
+  as Ubuntu's security updates, and reboot at 05:00 UTC when needed
+  (`/etc/apt/apt.conf.d/52unattended-upgrades-local`; see the runbook's
+  Patching section).
 - **SSH hardening** in `/etc/ssh/sshd_config.d/00-hardening.conf`:
 
   ```

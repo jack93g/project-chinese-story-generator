@@ -787,7 +787,19 @@ always full.
 ## Patching
 
 **Host OS.** Ubuntu's `unattended-upgrades` applies security updates
-automatically. Check it's on with `systemctl is-active unattended-upgrades`.
+automatically, once a day (around 06:00 UTC). A local file,
+`/etc/apt/apt.conf.d/52unattended-upgrades-local` (written by cloud-init),
+adds two things to Ubuntu's defaults:
+
+- **Docker Engine and containerd** from Docker's own repo are updated too.
+  Upgrading the engine restarts every container: under a minute of downtime,
+  and a generation in progress is retried.
+- **Automatic reboot at 05:00 UTC** when an update needs one (e.g. a
+  kernel), clear of the Sunday 03:17 backup and the 04:23 sync.
+
+Check it's on with `systemctl is-active unattended-upgrades`, and see what
+it did in `/var/log/unattended-upgrades/unattended-upgrades.log`. Ordinary
+(non-security) updates from `noble-updates` still wait for the manual pass.
 Monthly, or when a notable CVE lands:
 
 ```bash

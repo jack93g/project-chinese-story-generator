@@ -39,6 +39,17 @@ write_files:
       Components: stable
       Signed-By: /etc/apt/keyrings/docker.asc
 
+  # unattended-upgrades additions (docs/runbook.md, "Patching"): also update
+  # Docker Engine/containerd from Docker's repo, and reboot at 05:00 UTC
+  # (clear of the backup and sync cron jobs) when an update needs it.
+  - path: /etc/apt/apt.conf.d/52unattended-upgrades-local
+    content: |
+      Unattended-Upgrade::Origins-Pattern {
+              "origin=Docker,label=Docker CE";
+      };
+      Unattended-Upgrade::Automatic-Reboot "true";
+      Unattended-Upgrade::Automatic-Reboot-Time "05:00";
+
   # Shell helpers from docs/runbook.md ("Conventions"); keep the two in sync.
   # defer: write_files normally runs before users are created, and writing
   # into /home/deploy that early would create it root-owned. Deferred, it runs
