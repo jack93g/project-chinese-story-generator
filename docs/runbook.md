@@ -628,7 +628,7 @@ any secret: they only see a ping URL and the public `/health` page.
 | Service | Watches | Alerts when |
 | --- | --- | --- |
 | [Healthchecks.io](https://healthchecks.io) | the laptop's weekly backup pull | a pull reports failure, or no ping arrives within 8 days |
-| [UptimeRobot](https://uptimerobot.com) | `https://api.huaben.app/health` every 5 minutes | the API is down or not answering `ok` |
+| [UptimeRobot](https://uptimerobot.com) | `https://api.huaben.app/health` every 5 minutes | the API doesn't answer with a success status (down, or Caddy returning 502) |
 
 **Setup (once):**
 
@@ -637,8 +637,9 @@ any secret: they only see a ping URL and the public `/health` page.
   `~/.config/story-backup/ping-url` on the laptop. Nothing on the Droplet
   pings it: the laptop's pull succeeding proves the backup ran *and* reached
   the laptop.
-- UptimeRobot: a **Keyword** monitor on `https://api.huaben.app/health`,
-  keyword `ok`, 5-minute interval, email alert.
+- UptimeRobot: an **HTTP(s)** monitor on `https://api.huaben.app/health`,
+  5-minute interval, email alert. A plain status check is enough: when the
+  API is down, Caddy answers 502.
 
 **When an alert fires:**
 
