@@ -79,7 +79,9 @@ uses a session cookie; see Authentication below),
 `CORS_ALLOWED_ORIGINS` (comma-separated browser origins; defaults to the
 local Next.js dev server; also the allowlist for cookie-authenticated writes),
 `SESSION_COOKIE_SECURE` (optional, default `true`; `false` only for local
-http if a browser drops the Secure cookie), plus `POSTGRES_USER`, `POSTGRES_PASSWORD`,
+http if a browser drops the Secure cookie), `ENABLE_API_DOCS` (optional,
+default off; `true` serves `/docs`, `/redoc` and `/openapi.json` without
+auth, so local development only, never production), plus `POSTGRES_USER`, `POSTGRES_PASSWORD`,
 `POSTGRES_DB` (used by Compose to create the database and build the
 containers' `DATABASE_URL`).
 

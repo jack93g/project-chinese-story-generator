@@ -43,9 +43,21 @@ def test_missing_key_on_write_endpoints_returns_401(anonymous_client):
     assert anonymous_client.delete("/stories/1").status_code == 401
 
 
-def test_docs_and_openapi_are_not_exposed(anonymous_client):
+def test_docs_and_openapi_are_not_exposed_by_default(monkeypatch):
+    # A developer's .env may turn them on; the default must still be off.
+    monkeypatch.delenv("ENABLE_API_DOCS", raising=False)
+    client = TestClient(create_app())
+
     for path in ("/docs", "/redoc", "/openapi.json"):
-        assert anonymous_client.get(path).status_code == 404
+        assert client.get(path).status_code == 404
+
+
+def test_docs_and_openapi_can_be_enabled_for_local_development(monkeypatch):
+    monkeypatch.setenv("ENABLE_API_DOCS", "true")
+    client = TestClient(create_app())
+
+    for path in ("/docs", "/redoc", "/openapi.json"):
+        assert client.get(path).status_code == 200
 
 
 def test_cors_preflight_allows_the_key_header_without_needing_it(monkeypatch):

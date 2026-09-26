@@ -254,7 +254,8 @@ Droplet, cloud-init does all of them.
 Every route except `GET /health` and `/auth/login`/`/auth/logout` requires
 either a login session or an `X-API-Key` header matching `API_ACCESS_KEY`
 (compared in constant time); anything else gets 401. The API refuses to start
-without the key, and its interactive docs are disabled.
+without the key, and its interactive docs are disabled (`ENABLE_API_DOCS`
+turns them on for local development; never set it in production).
 
 - **Browser:** the frontend shows a login form. `POST /auth/login` checks the
   password against an argon2 hash and sets a `session` cookie scoped to

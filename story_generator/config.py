@@ -74,6 +74,17 @@ def get_api_access_key() -> str:
     return key
 
 
+def get_api_docs_enabled() -> bool:
+    """
+    Whether to serve the interactive docs (/docs, /redoc) and the OpenAPI
+    schema. Off unless ENABLE_API_DOCS=true: they are app-level routes the
+    auth dependency doesn't cover, so turning them on shows every endpoint to
+    anyone who can reach the API. For local development only; never set it
+    in production.
+    """
+    return os.getenv("ENABLE_API_DOCS", "false").strip().lower() == "true"
+
+
 def get_session_cookie_secure() -> bool:
     """
     Whether the login cookie is marked Secure (sent over HTTPS only). On by

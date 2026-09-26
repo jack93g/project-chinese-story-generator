@@ -10,7 +10,11 @@ from story_generator.api.routers.story_generations import (
 from story_generator.api.routers.sync_status import router as sync_status_router
 from story_generator.api.routers.vocabulary import router as vocabulary_router
 from story_generator.api.security import require_auth
-from story_generator.config import get_api_access_key, get_cors_allowed_origins
+from story_generator.config import (
+    get_api_access_key,
+    get_api_docs_enabled,
+    get_cors_allowed_origins,
+)
 
 
 def create_app() -> FastAPI:
@@ -19,13 +23,14 @@ def create_app() -> FastAPI:
 
     # Interactive docs and the OpenAPI schema are app-level routes that the
     # auth dependency doesn't cover, so they're disabled rather than left
-    # public.
+    # public, unless ENABLE_API_DOCS turns them on for local development.
+    docs_enabled = get_api_docs_enabled()
     app = FastAPI(
         title="Chinese Story Generator API",
         version="0.1.0",
-        docs_url=None,
-        redoc_url=None,
-        openapi_url=None,
+        docs_url="/docs" if docs_enabled else None,
+        redoc_url="/redoc" if docs_enabled else None,
+        openapi_url="/openapi.json" if docs_enabled else None,
     )
 
     app.add_middleware(
