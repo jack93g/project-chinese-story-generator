@@ -70,6 +70,10 @@ procedures (deploys, rollbacks, backups, secret rotation) are in
   key), or Terraform.
 - **Accounts you need**: DigitalOcean, Cloudflare (DNS for `huaben.app`),
   GitHub (repo admin, for Environments and packages), and the AI provider.
+  Turn on two-factor authentication for all of them: each one alone is enough
+  to take over the service (DigitalOcean can power off and rebuild the
+  Droplet, Cloudflare can point `api.huaben.app` elsewhere and get a
+  certificate for it, GitHub can deploy any code).
 
 ## Rebuild from scratch
 
@@ -89,6 +93,13 @@ where it runs. Expect about an hour.
    terraform plan      # read all of it; see "Terraform" below before any apply
    terraform apply
    ```
+
+   Make both tokens as narrow and short-lived as the job allows, since they
+   only need to exist for this run: for DigitalOcean, **Custom Scopes**
+   covering droplet, firewall and ssh_key (plus the read-only scopes it
+   pre-selects) with a short expiry; for Cloudflare, the "Edit zone DNS"
+   template limited to the `huaben.app` zone only, with a TTL. Revoke them
+   afterwards if you won't need them again soon.
 
    The output gives `droplet_ipv4` and `api_url`. If an old Droplet's host key
    is in `~/.ssh/known_hosts`, remove it (`ssh-keygen -R api.huaben.app` and
