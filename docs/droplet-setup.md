@@ -101,7 +101,8 @@ where it runs. Expect about an hour.
    docker --version && docker compose version   # Compose must be 2.24+
    sudo -n true && echo "sudo ok"
    command -v age && type dc
-   sudo sshd -T | grep -Ei 'permitrootlogin|passwordauthentication'   # both "no"
+   sudo sshd -T | grep -Ei '^(permitrootlogin|passwordauthentication|allowusers) '   # no, no, deploy
+   sudo wc -c /root/.ssh/authorized_keys                                         # 0
    ```
 
    If `ssh` fails or anything is missing, see
@@ -210,11 +211,25 @@ Droplet, cloud-init does all of them.
   ```
   PermitRootLogin no
   PasswordAuthentication no
+  KbdInteractiveAuthentication no
+  AllowUsers deploy
+  MaxAuthTries 3
+  X11Forwarding no
+  AllowAgentForwarding no
+  AllowTcpForwarding no
   ```
 
   The `00-` prefix matters: SSH uses the first value it reads, and the main
-  `sshd_config` sets `PermitRootLogin yes`. Check with
-  `sudo sshd -T | grep -Ei 'permitrootlogin|passwordauthentication'`.
+  `sshd_config` sets `PermitRootLogin yes`. Nothing uses SSH forwarding;
+  remove `AllowTcpForwarding no` if you ever want an `ssh -L` tunnel to
+  Postgres. Check with
+  `sudo sshd -T | grep -Ei '^(permitrootlogin|passwordauthentication|allowusers|allowtcpforwarding) '`.
+  To change it on a live Droplet: edit the file, `sudo sshd -t && sudo
+  systemctl reload ssh`, and prove a login from a **new** terminal before
+  closing the current one.
+- **Root's `authorized_keys` is empty.** DigitalOcean installs the admin key
+  for root too; it's removed so that, even if `PermitRootLogin no` were ever
+  lost, that key still couldn't log in as root.
 - **`age`** (for encrypting backups) and the runbook's `dc`/`dbsql` helpers in
   `~deploy/.bashrc`.
 - On the hand-built Droplet, the first `apt upgrade` asked about the modified
