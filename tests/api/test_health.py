@@ -13,3 +13,12 @@ def test_health_check_reports_an_available_application_without_database_configur
 
     assert response.status_code == 200
     assert response.json() == {"status": "ok"}
+
+
+def test_health_check_answers_head_for_uptime_monitors():
+    client = TestClient(create_app())
+
+    response = client.head("/health")
+
+    assert response.status_code == 200
+    assert response.content == b""
