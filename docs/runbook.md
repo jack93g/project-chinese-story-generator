@@ -800,6 +800,14 @@ All services have `restart: unless-stopped`, so they come back after a reboot
 or a Docker engine upgrade. Afterwards: `dc ps` (all Up) and
 `curl -s https://api.huaben.app/health`. Expect a minute or so of downtime.
 
+Then clear out old images: every deploy pulls a new app image and nothing
+removes the old ones. This deletes only images no container is using; a
+rollback just pulls its image from GHCR again.
+
+```bash
+docker image prune -af && df -h /
+```
+
 **App image** (`FROM python:3.12`, a moving tag). Every build resolves the tag
 again, so any deploy picks up the latest Python patch release and Debian
 security updates. Normally that's enough. For an urgent base-image fix with no
