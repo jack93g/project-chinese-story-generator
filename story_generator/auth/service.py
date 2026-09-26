@@ -3,17 +3,22 @@ import secrets
 from collections.abc import Callable
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
+from enum import StrEnum
 from functools import cache
 
 from argon2 import PasswordHasher
 from argon2.exceptions import InvalidHashError, VerificationError
 
-from story_generator.auth.persistence.models import AuthSession, User
+from story_generator.auth.persistence.models import AuthEvent, AuthSession, User
 from story_generator.auth.persistence.repository import AuthRepository
 
 SESSION_LIFETIME = timedelta(days=30)
 MIN_PASSWORD_LENGTH = 12
 MAX_USERNAME_LENGTH = 150
+# Auth events hold client IPs, which are personal data: keep them for a fixed
+# period only. `manage-logins purge`, run daily by cron, deletes older rows.
+AUTH_EVENT_RETENTION = timedelta(days=90)
+MAX_USER_AGENT_LENGTH = 512
 
 _hasher = PasswordHasher()
 
@@ -37,7 +42,24 @@ def hash_session_token(token: str) -> str:
     return hashlib.sha256(token.encode()).hexdigest()
 
 
+class AuthEventType(StrEnum):
+    LOGIN_SUCCEEDED = "login_succeeded"
+    LOGIN_WRONG_PASSWORD = "login_wrong_password"
+    LOGIN_UNKNOWN_USER = "login_unknown_user"
+    LOGOUT = "logout"
+
+
+FAILED_LOGIN_EVENTS = (
+    AuthEventType.LOGIN_WRONG_PASSWORD,
+    AuthEventType.LOGIN_UNKNOWN_USER,
+)
+
+
 class InvalidCredentialsError(Exception):
+    """Raised for an unknown username and a wrong password alike, so callers
+    can't tell them apart. The failed attempt has already been recorded as an
+    auth event: commit the session to keep it."""
+
     def __init__(self):
         super().__init__("Invalid username or password")
 
@@ -80,6 +102,28 @@ class IssuedSession:
 
 
 @dataclass(frozen=True)
+class ClientInfo:
+    """Where a login or logout came from, as recorded on its auth event."""
+
+    ip: str | None = None
+    user_agent: str | None = None
+
+
+NO_CLIENT = ClientInfo()
+
+
+@dataclass(frozen=True)
+class AuthEventSummary:
+    occurred_at: datetime
+    event_type: str
+    # None for an unknown username (which is never stored) or a deleted user.
+    username: str | None
+    session_id: int | None
+    client_ip: str | None
+    user_agent: str | None
+
+
+@dataclass(frozen=True)
 class AuthenticatedUser:
     id: int
     username: str
@@ -116,12 +160,20 @@ class AuthService:
         user.updated_at = now
         self.repository.revoke_all_sessions(user.id, now)
 
-    def login(self, username: str, password: str) -> IssuedSession:
+    def login(
+        self, username: str, password: str, client: ClientInfo = NO_CLIENT
+    ) -> IssuedSession:
+        """Start a session, recording the attempt as an auth event whether or
+        not it succeeds. The attempted username is never recorded."""
         user = self.repository.get_user_by_username(normalize_username(username))
         if user is None:
             self._verify(_dummy_hash(), password)
+            self._record(AuthEventType.LOGIN_UNKNOWN_USER, client, self.clock())
             raise InvalidCredentialsError()
         if not self._verify(user.password_hash, password):
+            self._record(
+                AuthEventType.LOGIN_WRONG_PASSWORD, client, self.clock(), user.id
+            )
             raise InvalidCredentialsError()
 
         now = self.clock()
@@ -131,13 +183,15 @@ class AuthService:
 
         token = secrets.token_urlsafe(32)
         expires_at = now + SESSION_LIFETIME
-        self.repository.add_session(
-            AuthSession(
-                user_id=user.id,
-                token_hash=hash_session_token(token),
-                created_at=now,
-                expires_at=expires_at,
-            )
+        auth_session = AuthSession(
+            user_id=user.id,
+            token_hash=hash_session_token(token),
+            created_at=now,
+            expires_at=expires_at,
+        )
+        self.repository.add_session(auth_session)
+        self._record(
+            AuthEventType.LOGIN_SUCCEEDED, client, now, user.id, auth_session.id
         )
         return IssuedSession(token=token, username=user.username, expires_at=expires_at)
 
@@ -153,9 +207,57 @@ class AuthService:
             id=auth_session.user.id, username=auth_session.user.username
         )
 
-    def logout(self, token: str) -> None:
-        """Revoke the session. A no-op for unknown or already-revoked tokens."""
-        self.repository.revoke_session(hash_session_token(token), self.clock())
+    def logout(self, token: str, client: ClientInfo = NO_CLIENT) -> None:
+        """Revoke the session and record the logout. A no-op (nothing
+        recorded) for unknown or already-revoked tokens."""
+        now = self.clock()
+        revoked = self.repository.revoke_session(hash_session_token(token), now)
+        if revoked is not None:
+            session_id, user_id = revoked
+            self._record(AuthEventType.LOGOUT, client, now, user_id, session_id)
+
+    def recent_events(
+        self, limit: int, failed_only: bool = False
+    ) -> list[AuthEventSummary]:
+        """The latest auth events, newest first."""
+        events = self.repository.recent_events(
+            limit, FAILED_LOGIN_EVENTS if failed_only else None
+        )
+        return [
+            AuthEventSummary(
+                occurred_at=event.occurred_at,
+                event_type=event.event_type,
+                username=event.user.username if event.user else None,
+                session_id=event.session_id,
+                client_ip=event.client_ip,
+                user_agent=event.user_agent,
+            )
+            for event in events
+        ]
+
+    def delete_expired_events(self) -> int:
+        """Delete auth events older than the retention period. Returns how
+        many were deleted."""
+        return self.repository.delete_events_before(self.clock() - AUTH_EVENT_RETENTION)
+
+    def _record(
+        self,
+        event_type: AuthEventType,
+        client: ClientInfo,
+        occurred_at: datetime,
+        user_id: int | None = None,
+        session_id: int | None = None,
+    ) -> None:
+        self.repository.add_event(
+            AuthEvent(
+                occurred_at=occurred_at,
+                event_type=event_type,
+                user_id=user_id,
+                session_id=session_id,
+                client_ip=client.ip,
+                user_agent=(client.user_agent or "")[:MAX_USER_AGENT_LENGTH] or None,
+            )
+        )
 
     @staticmethod
     def _verify(password_hash: str, password: str) -> bool:

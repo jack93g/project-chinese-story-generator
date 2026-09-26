@@ -300,7 +300,13 @@ turns them on for local development; never set it in production).
   Cookie-authenticated writes must also carry an `Origin` in
   `CORS_ALLOWED_ORIGINS`, else 403. Login attempts are limited to 10 a minute
   per client address, and 60 a minute across all clients, so a single
-  guesser can't lock everyone else out.
+  guesser can't lock everyone else out. Each attempt that gets past those
+  limits, and each logout, is a row in `auth_events` (outcome, user if the
+  name is an account, session, client IP, user agent). A username that isn't
+  an account is never stored, since it's sometimes a mistyped password.
+  Failed attempts return the same 401 whatever the reason. Rows are deleted
+  after 90 days by a daily cron job
+  ([runbook](runbook.md#login-activity)).
 - **Scripts and `curl`:** the `X-API-Key` header. The frontend no longer uses
   the key at all, so nothing secret is kept in the browser.
 Creating or retrying a generation returns 429 when 3 are already queued or
