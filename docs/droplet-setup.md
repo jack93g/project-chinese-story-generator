@@ -182,7 +182,9 @@ where it runs. Expect about an hour.
      fail.
 
 9. **Data and backups.** Set up backups (runbook →
-   [Backups → One-time setup](runbook.md#one-time-setup)). If this replaces a
+   [Backups → One-time setup](runbook.md#one-time-setup), then
+   [One-time setup: automatic pull](runbook.md#one-time-setup-automatic-pull)).
+   If this replaces a
    Droplet that had data, restore the newest backup
    (runbook → [Restore from a backup](runbook.md#restore-from-a-backup)).
    Otherwise, import vocabulary: `dc run --rm api sync-skritter --all`.
