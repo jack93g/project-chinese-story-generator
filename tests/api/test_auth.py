@@ -5,11 +5,14 @@ from story_generator.api import rate_limit
 from story_generator.api.app import create_app
 from story_generator.api.dependencies import get_db
 from story_generator.api.rate_limit import SlidingWindowRateLimiter
+from story_generator.auth.persistence.models import AuthEvent, AuthSession
 from story_generator.auth.persistence.repository import AuthRepository
 from story_generator.auth.service import AuthService
 
 PASSWORD = "correct horse battery"
 ALLOWED_ORIGIN = "https://huaben.app"
+CLIENT_IP = "203.0.113.9"
+USER_AGENT = "Mozilla/5.0 (test browser)"
 
 
 @pytest.fixture
@@ -19,7 +22,12 @@ def browser(db_session, monkeypatch):
     monkeypatch.setenv("CORS_ALLOWED_ORIGINS", ALLOWED_ORIGIN)
     app = create_app()
     app.dependency_overrides[get_db] = lambda: db_session
-    with TestClient(app, base_url="https://testserver") as client:
+    with TestClient(
+        app,
+        base_url="https://testserver",
+        client=(CLIENT_IP, 50000),
+        headers={"User-Agent": USER_AGENT},
+    ) as client:
         yield client
 
 
@@ -231,3 +239,96 @@ def test_question_flag_records_the_logged_in_user(browser, user, db_session):
 
     assert response.status_code == 201
     assert db_session.get(QuestionFlag, response.json()["id"]).user_id == user.id
+
+
+def auth_events(db_session):
+    return db_session.query(AuthEvent).order_by(AuthEvent.id).all()
+
+
+@pytest.mark.db
+def test_successful_login_records_the_session_and_client(browser, user, db_session):
+    log_in(browser)
+
+    (event,) = auth_events(db_session)
+    assert event.event_type == "login_succeeded"
+    assert event.user_id == user.id
+    assert event.session_id == db_session.query(AuthSession).one().id
+    assert event.client_ip == CLIENT_IP
+    assert event.user_agent == USER_AGENT
+
+
+@pytest.mark.db
+def test_wrong_password_is_recorded_and_committed(browser, user, db_session):
+    log_in(browser, password="not the password")
+    # Undo anything the request left uncommitted: the event must survive.
+    db_session.rollback()
+
+    (event,) = auth_events(db_session)
+    assert event.event_type == "login_wrong_password"
+    assert event.user_id == user.id
+    assert event.session_id is None
+    assert event.client_ip == CLIENT_IP
+
+
+@pytest.mark.db
+def test_unknown_user_is_recorded_without_the_attempted_username(
+    browser, user, db_session
+):
+    # What someone who typed their password into the username box would send.
+    attempted = "hunter2-my-secret"
+    log_in(browser, username=attempted)
+    db_session.rollback()
+
+    (event,) = auth_events(db_session)
+    assert event.event_type == "login_unknown_user"
+    assert event.user_id is None
+    assert event.session_id is None
+    stored = [getattr(event, column.key) for column in AuthEvent.__table__.columns]
+    assert not any(attempted in str(value) for value in stored)
+
+
+@pytest.mark.db
+def test_both_kinds_of_failed_login_look_the_same(browser, user):
+    wrong_password = log_in(browser, password="not the password")
+    unknown_user = log_in(browser, username="nobody")
+
+    assert wrong_password.status_code == unknown_user.status_code == 401
+    assert wrong_password.json() == unknown_user.json()
+    assert wrong_password.json() == {"detail": "Incorrect username or password"}
+
+
+@pytest.mark.db
+def test_rate_limited_login_attempts_are_not_recorded(
+    browser, user, db_session, monkeypatch
+):
+    monkeypatch.setattr(
+        rate_limit, "_login_client_limiter", SlidingWindowRateLimiter(1, 60)
+    )
+
+    assert log_in(browser, password="not the password").status_code == 401
+    assert log_in(browser, password="not the password").status_code == 429
+
+    assert len(auth_events(db_session)) == 1
+
+
+@pytest.mark.db
+def test_logout_is_recorded_with_its_session(browser, user, db_session):
+    log_in(browser)
+    login_event = auth_events(db_session)[0]
+
+    browser.post("/auth/logout")
+
+    logout_event = auth_events(db_session)[1]
+    assert logout_event.event_type == "logout"
+    assert logout_event.user_id == user.id
+    assert logout_event.session_id == login_event.session_id
+    assert logout_event.client_ip == CLIENT_IP
+
+
+@pytest.mark.db
+def test_logout_without_a_live_session_is_not_recorded(browser, user, db_session):
+    browser.post("/auth/logout")
+    browser.cookies.set("session", "made-up")
+    browser.post("/auth/logout")
+
+    assert auth_events(db_session) == []

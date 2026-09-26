@@ -51,6 +51,11 @@ Future infrastructure (Airflow, BigQuery, etc.) is tracked on the
    keys, marks each attempt, and records it in `quiz_attempts`; a report of
    a question that seems wrong goes to `question_flags`. Both keep the
    logged-in user, and `manage-questions` reads them back for review.
+7. Logging in and out is recorded in `auth_events`: the outcome
+   (`login_succeeded`, `login_wrong_password`, `login_unknown_user`,
+   `logout`), the user and session where there is one, and the client IP and
+   user agent. Attempts refused by the rate limiter aren't recorded, and an
+   unknown username is never stored. Rows are deleted after 90 days.
 
 ## Request flow example: `GET /vocabulary-lists/{list_id}`
 

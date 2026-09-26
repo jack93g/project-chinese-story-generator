@@ -26,6 +26,7 @@ guess.
 - [Hide vocabulary lists](#hide-vocabulary-lists)
 - [Review flagged questions](#review-flagged-questions)
 - [Login accounts](#login-accounts)
+- [Login activity](#login-activity)
 - [Abuse response](#abuse-response)
 - [Patching](#patching)
 - [Rehearsal log](#rehearsal-log)
@@ -448,6 +449,18 @@ backup at 03:17):
 Cron doesn't read `~/.bashrc`, so these spell out what `dc` does. They run
 the image of the deployed commit, so a rollback also rolls back the sync code.
 
+In the same crontab, the daily purge of login records older than 90 days
+([Login activity](#login-activity)). Add it only after the release that
+added `auth_events` is deployed; before that the command doesn't exist:
+
+```
+43 4 * * * cd /home/deploy/app && IMAGE_TAG=$(git rev-parse HEAD) docker compose -f docker-compose.yml -f docker-compose.prod.yml run --rm api manage-logins purge >> /home/deploy/logins-purge.log 2>&1
+```
+
+After a rollback to before `auth_events`, this line fails with "invalid
+choice" in `~/logins-purge.log` (older images have no `manage-logins`).
+Comment it out until you roll forward. Nothing new is recorded meanwhile.
+
 **After a rollback** to a commit older than the scheduled sync (before
 `--refresh` existed), the Sunday line fails with an argparse error. Comment
 it out until you roll forward. The daily line still works, but on old code
@@ -841,6 +854,38 @@ UPDATE auth_sessions SET revoked_at = now() WHERE revoked_at IS NULL;
 COMMIT;
 ```
 
+## Login activity
+
+Every login attempt that gets past the rate limiter, and every logout of a
+live session, is a row in `auth_events`:
+
+| `event_type` | `user_id` | `session_id` |
+| --- | --- | --- |
+| `login_succeeded` | the user | the new session |
+| `login_wrong_password` | the user | null |
+| `login_unknown_user` | null | null |
+| `logout` | the user | the session it ended |
+
+Each row also has `occurred_at`, `client_ip` (the real caller, via Caddy's
+`X-Forwarded-For`) and `user_agent` (first 512 characters). The username
+typed for `login_unknown_user` is deliberately not stored: it's sometimes a
+password typed into the wrong box. Attempts refused with 429 aren't recorded,
+and nor are malformed requests (422). The login form gets the same 401
+either way.
+
+```bash
+dc run --rm api manage-logins recent                # latest 20, newest first
+dc run --rm api manage-logins recent --failed --limit 100
+```
+
+**Retention.** `client_ip` is personal data, so rows are deleted 90 days
+after they happen by the daily `manage-logins purge` cron job
+([Cron setup](#cron-setup)). It prints how many rows it deleted to
+`~/logins-purge.log`. To change the period, change `AUTH_EVENT_RETENTION` in
+`story_generator/auth/service.py` (it's a fixed period in code, not a
+setting). Backups still hold deleted rows until they age out
+([Backups](#backups)).
+
 ## Abuse response
 
 Signs: requests you didn't make, the provider bill jumping, the 3-request cap
@@ -869,6 +914,21 @@ always full.
    capped at 50MB per container, so on a busy attack the oldest lines may
    already be gone; save them early with
    `dc logs --no-color api > ~/api-$(date -u +%F).log`.
+
+   Login attempts are in `auth_events` ([Login activity](#login-activity)),
+   which survives redeploys, unlike the access log. Who's guessing, and
+   against which accounts (a null `user_id` is a username that isn't an
+   account):
+   ```sql
+   SELECT client_ip, event_type, user_id, count(*),
+          min(occurred_at) AS first, max(occurred_at) AS last
+   FROM auth_events
+   WHERE occurred_at > now() - interval '48 hours'
+     AND event_type IN ('login_wrong_password', 'login_unknown_user')
+   GROUP BY 1, 2, 3 ORDER BY 4 DESC;
+   ```
+   A `login_succeeded` from an address you don't recognise means someone
+   knows the password: change it (step 2).
 4. **Drain the queue.** Prefer cancelling (keeps the audit trail) over
    deleting:
    ```sql

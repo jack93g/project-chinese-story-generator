@@ -30,6 +30,8 @@ python3.12 -m venv .venv
 
 .venv/bin/manage-users create USERNAME           # create a frontend login (prompts for password)
 .venv/bin/manage-users set-password USERNAME     # change it; revokes that user's sessions
+.venv/bin/manage-logins recent [--limit N] [--failed]   # recent login attempts and logouts
+.venv/bin/manage-logins purge                    # delete auth events older than 90 days (daily cron)
 
 .venv/bin/manage-lists list                      # every vocabulary list, by Skritter ID
 .venv/bin/manage-lists hide SKRITTER_LIST_ID...  # hide lists from the app (show ... undoes it)
@@ -126,7 +128,13 @@ should be structured.
   session tokens stored only as SHA-256 hashes, 30-day expiry, logout
   revocation. Accounts are created by `cli/users.py` (`manage-users`); there is
   no sign-up endpoint. Every account sees the same data (a login gate, not
-  multi-tenancy).
+  multi-tenancy). Every login attempt that passes the rate limiter, and every
+  logout of a live session, is recorded in `auth_events` with the client IP
+  and user agent. A login for a name that isn't an account is
+  `login_unknown_user` with no `user_id`: the attempted username is never
+  stored, because it's sometimes a password. The 401 stays identical for
+  both failure kinds. IPs are personal data, so rows are kept 90 days
+  (`manage-logins purge`, daily cron).
 - `ingestion/` — Skritter client and sync orchestration. Sync is
   idempotent and fetches only words not yet stored (`--refresh` re-fetches
   all). A PostgreSQL advisory lock (`SyncLock`) lets one sync run at a time.
@@ -164,7 +172,8 @@ should be structured.
 - `database/` — shared SQLAlchemy engine/session setup (`base.py`,
   `session.py`).
 - `cli/` — `ingestion` (Skritter sync), `generation_worker`, `users`
-  (`manage-users`), `lists` (`manage-lists`: hide/show vocabulary lists),
+  (`manage-users`), `logins` (`manage-logins`: recent auth events, and the
+  90-day retention purge), `lists` (`manage-lists`: hide/show vocabulary lists),
   `questions` (`manage-questions`: review flagged comprehension questions,
   read-only; the review logic is in `stories/review.py`),
   `provider_comparison` (evaluate a provider against a fixed eval set before
@@ -178,7 +187,8 @@ should be structured.
 `comprehension_questions`), `quiz_attempts` (one row per marked quiz
 attempt, with the user when logged in) and `question_flags` (one row per
 "this question seems wrong" report), `users` + `auth_sessions`
-(frontend logins).
+(frontend logins) and `auth_events` (one row per login attempt or logout,
+kept 90 days).
 
 **Authentication** (`api/security.py`): `require_auth` guards every router
 except health and `/auth/*`. It accepts either the `X-API-Key` header or the

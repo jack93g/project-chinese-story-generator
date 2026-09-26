@@ -1,12 +1,14 @@
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 
 import pytest
 
-from story_generator.auth.persistence.models import AuthSession, User
+from story_generator.auth.persistence.models import AuthEvent, AuthSession, User
 from story_generator.auth.persistence.repository import AuthRepository
 from story_generator.auth.service import (
+    AUTH_EVENT_RETENTION,
     SESSION_LIFETIME,
     AuthService,
+    ClientInfo,
     InvalidCredentialsError,
     InvalidUsernameError,
     PasswordTooShortError,
@@ -141,3 +143,55 @@ def test_set_password_changes_password_and_revokes_all_sessions(service):
 def test_set_password_for_unknown_user_raises(service):
     with pytest.raises(UserNotFoundError):
         service.set_password("nobody", PASSWORD)
+
+
+def test_login_and_logout_record_events_with_the_clock_time(service, db_session, clock):
+    service.create_user("jack", PASSWORD)
+    issued = service.login("jack", PASSWORD, ClientInfo(ip="203.0.113.9"))
+    clock.now += timedelta(hours=1)
+    service.logout(issued.token, ClientInfo(ip="203.0.113.9"))
+
+    login, logout = db_session.query(AuthEvent).order_by(AuthEvent.id).all()
+    assert (login.event_type, login.occurred_at) == (
+        "login_succeeded",
+        clock.now - timedelta(hours=1),
+    )
+    assert (logout.event_type, logout.occurred_at) == ("logout", clock.now)
+    assert logout.session_id == login.session_id
+
+
+def test_recent_events_newest_first_and_failed_only(service, clock):
+    service.create_user("jack", PASSWORD)
+    service.login("jack", PASSWORD)
+    for username, password in [("jack", "wrong password here"), ("nobody", PASSWORD)]:
+        clock.now += timedelta(minutes=1)
+        with pytest.raises(InvalidCredentialsError):
+            service.login(username, password)
+
+    everything = service.recent_events(limit=10)
+    failed = service.recent_events(limit=10, failed_only=True)
+
+    assert [e.event_type for e in everything] == [
+        "login_unknown_user",
+        "login_wrong_password",
+        "login_succeeded",
+    ]
+    assert [e.username for e in everything] == [None, "jack", "jack"]
+    assert [e.event_type for e in failed] == [
+        "login_unknown_user",
+        "login_wrong_password",
+    ]
+    assert len(service.recent_events(limit=1)) == 1
+
+
+def test_delete_expired_events_keeps_those_within_retention(service, db_session, clock):
+    service.create_user("jack", PASSWORD)
+    service.login("jack", PASSWORD)  # will be just past retention
+    clock.now += timedelta(days=2)
+    service.login("jack", PASSWORD)  # will be just inside it
+    clock.now += AUTH_EVENT_RETENTION - timedelta(days=1)
+
+    assert service.delete_expired_events() == 1
+
+    (kept,) = db_session.query(AuthEvent).all()
+    assert kept.occurred_at == clock.now - AUTH_EVENT_RETENTION + timedelta(days=1)
