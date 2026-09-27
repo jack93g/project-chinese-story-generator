@@ -1,3 +1,5 @@
+import logging
+
 import httpx
 
 from story_generator.ingestion.schemas import (
@@ -8,16 +10,26 @@ from story_generator.ingestion.schemas import (
     validate_skritter_response,
 )
 
+logger = logging.getLogger(__name__)
+
 
 class SkritterClient:
     BASE_URL = "https://legacy.skritter.com/api/v0"
+    # httpx's default is 5s, and Skritter is sometimes slower than that: two
+    # daily syncs running each had one list time out, a different one each
+    # day.
+    TIMEOUT = httpx.Timeout(30.0, connect=10.0)
+    # Every call is a read-only GET, so a timed-out or dropped request is
+    # safe to send again.
+    ATTEMPTS = 2
 
     def __init__(self, access_token: str, on_response=None):
         self.client = httpx.Client(
             headers={
                 "Authorization": f"Bearer {access_token}",
                 "Accept": "application/json",
-            }
+            },
+            timeout=self.TIMEOUT,
         )
         # Optional hook: called as on_response(request_path, request_params,
         # response_status, payload) after every successful request. Lets
@@ -35,6 +47,21 @@ class SkritterClient:
                 body = {"_raw_text": response.text}
             self.on_response(request_path, request_params, response.status_code, body)
 
+    def _get(self, url: str, params: dict | None = None) -> httpx.Response:
+        # Only transport errors (timeouts, dropped connections) are retried:
+        # an HTTP error status is returned for the caller's raise_for_status.
+        for attempt in range(1, self.ATTEMPTS):
+            try:
+                return self.client.get(url, params=params)
+            except httpx.TransportError:
+                logger.warning(
+                    "Skritter request to %s failed (attempt %d/%d); retrying",
+                    url,
+                    attempt,
+                    self.ATTEMPTS,
+                )
+        return self.client.get(url, params=params)
+
     @staticmethod
     def _json(response: httpx.Response, endpoint: str) -> object:
         try:
@@ -48,7 +75,7 @@ class SkritterClient:
         url = f"{self.BASE_URL}/vocablists/{list_id}"
         request_path = f"/vocablists/{list_id}"
 
-        response = self.client.get(url)
+        response = self._get(url)
         self._notify(request_path, {}, response)
         response.raise_for_status()
 
@@ -70,7 +97,7 @@ class SkritterClient:
 
     def get_vocab(self, vocab_id: str) -> dict:
         params = {"ids": vocab_id}
-        response = self.client.get(f"{self.BASE_URL}/vocabs", params=params)
+        response = self._get(f"{self.BASE_URL}/vocabs", params=params)
         self._notify("/vocabs", params, response)
         response.raise_for_status()
 
@@ -91,10 +118,7 @@ class SkritterClient:
             if cursor:
                 params["cursor"] = cursor
 
-            response = self.client.get(
-                f"{self.BASE_URL}/vocablists",
-                params=params,
-            )
+            response = self._get(f"{self.BASE_URL}/vocablists", params=params)
             self._notify("/vocablists", params, response)
             response.raise_for_status()
 

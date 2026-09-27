@@ -180,3 +180,64 @@ def test_get_lists_notifies_per_page():
     assert received[0][2] == 200
     assert received[0][3] == page_one
     assert received[1][3] == page_two
+
+
+LIST_URL = "https://legacy.skritter.com/api/v0/vocablists/123"
+LIST_RESPONSE = {
+    "VocabList": {
+        "id": "123",
+        "name": "Core Verbs",
+        "sections": [{"rows": [{"vocabId": "zh-做-0"}]}],
+    }
+}
+
+
+def test_client_waits_longer_than_the_httpx_default():
+    timeout = SkritterClient("my_token").client.timeout
+
+    assert timeout.read == 30.0
+    assert timeout.connect == 10.0
+
+
+@respx.mock
+def test_get_list_retries_once_after_a_timeout():
+    route = respx.get(LIST_URL).mock(
+        side_effect=[
+            httpx.ReadTimeout("The read operation timed out"),
+            httpx.Response(200, json=LIST_RESPONSE),
+        ]
+    )
+
+    responses = []
+    client = SkritterClient(
+        "my_token", on_response=lambda *args: responses.append(args)
+    )
+
+    result = client.get_list("123")
+
+    assert result["vocab_ids"] == ["zh-做-0"]
+    assert route.call_count == 2
+    # only the response that arrived is recorded as a raw payload
+    assert [(path, status) for path, _, status, _ in responses] == [
+        ("/vocablists/123", 200)
+    ]
+
+
+@respx.mock
+def test_get_list_gives_up_after_a_second_timeout():
+    route = respx.get(LIST_URL).mock(
+        side_effect=httpx.ReadTimeout("The read operation timed out")
+    )
+
+    with pytest.raises(httpx.ReadTimeout):
+        SkritterClient("my_token").get_list("123")
+    assert route.call_count == 2
+
+
+@respx.mock
+def test_get_list_does_not_retry_an_error_status():
+    route = respx.get(LIST_URL).mock(return_value=httpx.Response(401, json={}))
+
+    with pytest.raises(httpx.HTTPStatusError):
+        SkritterClient("my_token").get_list("123")
+    assert route.call_count == 1
