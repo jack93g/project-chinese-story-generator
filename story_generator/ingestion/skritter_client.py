@@ -48,19 +48,19 @@ class SkritterClient:
             self.on_response(request_path, request_params, response.status_code, body)
 
     def _get(self, url: str, params: dict | None = None) -> httpx.Response:
-        for attempt in range(1, self.ATTEMPTS + 1):
+        # Only transport errors (timeouts, dropped connections) are retried:
+        # an HTTP error status is returned for the caller's raise_for_status.
+        for attempt in range(1, self.ATTEMPTS):
             try:
                 return self.client.get(url, params=params)
             except httpx.TransportError:
-                if attempt == self.ATTEMPTS:
-                    raise
                 logger.warning(
                     "Skritter request to %s failed (attempt %d/%d); retrying",
                     url,
                     attempt,
                     self.ATTEMPTS,
                 )
-        raise AssertionError("unreachable")
+        return self.client.get(url, params=params)
 
     @staticmethod
     def _json(response: httpx.Response, endpoint: str) -> object:
