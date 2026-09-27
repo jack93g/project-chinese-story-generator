@@ -483,6 +483,9 @@ dc run --rm api manage-lists list    # STATUS column shows archived and hidden l
 expired or was revoked. Replace it ([Rotate a secret](#rotate-a-secret)).
 A failure naming one list is a partial failure: the other lists synced, so
 read that list's error in `~/sync.log`.
+"The read operation timed out" means Skritter took over 30 seconds to answer
+twice in a row (each request is retried once). That's usually Skritter being
+slow: sync that list by hand with `--list-id` to confirm it goes through.
 
 ## Backups
 
