@@ -65,7 +65,7 @@ def login(
         secure=get_session_cookie_secure(),
         **_COOKIE_FLAGS,
     )
-    return CurrentUserResponse(username=issued.username)
+    return CurrentUserResponse(id=str(issued.user_id), username=issued.username)
 
 
 @router.post("/auth/logout", status_code=204)
@@ -88,4 +88,4 @@ def logout(
 def current_user(
     user: AuthenticatedUser = Depends(require_session_user),
 ) -> CurrentUserResponse:
-    return CurrentUserResponse(username=user.username)
+    return CurrentUserResponse(id=str(user.id), username=user.username)

@@ -45,7 +45,7 @@ def test_login_sets_a_locked_down_session_cookie(browser, user):
     response = log_in(browser, username="Jack")
 
     assert response.status_code == 200
-    assert response.json() == {"username": "jack"}
+    assert response.json() == {"id": str(user.id), "username": "jack"}
     cookie = response.headers["set-cookie"].lower()
     assert cookie.startswith("session=")
     assert "httponly" in cookie
@@ -61,7 +61,10 @@ def test_session_cookie_grants_access_and_identifies_the_user(browser, user):
     log_in(browser)
 
     assert browser.get("/stories").status_code == 200
-    assert browser.get("/auth/me").json() == {"username": "jack"}
+    assert browser.get("/auth/me").json() == {
+        "id": str(user.id),
+        "username": "jack",
+    }
 
 
 @pytest.mark.db
@@ -180,6 +183,42 @@ def test_cors_allows_credentials_for_listed_origins(monkeypatch):
     assert response.status_code == 200
     assert response.headers["access-control-allow-origin"] == ALLOWED_ORIGIN
     assert response.headers["access-control-allow-credentials"] == "true"
+
+
+def test_cors_preflight_allows_the_tracking_headers(monkeypatch):
+    monkeypatch.setenv("CORS_ALLOWED_ORIGINS", ALLOWED_ORIGIN)
+    client = TestClient(create_app())
+    requested = "content-type,x-anonymous-id,x-session-id,x-tracking-consent"
+
+    response = client.options(
+        "/stories",
+        headers={
+            "Origin": ALLOWED_ORIGIN,
+            "Access-Control-Request-Method": "GET",
+            "Access-Control-Request-Headers": requested,
+        },
+    )
+
+    assert response.status_code == 200
+    allowed = response.headers["access-control-allow-headers"].lower()
+    for header in requested.split(","):
+        assert header in allowed
+
+
+def test_cors_preflight_rejects_an_unlisted_header(monkeypatch):
+    monkeypatch.setenv("CORS_ALLOWED_ORIGINS", ALLOWED_ORIGIN)
+    client = TestClient(create_app())
+
+    response = client.options(
+        "/stories",
+        headers={
+            "Origin": ALLOWED_ORIGIN,
+            "Access-Control-Request-Method": "GET",
+            "Access-Control-Request-Headers": "x-not-allowed",
+        },
+    )
+
+    assert response.status_code == 400
 
 
 def test_insecure_cookie_setting_is_opt_in(monkeypatch):
