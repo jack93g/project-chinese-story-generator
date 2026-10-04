@@ -8,4 +8,7 @@ class LoginRequest(BaseModel):
 
 
 class CurrentUserResponse(BaseModel):
+    # The database key, as a string: the identifier tracking uses for a
+    # logged-in user. The username is for the UI only.
+    id: str
     username: str

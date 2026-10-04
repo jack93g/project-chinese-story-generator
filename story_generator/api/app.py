@@ -40,7 +40,15 @@ def create_app() -> FastAPI:
         # api.huaben.app). Safe only because allow_origins is an explicit list.
         allow_credentials=True,
         allow_methods=["*"],
-        allow_headers=["Content-Type", "X-API-Key"],
+        # The three tracking headers are only allowed through for now: the
+        # frontend sends them, and nothing reads them yet.
+        allow_headers=[
+            "Content-Type",
+            "X-API-Key",
+            "X-Anonymous-Id",
+            "X-Session-Id",
+            "X-Tracking-Consent",
+        ],
     )
 
     app.include_router(health_router)

@@ -99,6 +99,7 @@ class IssuedSession:
     browser's cookie and is never stored server-side."""
 
     token: str
+    user_id: int
     username: str
     expires_at: datetime
 
@@ -195,7 +196,12 @@ class AuthService:
         self._record(
             AuthEventType.LOGIN_SUCCEEDED, client, now, user.id, auth_session.id
         )
-        return IssuedSession(token=token, username=user.username, expires_at=expires_at)
+        return IssuedSession(
+            token=token,
+            user_id=user.id,
+            username=user.username,
+            expires_at=expires_at,
+        )
 
     def authenticate(self, token: str) -> AuthenticatedUser | None:
         """Return the session's user, or None if the token is unknown,
