@@ -3,7 +3,7 @@ import { gtmScriptUrl } from "@/lib/gtm";
 
 // Google Tag Manager's <head> snippet, built from the build's env vars. The
 // <noscript> iframe is left out on purpose: the app needs JavaScript anyway,
-// and the iframe would load whatever the visitor's consent choice.
+// and the iframe would load regardless of the visitor's consent choice.
 export function GoogleTagManager() {
   const src = gtmScriptUrl(
     process.env.NEXT_PUBLIC_GTM_ID,

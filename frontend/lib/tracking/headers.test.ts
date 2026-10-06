@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it } from "vitest";
 import { resetConsent } from "./consent";
 import { trackingHeaders } from "./headers";
-import { getIdentity } from "./identity";
+import { deleteIdentity, getIdentity } from "./identity";
 
 function cookiebotReports(statistics: boolean): void {
   Object.assign(window, {
@@ -13,8 +13,7 @@ function cookiebotReports(statistics: boolean): void {
 afterEach(() => {
   resetConsent();
   Reflect.deleteProperty(window, "Cookiebot");
-  document.cookie = "huaben_anonymous_id=; Max-Age=0; Path=/";
-  document.cookie = "huaben_session_id=; Max-Age=0; Path=/";
+  deleteIdentity();
 });
 
 describe("trackingHeaders", () => {

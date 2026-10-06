@@ -4,6 +4,7 @@ import {
   ANONYMOUS_ID_COOKIE,
   SESSION_ID_COOKIE,
   cookieAttributes,
+  deleteIdentity,
   getIdentity,
   keepIdentityInStepWithConsent,
 } from "./identity";
@@ -30,12 +31,6 @@ function cookie(name: string): string | undefined {
     ?.split("=")[1];
 }
 
-function clearCookies(): void {
-  for (const name of [ANONYMOUS_ID_COOKIE, SESSION_ID_COOKIE]) {
-    document.cookie = `${name}=; Max-Age=0; Path=/`;
-  }
-}
-
 beforeEach(() => {
   vi.useFakeTimers({ toFake: ["Date"] });
   vi.setSystemTime(new Date("2026-10-06T09:00:00Z"));
@@ -45,7 +40,7 @@ afterEach(() => {
   vi.useRealTimers();
   resetConsent();
   delete (window as CookiebotWindow).Cookiebot;
-  clearCookies();
+  deleteIdentity();
 });
 
 describe("cookieAttributes", () => {

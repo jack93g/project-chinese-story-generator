@@ -329,6 +329,12 @@ describe("session handling", () => {
     vi.unstubAllGlobals();
     const { resetSessionState } = await import("./session");
     resetSessionState();
+    // The tracking modules keep state too, and one test grants consent.
+    const { deleteIdentity } = await import("./tracking/identity");
+    const { resetConsent } = await import("./tracking/consent");
+    deleteIdentity();
+    resetConsent();
+    Reflect.deleteProperty(window, "Cookiebot");
     vi.resetModules();
   });
 
@@ -376,10 +382,6 @@ describe("session handling", () => {
     }
     const post = new Headers((fetchMock.mock.calls[1][1] as RequestInit).headers);
     expect(post.get("content-type")).toBe("application/json");
-
-    Reflect.deleteProperty(window, "Cookiebot");
-    document.cookie = "huaben_anonymous_id=; Max-Age=0; Path=/";
-    document.cookie = "huaben_session_id=; Max-Age=0; Path=/";
   });
 
   it("sends the cookie on DELETE requests too", async () => {

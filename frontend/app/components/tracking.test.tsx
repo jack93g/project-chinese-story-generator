@@ -2,6 +2,7 @@ import { act, render } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { resetSessionState, setSignedIn, setSignedOut } from "@/lib/session";
 import { resetConsent } from "@/lib/tracking/consent";
+import { deleteIdentity } from "@/lib/tracking/identity";
 import { resetPageViews } from "@/lib/tracking/page-view";
 import { Tracking } from "./tracking";
 
@@ -46,8 +47,7 @@ afterEach(() => {
   resetConsent();
   Reflect.deleteProperty(window, "Cookiebot");
   delete (window as TrackedWindow).dataLayer;
-  document.cookie = "huaben_anonymous_id=; Max-Age=0; Path=/";
-  document.cookie = "huaben_session_id=; Max-Age=0; Path=/";
+  deleteIdentity();
 });
 
 describe("Tracking", () => {

@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { resetConsent } from "./consent";
-import { getIdentity } from "./identity";
+import { deleteIdentity, getIdentity } from "./identity";
 import { resetPageViews, showPage, trackedUrl } from "./page-view";
 
 const UUID_V4 =
@@ -33,8 +33,7 @@ afterEach(() => {
   resetConsent();
   Reflect.deleteProperty(window, "Cookiebot");
   delete (window as TrackedWindow).dataLayer;
-  document.cookie = "huaben_anonymous_id=; Max-Age=0; Path=/";
-  document.cookie = "huaben_session_id=; Max-Age=0; Path=/";
+  deleteIdentity();
 });
 
 describe("trackedUrl", () => {

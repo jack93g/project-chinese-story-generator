@@ -80,14 +80,18 @@ export function getIdentity(): Identity | null {
   return { anonymousId, sessionId };
 }
 
+export function deleteIdentity(): void {
+  deleteCookie(ANONYMOUS_ID_COOKIE);
+  deleteCookie(SESSION_ID_COOKIE);
+}
+
 function followConsent(): void {
   if (getConsent() === "granted") {
     getIdentity();
   } else if (isConsentKnown()) {
     // Only once the visitor's refusal is known: before Cookiebot reports,
     // "denied" would wrongly delete a returning visitor's identifiers.
-    deleteCookie(ANONYMOUS_ID_COOKIE);
-    deleteCookie(SESSION_ID_COOKIE);
+    deleteIdentity();
   }
 }
 
