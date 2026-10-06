@@ -370,6 +370,22 @@ describe("clearIdentifiers", () => {
     expect(pushed()).toEqual([]);
   });
 
+  it("is followed by a new page_view for the same page if consent returns there", () => {
+    showPage(`${ORIGIN}/stories`, true, "42");
+    cookiebotReports(false);
+    clearIdentifiers();
+
+    cookiebotReports(true);
+    showPage(`${ORIGIN}/stories`, true, "42");
+    showPage(`${ORIGIN}/stories`, true, "42");
+
+    const views = pushed().filter((entry) => entry.event === "page_view");
+    expect(views).toHaveLength(2);
+    expect(views[1].page_location).toBe(views[0].page_location);
+    expect(views[1].event_id).not.toBe(views[0].event_id);
+    expect(views[1].anonymous_id).toBe(getIdentity()?.anonymousId);
+  });
+
   it("is followed by current identifiers on the next page_view once consent returns", () => {
     showPage(`${ORIGIN}/stories`, true, "42");
     cookiebotReports(false);

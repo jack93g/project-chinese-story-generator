@@ -165,6 +165,22 @@ describe("Tracking", () => {
     expect(hasIdentityCookies()).toBe(false);
   });
 
+  it("sends a page_view for the page being shown when consent is granted again", () => {
+    render(<Tracking />);
+    act(() => cookiebotReports(true));
+    act(() => setSignedIn({ id: "42", username: "jack" }));
+    act(() => cookiebotReports(false));
+
+    act(() => cookiebotReports(true));
+
+    expect(pageViews()).toHaveLength(2);
+    expect(pageViews()[1]).toMatchObject({
+      user_id: "42",
+      page_location: `${ORIGIN}/`,
+    });
+    expect(pageViews()[1].anonymous_id).not.toBe(pageViews()[0].anonymous_id);
+  });
+
   it("keeps the identifiers and drops user_id after a logout", () => {
     const { rerender } = render(<Tracking />);
     act(() => cookiebotReports(true));
