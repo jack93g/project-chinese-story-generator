@@ -18,20 +18,27 @@ export type Consent = "granted" | "denied";
 const CONSENT_READY_EVENT = "CookiebotOnConsentReady";
 
 type CookiebotWindow = Window & {
-  Cookiebot?: { consent?: { statistics?: boolean } };
+  Cookiebot?: { consent?: { statistics?: boolean }; hasResponse?: boolean };
 };
 
 let consent: Consent = "denied";
+// Whether Cookiebot has reported the visitor's choice. "denied" before that
+// only means "not known yet", which must not undo an earlier "granted".
+let known = false;
 let watching = false;
 const listeners = new Set<() => void>();
 
-function readCookiebot(): void {
-  const granted = (window as CookiebotWindow).Cookiebot?.consent?.statistics;
-  const next: Consent = granted === true ? "granted" : "denied";
-  if (next !== consent) {
+function update(next: Consent, nextKnown: boolean): void {
+  if (next !== consent || nextKnown !== known) {
     consent = next;
+    known = nextKnown;
     listeners.forEach((listener) => listener());
   }
+}
+
+function onConsentReady(): void {
+  const cookiebot = (window as CookiebotWindow).Cookiebot;
+  update(cookiebot?.consent?.statistics === true ? "granted" : "denied", true);
 }
 
 // Started on first use, not at import, so importing this module during the
@@ -41,10 +48,14 @@ function watchCookiebot(): void {
     return;
   }
   watching = true;
-  window.addEventListener(CONSENT_READY_EVENT, readCookiebot);
+  window.addEventListener(CONSENT_READY_EVENT, onConsentReady);
   // Cookiebot may have reported before anything asked: its event isn't
-  // repeated, so read what it already knows.
-  readCookiebot();
+  // repeated, so read what it already knows. Without a response there is
+  // nothing to read yet: its `statistics` is false until the visitor chooses.
+  const cookiebot = (window as CookiebotWindow).Cookiebot;
+  if (cookiebot?.consent?.statistics === true || cookiebot?.hasResponse) {
+    onConsentReady();
+  }
 }
 
 export function getConsent(): Consent {
@@ -52,7 +63,16 @@ export function getConsent(): Consent {
   return consent;
 }
 
-/** `onChange` runs whenever the answer flips. Returns the unsubscribe. */
+/** False until Cookiebot has reported: `getConsent()` is then a placeholder. */
+export function isConsentKnown(): boolean {
+  watchCookiebot();
+  return known;
+}
+
+/**
+ * `onChange` runs when the answer flips, and when it first becomes known.
+ * Returns the unsubscribe.
+ */
 export function subscribeToConsent(onChange: () => void): () => void {
   watchCookiebot();
   listeners.add(onChange);
@@ -64,9 +84,10 @@ export function subscribeToConsent(onChange: () => void): () => void {
 /** Back to the unstarted state; for tests, which share this module's state. */
 export function resetConsent(): void {
   if (watching) {
-    window.removeEventListener(CONSENT_READY_EVENT, readCookiebot);
+    window.removeEventListener(CONSENT_READY_EVENT, onConsentReady);
   }
   watching = false;
   consent = "denied";
+  known = false;
   listeners.clear();
 }

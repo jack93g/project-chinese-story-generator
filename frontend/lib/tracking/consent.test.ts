@@ -1,13 +1,21 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { getConsent, resetConsent, subscribeToConsent } from "./consent";
+import {
+  getConsent,
+  isConsentKnown,
+  resetConsent,
+  subscribeToConsent,
+} from "./consent";
 
 type CookiebotWindow = Window & {
-  Cookiebot?: { consent?: { statistics?: boolean } };
+  Cookiebot?: { consent?: { statistics?: boolean }; hasResponse?: boolean };
 };
 
 /** What Cookiebot does when the visitor's choice is known or changes. */
 function cookiebotReports(statistics: boolean): void {
-  (window as CookiebotWindow).Cookiebot = { consent: { statistics } };
+  (window as CookiebotWindow).Cookiebot = {
+    consent: { statistics },
+    hasResponse: true,
+  };
   window.dispatchEvent(new Event("CookiebotOnConsentReady"));
 }
 
@@ -17,14 +25,36 @@ afterEach(() => {
 });
 
 describe("consent", () => {
-  it("is denied until Cookiebot has loaded", () => {
+  it("is denied, and not yet known, until Cookiebot has loaded", () => {
     expect(getConsent()).toBe("denied");
+    expect(isConsentKnown()).toBe(false);
   });
 
-  it("is denied while Cookiebot is loaded but the visitor hasn't chosen", () => {
-    (window as CookiebotWindow).Cookiebot = { consent: { statistics: false } };
+  it("is still not known while the visitor hasn't chosen", () => {
+    (window as CookiebotWindow).Cookiebot = {
+      consent: { statistics: false },
+      hasResponse: false,
+    };
 
     expect(getConsent()).toBe("denied");
+    expect(isConsentKnown()).toBe(false);
+  });
+
+  it("tells listeners when a visitor's refusal becomes known", () => {
+    const onChange = vi.fn();
+    subscribeToConsent(onChange);
+
+    cookiebotReports(false);
+
+    expect(getConsent()).toBe("denied");
+    expect(isConsentKnown()).toBe(true);
+    expect(onChange).toHaveBeenCalledTimes(1);
+  });
+
+  it("picks up a refusal Cookiebot reported before anything asked", () => {
+    cookiebotReports(false);
+
+    expect(isConsentKnown()).toBe(true);
   });
 
   it("follows Cookiebot when it reports after the app started", () => {
@@ -54,11 +84,10 @@ describe("consent", () => {
     expect(onChange).toHaveBeenCalledTimes(1);
   });
 
-  it("only notifies when the answer changes", () => {
+  it("only notifies when something changes", () => {
     const onChange = vi.fn();
     subscribeToConsent(onChange);
 
-    cookiebotReports(false);
     cookiebotReports(true);
     cookiebotReports(true);
 
