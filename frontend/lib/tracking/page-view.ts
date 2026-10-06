@@ -62,29 +62,37 @@ export function trackedUrl(url: string): string | undefined {
 // How long a page_view waits for the page's title before going without one.
 const TITLE_WAIT_MS = 1000;
 
+// A page_view that is waiting for its page's title. At most one at a time.
+type Pending = {
+  /** Send it now, without a title, because the visitor has moved on. */
+  flush: () => void;
+  /** Drop it. */
+  cancel: () => void;
+};
+let pending: Pending | undefined;
+
 /**
- * Runs `send` once the document has a title. On a route change Next.js
- * removes the <title> and puts it back a moment later, and a page_view is
- * created in between, so it would otherwise go out with an empty title.
+ * Calls `send` with the document's title once it has one. On a route change
+ * Next.js removes the <title> and puts it back a moment later, and a
+ * page_view is created in between, so it would otherwise go out with an
+ * empty title. Gives up after a second and sends without one.
  */
-function whenTitleIsSet(send: () => void): void {
+function sendWithTitle(send: (title: string | undefined) => void): void {
   if (document.title) {
-    send();
+    send(document.title);
     return;
   }
-  let done = false;
-  const finish = () => {
-    if (done) {
-      return;
-    }
-    done = true;
+  const settle = (deliver: boolean, title?: string) => {
     observer.disconnect();
     clearTimeout(timer);
-    send();
+    pending = undefined;
+    if (deliver) {
+      send(title);
+    }
   };
   const observer = new MutationObserver(() => {
     if (document.title) {
-      finish();
+      settle(true, document.title);
     }
   });
   observer.observe(document.head, {
@@ -92,7 +100,8 @@ function whenTitleIsSet(send: () => void): void {
     subtree: true,
     characterData: true,
   });
-  const timer = setTimeout(finish, TITLE_WAIT_MS);
+  const timer = setTimeout(() => settle(true), TITLE_WAIT_MS);
+  pending = { flush: () => settle(true), cancel: () => settle(false) };
 }
 
 // The page being shown, as a tracked URL; the one shown before it; and
@@ -119,40 +128,51 @@ export function showPage(
     return;
   }
   if (location !== shown) {
+    // The previous page's view goes out first, so views stay in order. The
+    // title in the document may no longer be that page's, so it goes without.
+    pending?.flush();
     // First page of this load: where the visitor came from. Afterwards: the
     // page they were just on.
     referrer = shown ?? trackedUrl(document.referrer);
     shown = location;
     sent = false;
   }
-  if (sent || !canSend) {
-    return;
-  }
-  const identity = getIdentity();
-  if (!identity) {
+  if (sent || !canSend || !getIdentity()) {
     return;
   }
   sent = true;
 
-  // Every key on every push, undefined when there's no value: GTM merges
-  // pushes, so a key left out would keep its last value (a user_id surviving
-  // a logout).
-  // Everything but the title is fixed now, when the page was shown.
-  const pageView: PageView = {
-    event: "page_view",
-    event_id: crypto.randomUUID(),
-    schema_version: SCHEMA_VERSION,
-    event_timestamp: new Date().toISOString(),
-    user_id: userId,
-    anonymous_id: identity.anonymousId,
-    session_id: identity.sessionId,
-    page_location: location,
-    page_path: new URL(location).pathname,
-    page_title: undefined,
-    page_referrer: referrer,
-  };
-  whenTitleIsSet(() => {
-    pageView.page_title = document.title || undefined;
+  // What is true of the page when it's shown is fixed now. The title and the
+  // identifiers are read when the view is sent, which can be a moment later.
+  const eventId = crypto.randomUUID();
+  const eventTimestamp = new Date().toISOString();
+  const pageReferrer = referrer;
+  sendWithTitle((title) => {
+    // Null if consent was withdrawn while this waited: nothing is sent, and
+    // the page's view is owed again if consent comes back while it's shown.
+    const identity = getIdentity();
+    if (!identity) {
+      if (shown === location) {
+        sent = false;
+      }
+      return;
+    }
+    // Every key on every push, undefined when there's no value: GTM merges
+    // pushes, so a key left out would keep its last value (a user_id
+    // surviving a logout).
+    const pageView: PageView = {
+      event: "page_view",
+      event_id: eventId,
+      schema_version: SCHEMA_VERSION,
+      event_timestamp: eventTimestamp,
+      user_id: userId,
+      anonymous_id: identity.anonymousId,
+      session_id: identity.sessionId,
+      page_location: location,
+      page_path: new URL(location).pathname,
+      page_title: title,
+      page_referrer: pageReferrer,
+    };
     const target = window as Window & { dataLayer?: unknown[] };
     target.dataLayer = target.dataLayer ?? [];
     target.dataLayer.push(pageView);
@@ -161,6 +181,7 @@ export function showPage(
 
 /** Forget the page being shown; for tests, which share this module's state. */
 export function resetPageViews(): void {
+  pending?.cancel();
   shown = undefined;
   referrer = undefined;
   sent = false;

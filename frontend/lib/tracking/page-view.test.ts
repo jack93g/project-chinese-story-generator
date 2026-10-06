@@ -197,6 +197,54 @@ describe("showPage", () => {
     expect(pushed()[0]).toHaveProperty("page_title", undefined);
   });
 
+  it("sends a waiting page_view first, without a title, when the visitor moves on", async () => {
+    document.querySelector("title")?.remove();
+    showPage(`${ORIGIN}/stories`, true, "42");
+    expect(pushed()).toEqual([]);
+
+    showPage(`${ORIGIN}/generate`, true, "42");
+    document.title = "话本 Huaben";
+
+    await vi.waitFor(() => expect(pushed()).toHaveLength(2));
+    expect(pushed().map((view) => view.page_path)).toEqual([
+      "/stories",
+      "/generate",
+    ]);
+    expect(pushed()[0]).toHaveProperty("page_title", undefined);
+    expect(pushed()[1].page_title).toBe("话本 Huaben");
+    // Nothing more arrives once the wait would have run out.
+    await new Promise((resolve) => setTimeout(resolve, 20));
+    expect(pushed()).toHaveLength(2);
+  });
+
+  it("drops a waiting page_view if consent is withdrawn meanwhile", async () => {
+    vi.useFakeTimers();
+    document.querySelector("title")?.remove();
+    showPage(`${ORIGIN}/stories`, true, "42");
+
+    cookiebotReports(false);
+    document.title = "话本 Huaben";
+    vi.advanceTimersByTime(1000);
+    await Promise.resolve();
+
+    expect(pushed()).toEqual([]);
+  });
+
+  it("sends the dropped page_view if consent comes back on the same page", async () => {
+    vi.useFakeTimers();
+    document.querySelector("title")?.remove();
+    showPage(`${ORIGIN}/stories`, true, "42");
+    cookiebotReports(false);
+    vi.advanceTimersByTime(1000);
+    document.title = "话本 Huaben";
+
+    cookiebotReports(true);
+    showPage(`${ORIGIN}/stories`, true, "42");
+
+    expect(pushed()).toHaveLength(1);
+    expect(pushed()[0].anonymous_id).toBe(getIdentity()?.anonymousId);
+  });
+
   it("sends nothing and sets no cookies without consent", () => {
     cookiebotReports(false);
 
