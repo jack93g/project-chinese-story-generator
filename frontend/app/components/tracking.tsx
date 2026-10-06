@@ -13,7 +13,7 @@ import {
   type Consent,
 } from "@/lib/tracking/consent";
 import { keepIdentityInStepWithConsent } from "@/lib/tracking/identity";
-import { showPage } from "@/lib/tracking/page-view";
+import { clearUserId, showPage } from "@/lib/tracking/page-view";
 
 function getServerConsent(): Consent {
   return "denied";
@@ -53,6 +53,14 @@ export function Tracking() {
       userId,
     );
   }, [pathname, searchParams, consent, sessionChecked, userId]);
+
+  // After a logout or an expired session, so nothing in GTM still holds the
+  // ID of the person who left.
+  useEffect(() => {
+    if (userId === undefined) {
+      clearUserId();
+    }
+  }, [userId]);
 
   return null;
 }

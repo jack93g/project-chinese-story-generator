@@ -134,6 +134,19 @@ describe("Tracking", () => {
     expect(hasIdentityCookies()).toBe(false);
   });
 
+  it("clears user_id in the dataLayer as soon as someone logs out", () => {
+    render(<Tracking />);
+    act(() => cookiebotReports(true));
+    act(() => setSignedIn({ id: "42", username: "jack" }));
+
+    act(() => setSignedOut());
+
+    const dataLayer = (window as TrackedWindow).dataLayer ?? [];
+    expect(pageViews()).toHaveLength(1);
+    expect(dataLayer.at(-1)).toEqual({ user_id: undefined });
+    expect(Object.keys(dataLayer.at(-1) ?? {})).toEqual(["user_id"]);
+  });
+
   it("keeps the identifiers and drops user_id after a logout", () => {
     const { rerender } = render(<Tracking />);
     act(() => cookiebotReports(true));

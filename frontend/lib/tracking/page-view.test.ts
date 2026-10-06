@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { resetConsent } from "./consent";
 import { deleteIdentity, getIdentity } from "./identity";
-import { resetPageViews, showPage, trackedUrl } from "./page-view";
+import { clearUserId, resetPageViews, showPage, trackedUrl } from "./page-view";
 
 const UUID_V4 =
   /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/;
@@ -252,5 +252,54 @@ describe("showPage", () => {
 
     expect(pushed()).toEqual([]);
     expect(document.cookie).toBe("");
+  });
+});
+
+describe("clearUserId", () => {
+  it("clears the user_id GTM is holding, without sending an event", () => {
+    showPage(`${ORIGIN}/stories`, true, "42");
+
+    clearUserId();
+
+    expect(pushed()).toHaveLength(2);
+    expect(pushed()[1]).toEqual({ user_id: undefined });
+    expect(Object.keys(pushed()[1])).toEqual(["user_id"]);
+  });
+
+  it("pushes nothing when no user_id was ever sent", () => {
+    clearUserId();
+    showPage(`${ORIGIN}/`, true, undefined);
+    clearUserId();
+
+    expect(pushed()).toHaveLength(1);
+  });
+
+  it("clears it only once", () => {
+    showPage(`${ORIGIN}/stories`, true, "42");
+
+    clearUserId();
+    clearUserId();
+
+    expect(pushed()).toHaveLength(2);
+  });
+
+  it("clears it even if consent has been withdrawn since", () => {
+    showPage(`${ORIGIN}/stories`, true, "42");
+    cookiebotReports(false);
+
+    clearUserId();
+
+    expect(pushed()[1]).toEqual({ user_id: undefined });
+  });
+
+  it("sends a waiting page_view before clearing, so its user_id doesn't come back", () => {
+    document.querySelector("title")?.remove();
+    showPage(`${ORIGIN}/stories`, true, "42");
+
+    clearUserId();
+
+    expect(pushed()).toHaveLength(2);
+    expect(pushed()[0]).toMatchObject({ event: "page_view", user_id: "42" });
+    expect(pushed()[1]).toEqual({ user_id: undefined });
   });
 });

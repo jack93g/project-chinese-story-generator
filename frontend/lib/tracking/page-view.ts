@@ -109,6 +109,14 @@ function sendWithTitle(send: (title: string | undefined) => void): void {
 let shown: string | undefined;
 let referrer: string | undefined;
 let sent = false;
+// The user_id on the last push, which is what GTM's merged dataLayer holds.
+let userIdInDataLayer: string | undefined;
+
+function push(entry: object): void {
+  const target = window as Window & { dataLayer?: unknown[] };
+  target.dataLayer = target.dataLayer ?? [];
+  target.dataLayer.push(entry);
+}
 
 /**
  * Call whenever the URL may have changed, and whenever `canSend` may have.
@@ -173,15 +181,30 @@ export function showPage(
       page_title: title,
       page_referrer: pageReferrer,
     };
-    const target = window as Window & { dataLayer?: unknown[] };
-    target.dataLayer = target.dataLayer ?? [];
-    target.dataLayer.push(pageView);
+    push(pageView);
+    userIdInDataLayer = userId;
   });
+}
+
+/**
+ * Call when nobody is logged in any more. GTM keeps the last user_id it was
+ * given until the next page_view replaces it, and a logout doesn't change the
+ * page, so without this a tag firing in between would still read the ID of
+ * the person who just left. Pushes no event, only the cleared key.
+ */
+export function clearUserId(): void {
+  // A view still waiting for its title was shown while they were logged in.
+  pending?.flush();
+  if (userIdInDataLayer !== undefined) {
+    push({ user_id: undefined });
+    userIdInDataLayer = undefined;
+  }
 }
 
 /** Forget the page being shown; for tests, which share this module's state. */
 export function resetPageViews(): void {
   pending?.cancel();
+  userIdInDataLayer = undefined;
   shown = undefined;
   referrer = undefined;
   sent = false;
