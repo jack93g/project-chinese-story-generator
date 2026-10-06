@@ -122,8 +122,10 @@ function push(entry: object): void {
 
 /**
  * Call whenever the URL may have changed, and whenever `canSend` may have.
- * Sends at most one page_view per page shown: a URL change that only touches
- * dropped parameters (the story page removing ?fresh=1) isn't a new page.
+ * Sends one page_view per page shown: a URL change that only touches dropped
+ * parameters (the story page removing ?fresh=1) isn't a new page. The one
+ * exception is consent being withdrawn and granted again on the same page
+ * (see clearIdentifiers).
  *
  * `canSend` is false while consent isn't granted or the session check is
  * still running. The view is then sent by a later call, once it's true.
@@ -214,6 +216,10 @@ export function clearUserId(): void {
 export function clearIdentifiers(): void {
   // Without consent a waiting view isn't sent: this only settles it.
   pending?.flush();
+  // If consent comes back while this page is still shown, it gets a
+  // page_view again: the visitor then has new identifiers, and those have
+  // not seen this page.
+  sent = false;
   if (userIdInDataLayer || identityInDataLayer) {
     push({
       user_id: undefined,

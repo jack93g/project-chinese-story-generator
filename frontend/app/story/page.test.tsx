@@ -252,7 +252,11 @@ describe("StoryPage", () => {
     await screen.findByRole("heading", { name: "天气小记" });
 
     expect(container.querySelector("article")).toHaveClass("story-entrance");
-    expect(replaceState).toHaveBeenCalledWith(null, "", "/story?id=5");
+    // The URL is tidied in an effect, which can run just after the heading
+    // appears.
+    await vi.waitFor(() =>
+      expect(replaceState).toHaveBeenCalledWith(null, "", "/story?id=5"),
+    );
     // One animated span per sentence, delayed in turn across paragraphs.
     const sentences = container.querySelectorAll<HTMLElement>(".sentence");
     expect(sentences).toHaveLength(2);
