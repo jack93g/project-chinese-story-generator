@@ -19,6 +19,19 @@ development server; change it if the API runs elsewhere. Keep it on
 `localhost` rather than `127.0.0.1`: the dev server runs on `localhost`, and
 the browser only sends the login cookie to an API on the same site.
 
+Google Tag Manager is optional and off by default. To load it locally, add
+these to `.env.local`:
+
+| Variable | Value |
+| --- | --- |
+| `NEXT_PUBLIC_GTM_ID` | The container ID. Without it, GTM isn't loaded at all. |
+| `NEXT_PUBLIC_GTM_AUTH` | The `gtm_auth` value from the `dev` Environment's snippet in GTM. Never commit it. |
+| `NEXT_PUBLIC_GTM_PREVIEW` | The `gtm_preview` value from the same snippet, e.g. `env-3`. |
+
+With the last two set, the `dev` Environment loads; with only the container
+ID, the Live container loads. The GitHub Pages build sets none of them, so
+the deployed site doesn't load GTM.
+
 The site asks you to log in. Create an account first with `manage-users`
 (see the root README's [Login accounts](../README.md#login-accounts)). `NEXT_PUBLIC_*`
 variables are inlined into the browser bundle, so keep secrets out of them.

@@ -45,7 +45,7 @@ describe("fetchVocabularyLists", () => {
 
     expect(fetchMock).toHaveBeenCalledWith(
       "http://localhost:8000/vocabulary-lists?limit=10&offset=5",
-      { credentials: "include" },
+      { headers: { "X-Tracking-Consent": "denied" }, credentials: "include" },
     );
   });
 });
@@ -85,7 +85,7 @@ describe("fetchAllVocabularyLists", () => {
     expect(fetchMock).toHaveBeenNthCalledWith(
       2,
       "http://localhost:8000/vocabulary-lists?limit=2&offset=2",
-      { credentials: "include" },
+      { headers: { "X-Tracking-Consent": "denied" }, credentials: "include" },
     );
   });
 
@@ -145,7 +145,7 @@ describe("fetchStories / fetchAllStories", () => {
 
     expect(fetchMock).toHaveBeenCalledWith(
       "http://localhost:8000/stories?limit=10&offset=0",
-      { credentials: "include" },
+      { headers: { "X-Tracking-Consent": "denied" }, credentials: "include" },
     );
   });
 
@@ -198,7 +198,7 @@ describe("fetchStory", () => {
 
     expect(fetchMock).toHaveBeenCalledWith(
       "http://localhost:8000/stories/..%2Fvocabulary",
-      { credentials: "include" },
+      { headers: { "X-Tracking-Consent": "denied" }, credentials: "include" },
     );
   });
 });
@@ -217,7 +217,11 @@ describe("deleteStory", () => {
 
     expect(fetchMock).toHaveBeenCalledWith(
       "http://localhost:8000/stories/7",
-      { method: "DELETE", credentials: "include" },
+      {
+        method: "DELETE",
+        headers: { "X-Tracking-Consent": "denied" },
+        credentials: "include",
+      },
     );
   });
 
@@ -230,7 +234,11 @@ describe("deleteStory", () => {
 
     expect(fetchMock).toHaveBeenCalledWith(
       "http://localhost:8000/stories/..%2Fvocabulary",
-      { method: "DELETE", credentials: "include" },
+      {
+        method: "DELETE",
+        headers: { "X-Tracking-Consent": "denied" },
+        credentials: "include",
+      },
     );
   });
 
@@ -275,7 +283,10 @@ describe("submitQuizAttempt", () => {
       "http://localhost:8000/stories/..%2F7/quiz-attempts",
       {
         method: "POST",
-        headers: { "content-type": "application/json" },
+        headers: {
+          "content-type": "application/json",
+          "X-Tracking-Consent": "denied",
+        },
         body: JSON.stringify({ answers: [2] }),
         credentials: "include",
       },
@@ -302,7 +313,10 @@ describe("flagQuestion", () => {
       "http://localhost:8000/stories/7/question-flags",
       {
         method: "POST",
-        headers: { "content-type": "application/json" },
+        headers: {
+          "content-type": "application/json",
+          "X-Tracking-Consent": "denied",
+        },
         body: JSON.stringify({ question_index: 2 }),
         credentials: "include",
       },
@@ -315,6 +329,12 @@ describe("session handling", () => {
     vi.unstubAllGlobals();
     const { resetSessionState } = await import("./session");
     resetSessionState();
+    // The tracking modules keep state too, and one test grants consent.
+    const { deleteIdentity } = await import("./tracking/identity");
+    const { resetConsent } = await import("./tracking/consent");
+    deleteIdentity();
+    resetConsent();
+    Reflect.deleteProperty(window, "Cookiebot");
     vi.resetModules();
   });
 
@@ -340,6 +360,30 @@ describe("session handling", () => {
     expect(headers.get("content-type")).toBe("application/json");
   });
 
+  it("sends the tracking headers with every request", async () => {
+    Object.assign(window, {
+      Cookiebot: { consent: { statistics: true }, hasResponse: true },
+    });
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({ id: 4 }),
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    const { deleteStory, flagQuestion } = await import("./api");
+    await deleteStory(7);
+    await flagQuestion(7, 2);
+
+    for (const [, init] of fetchMock.mock.calls) {
+      const headers = new Headers((init as RequestInit).headers);
+      expect(headers.get("X-Tracking-Consent")).toBe("granted");
+      expect(headers.get("X-Anonymous-Id")).toMatch(/^[0-9a-f-]{36}$/);
+      expect(headers.get("X-Session-Id")).toMatch(/^[0-9a-f-]{36}$/);
+    }
+    const post = new Headers((fetchMock.mock.calls[1][1] as RequestInit).headers);
+    expect(post.get("content-type")).toBe("application/json");
+  });
+
   it("sends the cookie on DELETE requests too", async () => {
     const fetchMock = vi.fn().mockResolvedValue({ ok: true });
     vi.stubGlobal("fetch", fetchMock);
@@ -361,7 +405,7 @@ describe("session handling", () => {
       }),
     );
     const { setSignedIn, getSessionState } = await import("./session");
-    setSignedIn("jack");
+    setSignedIn({ id: "7", username: "jack" });
 
     const { fetchStories, ApiError } = await import("./api");
     await expect(fetchStories()).rejects.toBeInstanceOf(ApiError);
@@ -377,7 +421,7 @@ describe("session handling", () => {
     });
     vi.stubGlobal("fetch", fetchMock);
     const { setSignedIn, getSessionState } = await import("./session");
-    setSignedIn("jack");
+    setSignedIn({ id: "7", username: "jack" });
 
     const { logIn, ApiError } = await import("./api");
     await expect(logIn("jack", "nope")).rejects.toMatchObject(

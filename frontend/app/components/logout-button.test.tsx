@@ -30,7 +30,7 @@ describe("LogoutButton", () => {
 
   it("logs out and signs the page out", async () => {
     logOut.mockResolvedValue(undefined);
-    act(() => setSignedIn("jack"));
+    act(() => setSignedIn({ id: "7", username: "jack" }));
     render(<LogoutButton />);
 
     fireEvent.click(screen.getByRole("button", { name: "Log out" }));
@@ -46,7 +46,7 @@ describe("LogoutButton", () => {
 
   it("stays signed in and says so when logging out fails", async () => {
     logOut.mockRejectedValue(new TypeError("Failed to fetch"));
-    act(() => setSignedIn("jack"));
+    act(() => setSignedIn({ id: "7", username: "jack" }));
     render(<LogoutButton />);
 
     fireEvent.click(screen.getByRole("button", { name: "Log out" }));

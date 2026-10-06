@@ -5,7 +5,9 @@
 
 export type SessionState =
   | { status: "checking" }
-  | { status: "signed-in"; username: string }
+  // userId is the API's ID for the account, as a string: tracking sends it
+  // as user_id. The username is for display only and is never tracked.
+  | { status: "signed-in"; userId: string; username: string }
   | { status: "signed-out"; expired: boolean };
 
 const CHECKING: SessionState = { status: "checking" };
@@ -35,8 +37,8 @@ export function getServerSessionState(): SessionState {
   return CHECKING;
 }
 
-export function setSignedIn(username: string): void {
-  setState({ status: "signed-in", username });
+export function setSignedIn(user: { id: string; username: string }): void {
+  setState({ status: "signed-in", userId: user.id, username: user.username });
 }
 
 export function setSignedOut(): void {

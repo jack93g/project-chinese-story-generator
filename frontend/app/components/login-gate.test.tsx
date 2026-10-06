@@ -34,7 +34,7 @@ describe("LoginGate", () => {
   });
 
   it("shows the app when the API says a user is logged in", async () => {
-    fetchCurrentUser.mockResolvedValue({ username: "jack" });
+    fetchCurrentUser.mockResolvedValue({ id: "7", username: "jack" });
 
     render(<LoginGate>secret content</LoginGate>);
 
@@ -62,7 +62,7 @@ describe("LoginGate", () => {
 
   it("logs in with a trimmed username and then shows the app", async () => {
     fetchCurrentUser.mockRejectedValue(new ApiError("Not logged in", 401));
-    logIn.mockResolvedValue({ username: "jack" });
+    logIn.mockResolvedValue({ id: "7", username: "jack" });
     render(<LoginGate>secret content</LoginGate>);
     await screen.findByRole("heading", { name: "Log in" });
 
@@ -116,7 +116,7 @@ describe("LoginGate", () => {
   });
 
   it("returns to the login form when the session expires", async () => {
-    fetchCurrentUser.mockResolvedValue({ username: "jack" });
+    fetchCurrentUser.mockResolvedValue({ id: "7", username: "jack" });
     render(<LoginGate>secret content</LoginGate>);
     await screen.findByText("secret content");
 
@@ -131,7 +131,7 @@ describe("LoginGate", () => {
   it("offers a retry when the server can't be reached", async () => {
     fetchCurrentUser
       .mockRejectedValueOnce(new TypeError("Failed to fetch"))
-      .mockResolvedValueOnce({ username: "jack" });
+      .mockResolvedValueOnce({ id: "7", username: "jack" });
     render(<LoginGate>secret content</LoginGate>);
 
     fireEvent.click(await screen.findByRole("button", { name: "Try again" }));
@@ -141,7 +141,7 @@ describe("LoginGate", () => {
 
   it("removes the access key left over from before login existed", async () => {
     window.localStorage.setItem("story-generator-access-key", "old-secret");
-    fetchCurrentUser.mockResolvedValue({ username: "jack" });
+    fetchCurrentUser.mockResolvedValue({ id: "7", username: "jack" });
 
     render(<LoginGate>secret content</LoginGate>);
     await screen.findByText("secret content");
