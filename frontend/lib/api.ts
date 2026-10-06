@@ -1,4 +1,5 @@
 import { reportSessionExpired } from "./session";
+import { trackingHeaders } from "./tracking/headers";
 
 // "localhost", not 127.0.0.1: the dev frontend runs on localhost:3000, and the
 // browser only sends the login cookie to an API on the same site.
@@ -166,6 +167,12 @@ async function apiFetch(
   // origin (api.huaben.app, or localhost:8000 in development).
   const response = await fetch(apiUrl(path), {
     ...init,
+    // Callers in this file pass headers as plain objects, so a spread keeps
+    // theirs and adds the tracking ones.
+    headers: {
+      ...(init?.headers as Record<string, string>),
+      ...trackingHeaders(),
+    },
     credentials: "include",
   });
   if (response.status === 401 && reportUnauthorized) {

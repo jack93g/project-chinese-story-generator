@@ -45,7 +45,7 @@ describe("fetchVocabularyLists", () => {
 
     expect(fetchMock).toHaveBeenCalledWith(
       "http://localhost:8000/vocabulary-lists?limit=10&offset=5",
-      { credentials: "include" },
+      { headers: { "X-Tracking-Consent": "denied" }, credentials: "include" },
     );
   });
 });
@@ -85,7 +85,7 @@ describe("fetchAllVocabularyLists", () => {
     expect(fetchMock).toHaveBeenNthCalledWith(
       2,
       "http://localhost:8000/vocabulary-lists?limit=2&offset=2",
-      { credentials: "include" },
+      { headers: { "X-Tracking-Consent": "denied" }, credentials: "include" },
     );
   });
 
@@ -145,7 +145,7 @@ describe("fetchStories / fetchAllStories", () => {
 
     expect(fetchMock).toHaveBeenCalledWith(
       "http://localhost:8000/stories?limit=10&offset=0",
-      { credentials: "include" },
+      { headers: { "X-Tracking-Consent": "denied" }, credentials: "include" },
     );
   });
 
@@ -198,7 +198,7 @@ describe("fetchStory", () => {
 
     expect(fetchMock).toHaveBeenCalledWith(
       "http://localhost:8000/stories/..%2Fvocabulary",
-      { credentials: "include" },
+      { headers: { "X-Tracking-Consent": "denied" }, credentials: "include" },
     );
   });
 });
@@ -217,7 +217,11 @@ describe("deleteStory", () => {
 
     expect(fetchMock).toHaveBeenCalledWith(
       "http://localhost:8000/stories/7",
-      { method: "DELETE", credentials: "include" },
+      {
+        method: "DELETE",
+        headers: { "X-Tracking-Consent": "denied" },
+        credentials: "include",
+      },
     );
   });
 
@@ -230,7 +234,11 @@ describe("deleteStory", () => {
 
     expect(fetchMock).toHaveBeenCalledWith(
       "http://localhost:8000/stories/..%2Fvocabulary",
-      { method: "DELETE", credentials: "include" },
+      {
+        method: "DELETE",
+        headers: { "X-Tracking-Consent": "denied" },
+        credentials: "include",
+      },
     );
   });
 
@@ -275,7 +283,10 @@ describe("submitQuizAttempt", () => {
       "http://localhost:8000/stories/..%2F7/quiz-attempts",
       {
         method: "POST",
-        headers: { "content-type": "application/json" },
+        headers: {
+          "content-type": "application/json",
+          "X-Tracking-Consent": "denied",
+        },
         body: JSON.stringify({ answers: [2] }),
         credentials: "include",
       },
@@ -302,7 +313,10 @@ describe("flagQuestion", () => {
       "http://localhost:8000/stories/7/question-flags",
       {
         method: "POST",
-        headers: { "content-type": "application/json" },
+        headers: {
+          "content-type": "application/json",
+          "X-Tracking-Consent": "denied",
+        },
         body: JSON.stringify({ question_index: 2 }),
         credentials: "include",
       },
@@ -338,6 +352,34 @@ describe("session handling", () => {
     expect(init.credentials).toBe("include");
     expect(headers.get("X-API-Key")).toBeNull();
     expect(headers.get("content-type")).toBe("application/json");
+  });
+
+  it("sends the tracking headers with every request", async () => {
+    Object.assign(window, {
+      Cookiebot: { consent: { statistics: true }, hasResponse: true },
+    });
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({ id: 4 }),
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    const { deleteStory, flagQuestion } = await import("./api");
+    await deleteStory(7);
+    await flagQuestion(7, 2);
+
+    for (const [, init] of fetchMock.mock.calls) {
+      const headers = new Headers((init as RequestInit).headers);
+      expect(headers.get("X-Tracking-Consent")).toBe("granted");
+      expect(headers.get("X-Anonymous-Id")).toMatch(/^[0-9a-f-]{36}$/);
+      expect(headers.get("X-Session-Id")).toMatch(/^[0-9a-f-]{36}$/);
+    }
+    const post = new Headers((fetchMock.mock.calls[1][1] as RequestInit).headers);
+    expect(post.get("content-type")).toBe("application/json");
+
+    Reflect.deleteProperty(window, "Cookiebot");
+    document.cookie = "huaben_anonymous_id=; Max-Age=0; Path=/";
+    document.cookie = "huaben_session_id=; Max-Age=0; Path=/";
   });
 
   it("sends the cookie on DELETE requests too", async () => {
