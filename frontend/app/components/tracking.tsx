@@ -13,7 +13,11 @@ import {
   type Consent,
 } from "@/lib/tracking/consent";
 import { keepIdentityInStepWithConsent } from "@/lib/tracking/identity";
-import { clearUserId, showPage } from "@/lib/tracking/page-view";
+import {
+  clearIdentifiers,
+  clearUserId,
+  showPage,
+} from "@/lib/tracking/page-view";
 
 function getServerConsent(): Consent {
   return "denied";
@@ -61,6 +65,14 @@ export function Tracking() {
       clearUserId();
     }
   }, [userId]);
+
+  // After consent is withdrawn, so nothing in GTM still holds identifiers
+  // whose cookies are gone.
+  useEffect(() => {
+    if (consent !== "granted") {
+      clearIdentifiers();
+    }
+  }, [consent]);
 
   return null;
 }

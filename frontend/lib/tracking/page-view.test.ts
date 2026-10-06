@@ -1,7 +1,13 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { resetConsent } from "./consent";
 import { deleteIdentity, getIdentity } from "./identity";
-import { clearUserId, resetPageViews, showPage, trackedUrl } from "./page-view";
+import {
+  clearIdentifiers,
+  clearUserId,
+  resetPageViews,
+  showPage,
+  trackedUrl,
+} from "./page-view";
 
 const UUID_V4 =
   /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/;
@@ -283,13 +289,14 @@ describe("clearUserId", () => {
     expect(pushed()).toHaveLength(2);
   });
 
-  it("clears it even if consent has been withdrawn since", () => {
+  it("pushes nothing more once a withdrawal of consent has cleared it", () => {
     showPage(`${ORIGIN}/stories`, true, "42");
     cookiebotReports(false);
+    clearIdentifiers();
 
     clearUserId();
 
-    expect(pushed()[1]).toEqual({ user_id: undefined });
+    expect(pushed()).toHaveLength(2);
   });
 
   it("sends a waiting page_view before clearing, so its user_id doesn't come back", () => {
@@ -301,5 +308,81 @@ describe("clearUserId", () => {
     expect(pushed()).toHaveLength(2);
     expect(pushed()[0]).toMatchObject({ event: "page_view", user_id: "42" });
     expect(pushed()[1]).toEqual({ user_id: undefined });
+  });
+});
+
+describe("clearIdentifiers", () => {
+  const CLEARED = {
+    user_id: undefined,
+    anonymous_id: undefined,
+    session_id: undefined,
+  };
+
+  it("clears all three identifiers, without sending an event", () => {
+    showPage(`${ORIGIN}/stories`, true, "42");
+    cookiebotReports(false);
+
+    clearIdentifiers();
+
+    expect(pushed()).toHaveLength(2);
+    expect(pushed()[1]).toEqual(CLEARED);
+    expect(Object.keys(pushed()[1]).sort()).toEqual(
+      Object.keys(CLEARED).sort(),
+    );
+  });
+
+  it("clears the identifiers of a visitor who wasn't logged in", () => {
+    showPage(`${ORIGIN}/`, true, undefined);
+    cookiebotReports(false);
+
+    clearIdentifiers();
+
+    expect(Object.keys(pushed()[1]).sort()).toEqual(
+      Object.keys(CLEARED).sort(),
+    );
+  });
+
+  it("pushes nothing when no page_view was ever sent", () => {
+    cookiebotReports(false);
+
+    clearIdentifiers();
+
+    expect(pushed()).toEqual([]);
+  });
+
+  it("clears them only once", () => {
+    showPage(`${ORIGIN}/stories`, true, "42");
+    cookiebotReports(false);
+
+    clearIdentifiers();
+    clearIdentifiers();
+
+    expect(pushed()).toHaveLength(2);
+  });
+
+  it("drops a page_view that was still waiting for its title", () => {
+    document.querySelector("title")?.remove();
+    showPage(`${ORIGIN}/stories`, true, "42");
+    cookiebotReports(false);
+
+    clearIdentifiers();
+
+    expect(pushed()).toEqual([]);
+  });
+
+  it("is followed by current identifiers on the next page_view once consent returns", () => {
+    showPage(`${ORIGIN}/stories`, true, "42");
+    cookiebotReports(false);
+    clearIdentifiers();
+
+    cookiebotReports(true);
+    showPage(`${ORIGIN}/generate`, true, "42");
+
+    expect(pushed()).toHaveLength(3);
+    expect(pushed()[2]).toMatchObject({
+      event: "page_view",
+      user_id: "42",
+      anonymous_id: getIdentity()?.anonymousId,
+    });
   });
 });

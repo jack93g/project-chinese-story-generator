@@ -147,6 +147,24 @@ describe("Tracking", () => {
     expect(Object.keys(dataLayer.at(-1) ?? {})).toEqual(["user_id"]);
   });
 
+  it("clears all three identifiers in the dataLayer when consent is withdrawn", () => {
+    render(<Tracking />);
+    act(() => cookiebotReports(true));
+    act(() => setSignedIn({ id: "42", username: "jack" }));
+
+    act(() => cookiebotReports(false));
+
+    const last = ((window as TrackedWindow).dataLayer ?? []).at(-1) ?? {};
+    expect(pageViews()).toHaveLength(1);
+    expect(Object.keys(last).sort()).toEqual([
+      "anonymous_id",
+      "session_id",
+      "user_id",
+    ]);
+    expect(Object.values(last)).toEqual([undefined, undefined, undefined]);
+    expect(hasIdentityCookies()).toBe(false);
+  });
+
   it("keeps the identifiers and drops user_id after a logout", () => {
     const { rerender } = render(<Tracking />);
     act(() => cookiebotReports(true));

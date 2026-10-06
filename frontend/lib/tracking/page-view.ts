@@ -109,8 +109,10 @@ function sendWithTitle(send: (title: string | undefined) => void): void {
 let shown: string | undefined;
 let referrer: string | undefined;
 let sent = false;
-// The user_id on the last push, which is what GTM's merged dataLayer holds.
-let userIdInDataLayer: string | undefined;
+// What GTM's merged dataLayer still holds from the last page_view: a
+// user_id, and the two identifiers.
+let userIdInDataLayer = false;
+let identityInDataLayer = false;
 
 function push(entry: object): void {
   const target = window as Window & { dataLayer?: unknown[] };
@@ -182,29 +184,52 @@ export function showPage(
       page_referrer: pageReferrer,
     };
     push(pageView);
-    userIdInDataLayer = userId;
+    userIdInDataLayer = userId !== undefined;
+    identityInDataLayer = true;
   });
 }
 
+// GTM keeps every value it was given until a later push replaces it. Neither
+// a logout nor a withdrawal of consent changes the page, so no page_view
+// follows to do that. The two functions below push the cleared keys instead:
+// no event, so no tag can fire on them.
+
 /**
- * Call when nobody is logged in any more. GTM keeps the last user_id it was
- * given until the next page_view replaces it, and a logout doesn't change the
- * page, so without this a tag firing in between would still read the ID of
- * the person who just left. Pushes no event, only the cleared key.
+ * Call when nobody is logged in any more, so nothing in GTM still holds the
+ * ID of the person who just left.
  */
 export function clearUserId(): void {
   // A view still waiting for its title was shown while they were logged in.
   pending?.flush();
-  if (userIdInDataLayer !== undefined) {
+  if (userIdInDataLayer) {
     push({ user_id: undefined });
-    userIdInDataLayer = undefined;
+    userIdInDataLayer = false;
+  }
+}
+
+/**
+ * Call when there is no consent, so nothing in GTM still holds identifiers
+ * whose cookies have been deleted.
+ */
+export function clearIdentifiers(): void {
+  // Without consent a waiting view isn't sent: this only settles it.
+  pending?.flush();
+  if (userIdInDataLayer || identityInDataLayer) {
+    push({
+      user_id: undefined,
+      anonymous_id: undefined,
+      session_id: undefined,
+    });
+    userIdInDataLayer = false;
+    identityInDataLayer = false;
   }
 }
 
 /** Forget the page being shown; for tests, which share this module's state. */
 export function resetPageViews(): void {
   pending?.cancel();
-  userIdInDataLayer = undefined;
+  userIdInDataLayer = false;
+  identityInDataLayer = false;
   shown = undefined;
   referrer = undefined;
   sent = false;
