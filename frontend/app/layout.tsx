@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
+import { Suspense } from "react";
 import { GoogleTagManager } from "./components/google-tag-manager";
 import { LoginGate } from "./components/login-gate";
 import { SiteNav } from "./components/site-nav";
@@ -26,7 +27,9 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
     <html lang="en" className={`${geistSans.variable} ${geistMono.variable}`}>
       <body>
         <GoogleTagManager />
-        <Tracking />
+        <Suspense>
+          <Tracking />
+        </Suspense>
         <SiteNav />
         <main className="site-main">
           <LoginGate>{children}</LoginGate>

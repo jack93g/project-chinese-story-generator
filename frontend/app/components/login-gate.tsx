@@ -66,7 +66,7 @@ export function LoginGate({ children }: { children: ReactNode }) {
 async function resolveSession(): Promise<boolean> {
   try {
     const user = await fetchCurrentUser();
-    setSignedIn(user.username);
+    setSignedIn(user);
   } catch (error) {
     if (!(error instanceof ApiError && error.status === 401)) {
       return false;
@@ -101,7 +101,7 @@ function LoginForm({ expired }: { expired: boolean }) {
     setSubmitState({ status: "submitting" });
     try {
       const user = await logIn(username.trim(), password);
-      setSignedIn(user.username);
+      setSignedIn(user);
     } catch (error) {
       setPassword("");
       setSubmitState({ status: "error", message: loginErrorMessage(error) });

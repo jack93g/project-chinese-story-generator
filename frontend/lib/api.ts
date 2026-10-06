@@ -93,6 +93,7 @@ export type SyncStatus = {
 };
 
 export type CurrentUser = {
+  id: string;
   username: string;
 };
 

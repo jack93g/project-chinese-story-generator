@@ -403,7 +403,7 @@ describe("session handling", () => {
       }),
     );
     const { setSignedIn, getSessionState } = await import("./session");
-    setSignedIn("jack");
+    setSignedIn({ id: "7", username: "jack" });
 
     const { fetchStories, ApiError } = await import("./api");
     await expect(fetchStories()).rejects.toBeInstanceOf(ApiError);
@@ -419,7 +419,7 @@ describe("session handling", () => {
     });
     vi.stubGlobal("fetch", fetchMock);
     const { setSignedIn, getSessionState } = await import("./session");
-    setSignedIn("jack");
+    setSignedIn({ id: "7", username: "jack" });
 
     const { logIn, ApiError } = await import("./api");
     await expect(logIn("jack", "nope")).rejects.toMatchObject(
